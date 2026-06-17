@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,9 +35,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.naslabs.yardscape.data.PublicEventDetail
 import com.naslabs.yardscape.data.SeededYardSaleData
 import com.naslabs.yardscape.ui.BrowseEventItem
+import com.naslabs.yardscape.ui.EventDetailState
+import com.naslabs.yardscape.ui.LocationRevealState
 import com.naslabs.yardscape.ui.YardScapeAppState
 import com.naslabs.yardscape.ui.YardScapeRoute
 import com.naslabs.yardscape.ui.toDetailSections
@@ -65,7 +67,7 @@ fun App() {
                 )
 
                 is YardScapeRoute.EventDetail -> PublicEventDetailScreen(
-                    detail = appState.selectedPublicDetail(),
+                    state = appState.selectedEventDetailState(),
                     onBack = {
                         appState.returnToBrowse()
                         route = appState.route
@@ -76,8 +78,11 @@ fun App() {
                     },
                 )
 
-                is YardScapeRoute.Rsvp -> RoutePlaceholderScreen(
-                    title = "RSVP",
+                is YardScapeRoute.Rsvp -> RsvpScreen(
+                    onConfirm = {
+                        appState.confirmRsvp(currentRoute.eventId)
+                        route = appState.route
+                    },
                     onBack = {
                         appState.openEvent(currentRoute.eventId)
                         route = appState.route
@@ -202,14 +207,15 @@ private fun EventPreviewCard(
 
 @Composable
 private fun PublicEventDetailScreen(
-    detail: PublicEventDetail?,
+    state: EventDetailState?,
     onBack: () -> Unit,
     onRsvp: () -> Unit,
 ) {
-    if (detail == null) {
+    if (state == null) {
         RoutePlaceholderScreen(title = "Event unavailable", onBack = onBack)
         return
     }
+    val detail = state.detail
 
     LazyColumn(
         modifier = Modifier
@@ -238,8 +244,16 @@ private fun PublicEventDetailScreen(
             }
         }
 
+        item {
+            PhotoStrip(descriptions = detail.photos.mapNotNull { it.description })
+        }
+
         items(detail.toDetailSections(SeededYardSaleData.BASE_NOW_EPOCH_MILLIS)) { section ->
             DetailRow(label = section.first, value = section.second)
+        }
+
+        item {
+            LocationAccessPanel(revealState = state.revealState)
         }
 
         item {
@@ -252,13 +266,109 @@ private fun PublicEventDetailScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onRsvp,
-                ) {
-                    Text("RSVP")
+                if (state.shouldShowRsvpAction) {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onRsvp,
+                    ) {
+                        Text("RSVP")
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PhotoStrip(descriptions: List<String>) {
+    val photoLabels = descriptions.ifEmpty { listOf("Sale photo coming soon") }
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        photoLabels.forEach { description ->
+            Box(
+                modifier = Modifier
+                    .background(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = RoundedCornerShape(8.dp),
+                    )
+                    .heightIn(min = 72.dp)
+                    .padding(12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationAccessPanel(revealState: LocationRevealState) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = when (revealState) {
+                is LocationRevealState.Revealed -> MaterialTheme.colorScheme.primaryContainer
+                else -> MaterialTheme.colorScheme.surfaceContainerHighest
+            },
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = revealState.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = revealState.message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RsvpScreen(
+    onConfirm: () -> Unit,
+    onBack: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = "RSVP",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = "For this test workflow, RSVP is auto-accepted so you can verify the protected location reveal boundary.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onConfirm,
+        ) {
+            Text("Confirm RSVP")
+        }
+        Button(onClick = onBack) {
+            Text("Back")
         }
     }
 }
