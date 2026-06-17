@@ -19,8 +19,10 @@ import com.naslabs.yardscape.domain.toPublicPreview
 
 class SeededYardSaleEventRepository(
     private val events: List<YardSaleEvent> = SeededYardSaleData.events,
-    private val rsvps: List<Rsvp> = SeededYardSaleData.rsvps,
+    rsvps: List<Rsvp> = SeededYardSaleData.rsvps,
 ) : YardSaleEventRepository {
+    private val rsvps: MutableList<Rsvp> = rsvps.toMutableList()
+
     override fun publicPreviews(nowEpochMillis: Long): List<PublicEventPreview> =
         events
             .filter { event ->
@@ -32,7 +34,14 @@ class SeededYardSaleEventRepository(
 
     override fun publicEventDetail(eventId: String): PublicEventDetail? =
         events
-            .firstOrNull { it.id == eventId && it.status == EventStatus.PUBLISHED }
+            .firstOrNull { event ->
+                event.id == eventId &&
+                    event.status in setOf(
+                        EventStatus.PUBLISHED,
+                        EventStatus.CANCELLED,
+                        EventStatus.COMPLETED,
+                    )
+            }
             ?.toPublicEventDetail()
 
     override fun rsvpFor(eventId: String, shopperId: String): Rsvp? =
@@ -51,6 +60,24 @@ class SeededYardSaleEventRepository(
         )
     }
 
+    override fun submitRsvp(eventId: String, shopperId: String): Rsvp? {
+        val event = events.firstOrNull { it.id == eventId } ?: return null
+        if (event.status != EventStatus.PUBLISHED || event.saleWindow.hasEnded(SeededYardSaleData.BASE_NOW_EPOCH_MILLIS)) {
+            return rsvpFor(eventId, shopperId)
+        }
+
+        val acceptedRsvp = Rsvp(
+            id = "rsvp-$eventId-$shopperId",
+            eventId = eventId,
+            shopperId = shopperId,
+            status = RsvpStatus.ACCEPTED,
+            locationVisibility = LocationVisibility.RSVP_ACCEPTED,
+        )
+        rsvps.removeAll { it.eventId == eventId && it.shopperId == shopperId }
+        rsvps += acceptedRsvp
+        return acceptedRsvp
+    }
+
     override fun hostEvents(hostId: String): List<YardSaleEvent> =
         events
             .filter { it.host.id == hostId }
@@ -65,6 +92,8 @@ private fun YardSaleEvent.toPublicEventDetail(): PublicEventDetail =
         saleWindow = saleWindow,
         categories = categories,
         photos = photos,
+        acceptedPaymentTypes = acceptedPaymentTypes,
+        accessibilityNotes = accessibilityNotes,
         hostDisplayName = host.displayName,
         hostTrustSignals = host.trustSignals,
         publicLocation = location.publicLocation,
@@ -111,6 +140,8 @@ object SeededYardSaleData {
                 endsAtEpochMillis = BASE_NOW_EPOCH_MILLIS + HOURS_7,
             ),
             categories = listOf("kids", "housewares", "furniture"),
+            acceptedPaymentTypes = listOf("Cash", "Venmo"),
+            accessibilityNotes = listOf("Driveway sale", "One small curb step"),
             photos = listOf(
                 EventPhoto(
                     url = "seed://maple-ridge-driveway",
@@ -144,6 +175,8 @@ object SeededYardSaleData {
                 endsAtEpochMillis = BASE_NOW_EPOCH_MILLIS + HOURS_32,
             ),
             categories = listOf("tools", "music", "decor"),
+            acceptedPaymentTypes = listOf("Cash", "Zelle"),
+            accessibilityNotes = listOf("Flat driveway", "Some items in garage"),
             photos = listOf(
                 EventPhoto(
                     url = "seed://marin-tools-records",
@@ -176,6 +209,8 @@ object SeededYardSaleData {
                 endsAtEpochMillis = BASE_NOW_EPOCH_MILLIS + HOURS_55,
             ),
             categories = listOf("clothing", "books"),
+            acceptedPaymentTypes = listOf("Cash"),
+            accessibilityNotes = listOf("Draft accessibility notes"),
             photos = emptyList(),
             host = avery,
             status = EventStatus.DRAFT,
@@ -202,6 +237,8 @@ object SeededYardSaleData {
                 endsAtEpochMillis = BASE_NOW_EPOCH_MILLIS + HOURS_8,
             ),
             categories = listOf("garden", "decor"),
+            acceptedPaymentTypes = listOf("Cash"),
+            accessibilityNotes = listOf("Cancelled because of heavy rain"),
             photos = emptyList(),
             host = marin,
             status = EventStatus.CANCELLED,
@@ -251,6 +288,8 @@ object SeededYardSaleData {
         description: String,
         saleWindow: SaleWindow,
         categories: List<String>,
+        acceptedPaymentTypes: List<String>,
+        accessibilityNotes: List<String>,
         photos: List<EventPhoto>,
         host: UserProfile,
         publicLocation: PublicLocation,
@@ -264,6 +303,8 @@ object SeededYardSaleData {
             saleWindow = saleWindow,
             categories = categories,
             photos = photos,
+            acceptedPaymentTypes = acceptedPaymentTypes,
+            accessibilityNotes = accessibilityNotes,
             host = host,
             status = status,
             location = EventLocation(

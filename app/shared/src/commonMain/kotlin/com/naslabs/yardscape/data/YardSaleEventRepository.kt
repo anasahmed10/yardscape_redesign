@@ -22,6 +22,8 @@ interface YardSaleEventRepository {
         nowEpochMillis: Long,
     ): ExactAddress?
 
+    fun submitRsvp(eventId: String, shopperId: String): Rsvp?
+
     fun hostEvents(hostId: String): List<YardSaleEvent>
 }
 
@@ -32,6 +34,8 @@ data class PublicEventDetail(
     val saleWindow: SaleWindow,
     val categories: List<String>,
     val photos: List<EventPhoto>,
+    val acceptedPaymentTypes: List<String>,
+    val accessibilityNotes: List<String>,
     val hostDisplayName: String,
     val hostTrustSignals: List<String>,
     val publicLocation: PublicLocation,

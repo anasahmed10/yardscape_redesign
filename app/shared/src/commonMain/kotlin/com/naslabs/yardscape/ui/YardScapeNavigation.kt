@@ -4,7 +4,11 @@ import com.naslabs.yardscape.data.PublicEventDetail
 import com.naslabs.yardscape.data.SeededYardSaleData
 import com.naslabs.yardscape.data.SeededYardSaleEventRepository
 import com.naslabs.yardscape.data.YardSaleEventRepository
+import com.naslabs.yardscape.domain.EventStatus
+import com.naslabs.yardscape.domain.ExactAddress
+import com.naslabs.yardscape.domain.LocationVisibility
 import com.naslabs.yardscape.domain.PublicEventPreview
+import com.naslabs.yardscape.domain.RsvpStatus
 
 sealed interface YardScapeRoute {
     data object Browse : YardScapeRoute
@@ -16,6 +20,7 @@ sealed interface YardScapeRoute {
 class YardScapeAppState(
     private val repository: YardSaleEventRepository = SeededYardSaleEventRepository(),
     private val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
+    private val shopperId: String = SeededYardSaleData.SHOPPER_WITHOUT_ACCESS_ID,
 ) {
     var route: YardScapeRoute = YardScapeRoute.Browse
         private set
@@ -23,9 +28,27 @@ class YardScapeAppState(
     fun browseItems(): List<BrowseEventItem> =
         repository.publicPreviews(nowEpochMillis).map { it.toBrowseEventItem(nowEpochMillis) }
 
-    fun selectedPublicDetail(): PublicEventDetail? {
+    fun selectedEventDetailState(): EventDetailState? {
         val detailRoute = route as? YardScapeRoute.EventDetail ?: return null
-        return repository.publicEventDetail(detailRoute.eventId)
+        return detailStateFor(detailRoute.eventId)
+    }
+
+    fun detailStateFor(eventId: String): EventDetailState? {
+        val detail = repository.publicEventDetail(eventId) ?: return null
+        val rsvp = repository.rsvpFor(eventId, shopperId)
+        val exactAddress = repository.exactLocationFor(
+            eventId = eventId,
+            shopperId = shopperId,
+            nowEpochMillis = nowEpochMillis,
+        )
+        return EventDetailState(
+            detail = detail,
+            revealState = detail.toLocationRevealState(
+                rsvpStatus = rsvp?.status,
+                locationVisibility = rsvp?.locationVisibility,
+                exactAddress = exactAddress,
+            ),
+        )
     }
 
     fun openEvent(eventId: String) {
@@ -34,6 +57,11 @@ class YardScapeAppState(
 
     fun openRsvp(eventId: String) {
         route = YardScapeRoute.Rsvp(eventId)
+    }
+
+    fun confirmRsvp(eventId: String) {
+        repository.submitRsvp(eventId, shopperId)
+        route = YardScapeRoute.EventDetail(eventId)
     }
 
     fun openHostCreateEdit(eventId: String? = null) {
@@ -53,6 +81,55 @@ data class BrowseEventItem(
     val categoryLabels: List<String>,
     val statusLabel: String,
 )
+
+data class EventDetailState(
+    val detail: PublicEventDetail,
+    val revealState: LocationRevealState,
+) {
+    val shouldShowRsvpAction: Boolean =
+        detail.status == EventStatus.PUBLISHED &&
+            revealState !is LocationRevealState.Revealed
+}
+
+sealed interface LocationRevealState {
+    val title: String
+    val message: String
+
+    data object NotRequested : LocationRevealState {
+        override val title: String = "Approximate area only"
+        override val message: String =
+            "Exact addresses stay private until your RSVP is accepted."
+    }
+
+    data object Pending : LocationRevealState {
+        override val title: String = "RSVP pending"
+        override val message: String =
+            "The host has not granted exact-location access yet."
+    }
+
+    data object Revoked : LocationRevealState {
+        override val title: String = "Access revoked"
+        override val message: String =
+            "The host removed exact-location access for this RSVP."
+    }
+
+    data object Expired : LocationRevealState {
+        override val title: String = "Location access expired"
+        override val message: String =
+            "Exact-location access ends after the sale window closes."
+    }
+
+    data object Cancelled : LocationRevealState {
+        override val title: String = "Sale cancelled"
+        override val message: String =
+            "This event is no longer active, so exact-location access is hidden."
+    }
+
+    data class Revealed(val exactAddress: ExactAddress) : LocationRevealState {
+        override val title: String = "Exact location"
+        override val message: String = exactAddress.displayLabel()
+    }
+}
 
 fun PublicEventPreview.toBrowseEventItem(nowEpochMillis: Long): BrowseEventItem =
     BrowseEventItem(
@@ -76,8 +153,38 @@ fun PublicEventDetail.toDetailSections(nowEpochMillis: Long): List<Pair<String, 
             publicLocation.distanceLabel ?: publicLocation.areaDescription,
         ).joinToString(" - "),
         "Categories" to categories.joinToString(", "),
+        "Payments" to acceptedPaymentTypes.joinToString(", "),
+        "Accessibility" to accessibilityNotes.joinToString(", "),
         "Host" to listOf(hostDisplayName, hostTrustSignals.firstOrNull()).joinToString(" - "),
     )
+
+private fun PublicEventDetail.toLocationRevealState(
+    rsvpStatus: RsvpStatus?,
+    locationVisibility: LocationVisibility?,
+    exactAddress: ExactAddress?,
+): LocationRevealState {
+    if (status == EventStatus.CANCELLED || status == EventStatus.COMPLETED) {
+        return LocationRevealState.Cancelled
+    }
+    if (exactAddress != null) {
+        return LocationRevealState.Revealed(exactAddress)
+    }
+    return when {
+        locationVisibility == LocationVisibility.REVOKED -> LocationRevealState.Revoked
+        locationVisibility == LocationVisibility.EXPIRED -> LocationRevealState.Expired
+        rsvpStatus == RsvpStatus.REQUESTED ||
+            locationVisibility == LocationVisibility.RSVP_REQUESTED -> LocationRevealState.Pending
+        else -> LocationRevealState.NotRequested
+    }
+}
+
+private fun ExactAddress.displayLabel(): String =
+    listOfNotNull(
+        streetAddress,
+        unit,
+        "$city, $region $postalCode",
+        accessInstructions,
+    ).joinToString("\n")
 
 private fun com.naslabs.yardscape.domain.SaleWindow.toBrowseDateLabel(
     nowEpochMillis: Long,

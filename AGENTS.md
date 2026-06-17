@@ -100,7 +100,8 @@ Agents may complete normal feature, bug fix, test, and documentation work while 
 - Create agent-owned branches with the `codex/<issue-number>-<short-slug>` format after the issue exists. Use a short `codex/<short-description>` branch only for bootstrap work that cannot reasonably start from an issue.
 - Target Pull Requests to `main` until a release branch is created and this file is updated.
 - Inspect the current implementation before editing. Do not ask for file paths, package names, commands, or architecture facts that can be discovered locally.
-- Implement the smallest useful change, add or update tests when behavior changes, run the matching validation commands, commit, push, and open a Pull Request.
+- Implement the smallest useful change, add or update tests when behavior changes, run the matching validation commands, commit, push, open a Pull Request, review the resulting diff, make it ready for review if it was created as a draft, and merge it when validation and merge requirements are satisfied.
+- Agents are expected to complete normal queue tickets end-to-end on their own, including PR review and merge, when the work is within the approved autonomous scope and does not involve the restricted areas listed below.
 - Reference the ticket from the PR body with `Refs #<issue-number>`.
 - Use sensible defaults for routine implementation details and note them in the final report.
 - Interrupt the user only for product, security, privacy, cost, account, legal, release, or architecture decisions that cannot be inferred safely.
@@ -142,7 +143,8 @@ Use the narrowest validation that proves the change.
 - The default branch is `main`.
 - Pull Requests target `main` until a release branch exists.
 - When a release branch is created, update this section and target feature/fix PRs there.
-- Do not merge automatically until local validation, GitHub checks, secret scanning, and review expectations are satisfied.
+- Agents may merge their own PRs for normal queue work after local validation, GitHub checks if configured, secret scanning, and self-review are complete. If GitHub does not allow self-approval, record that limitation and proceed when repository rules permit merging.
+- Do not merge automatically until local validation, GitHub checks if configured, secret scanning, and review expectations are satisfied.
 - Prefer squash merges with concise summaries for agent-owned branches.
 
 ## Agent Workflow
@@ -153,8 +155,9 @@ Use the narrowest validation that proves the change.
 5. Preserve the privacy boundary between public approximate location and protected exact location.
 6. Add or update tests when behavior changes.
 7. Run the most focused validation command that proves the change.
-8. Report commands that could not be run and why.
-9. Update this file when a durable architectural or workflow rule changes.
+8. Open the PR, review the diff and checks, resolve any issues, make the PR ready, and merge it when repository rules allow.
+9. Report commands that could not be run and why.
+10. Update this file when a durable architectural or workflow rule changes.
 
 ## Current Milestones
 | # | Milestone | Status |

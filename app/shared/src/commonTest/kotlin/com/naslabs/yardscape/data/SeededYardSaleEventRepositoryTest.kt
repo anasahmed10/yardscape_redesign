@@ -42,6 +42,8 @@ class SeededYardSaleEventRepositoryTest {
 
         assertNotNull(detail)
         assertEquals("Maple Ridge", detail.publicLocation.neighborhood)
+        assertEquals(listOf("Cash", "Venmo"), detail.acceptedPaymentTypes)
+        assertTrue(detail.accessibilityNotes.contains("Driveway sale"))
         assertTrue(detail.rsvpPrompt.contains("RSVP"))
         assertFalse(detail.toString().contains("123 Cedar Street"))
     }
@@ -77,6 +79,22 @@ class SeededYardSaleEventRepositoryTest {
         )
 
         assertNull(exactLocation)
+    }
+
+    @Test
+    fun submitRsvpAutoAcceptsForMvpRevealTesting() {
+        val submitted = repository.submitRsvp(
+            eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID,
+            shopperId = "shopper-new",
+        )
+        val exactLocation = repository.exactLocationFor(
+            eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID,
+            shopperId = "shopper-new",
+            nowEpochMillis = now,
+        )
+
+        assertNotNull(submitted)
+        assertEquals("123 Cedar Street", exactLocation?.streetAddress)
     }
 
     @Test
