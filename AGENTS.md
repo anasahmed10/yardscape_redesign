@@ -145,6 +145,7 @@ Agents may complete normal feature, bug fix, test, and documentation work while 
 - Inspect the current implementation before editing. Do not ask for file paths, package names, commands, or architecture facts that can be discovered locally.
 - Implement the smallest useful change, add or update tests when behavior changes, run the matching validation commands, commit, push, open a Pull Request, review the resulting diff, make it ready for review if it was created as a draft, and merge it when validation and merge requirements are satisfied.
 - Agents are expected to complete normal queue tickets end-to-end on their own, including PR review and merge, when the work is within the approved autonomous scope and does not involve the restricted areas listed below.
+- After making and testing changes, agents must review their own PRs as if the PR came from another agent: inspect the final diff, check privacy-sensitive surfaces, confirm validation results, address issues, and merge when repository rules and the approval policy allow it.
 - Reference the ticket from the PR body with `Refs #<issue-number>`.
 - Use sensible defaults for routine implementation details and note them in the final report.
 - Interrupt the user only for product, security, privacy, cost, account, legal, release, or architecture decisions that cannot be inferred safely.
