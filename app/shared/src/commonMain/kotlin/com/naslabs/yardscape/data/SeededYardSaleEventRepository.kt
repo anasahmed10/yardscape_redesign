@@ -18,9 +18,10 @@ import com.naslabs.yardscape.domain.YardSaleEvent
 import com.naslabs.yardscape.domain.toPublicPreview
 
 class SeededYardSaleEventRepository(
-    private val events: List<YardSaleEvent> = SeededYardSaleData.events,
+    events: List<YardSaleEvent> = SeededYardSaleData.events,
     rsvps: List<Rsvp> = SeededYardSaleData.rsvps,
 ) : YardSaleEventRepository {
+    private val events: MutableList<YardSaleEvent> = events.toMutableList()
     private val rsvps: MutableList<Rsvp> = rsvps.toMutableList()
 
     override fun publicPreviews(nowEpochMillis: Long): List<PublicEventPreview> =
@@ -82,6 +83,52 @@ class SeededYardSaleEventRepository(
         events
             .filter { it.host.id == hostId }
             .sortedBy { it.saleWindow.startsAtEpochMillis }
+
+    override fun hostEvent(eventId: String): YardSaleEvent? =
+        events.firstOrNull { it.id == eventId }
+
+    override fun saveHostEvent(draft: HostEventDraft, status: EventStatus): HostEventSaveResult {
+        val validationErrors = draft.validateFor(status)
+        if (validationErrors.isNotEmpty()) {
+            return HostEventSaveResult(event = null, validationErrors = validationErrors)
+        }
+
+        val host = hostProfileFor(draft.hostId) ?: UserProfile(
+            id = draft.hostId,
+            displayName = "Host",
+            role = UserRole.HOST,
+        )
+        val event = draft.toYardSaleEvent(
+            host = host,
+            status = status,
+            fallbackNowEpochMillis = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + events.size,
+        )
+        events.removeAll { it.id == event.id }
+        events += event
+        return HostEventSaveResult(event = event, validationErrors = emptyList())
+    }
+
+    override fun cancelHostEvent(eventId: String): Boolean =
+        updateStatus(eventId, EventStatus.CANCELLED)
+
+    override fun hideHostEvent(eventId: String): Boolean =
+        updateStatus(eventId, EventStatus.HIDDEN)
+
+    private fun updateStatus(eventId: String, status: EventStatus): Boolean {
+        val index = events.indexOfFirst { it.id == eventId }
+        if (index == -1) return false
+        events[index] = events[index].copy(status = status)
+        if (status == EventStatus.CANCELLED || status == EventStatus.HIDDEN) {
+            rsvps.replaceAll { rsvp ->
+                if (rsvp.eventId == eventId) {
+                    rsvp.copy(locationVisibility = LocationVisibility.REVOKED)
+                } else {
+                    rsvp
+                }
+            }
+        }
+        return true
+    }
 }
 
 private fun YardSaleEvent.toPublicEventDetail(): PublicEventDetail =
@@ -129,6 +176,8 @@ object SeededYardSaleData {
         verificationState = VerificationState.UNVERIFIED,
         trustSignals = listOf("Neighborhood member since 2024"),
     )
+
+    val hostProfiles: List<UserProfile> = listOf(avery, marin)
 
     val events: List<YardSaleEvent> = listOf(
         yardSaleEvent(
@@ -322,3 +371,6 @@ object SeededYardSaleData {
     private const val HOURS_50 = 50L * 60L * 60L * 1_000L
     private const val HOURS_55 = 55L * 60L * 60L * 1_000L
 }
+
+private fun hostProfileFor(hostId: String): UserProfile? =
+    SeededYardSaleData.hostProfiles.firstOrNull { it.id == hostId }

@@ -105,4 +105,90 @@ class SeededYardSaleEventRepositoryTest {
         assertTrue(averyEvents.any { it.id == SeededYardSaleData.DRAFT_EVENT_ID })
         assertTrue(marinEvents.any { it.id == SeededYardSaleData.CANCELLED_EVENT_ID })
     }
+
+    @Test
+    fun publishingRequiresTimeAndLocationFields() {
+        val result = repository.saveHostEvent(
+            draft = validHostDraft().copy(
+                startsAtEpochMillis = null,
+                publicNeighborhood = "",
+                exactStreetAddress = "",
+            ),
+            status = EventStatus.PUBLISHED,
+        )
+
+        assertFalse(result.isSuccess)
+        assertTrue(result.validationErrors.any { it.contains("Start time") })
+        assertTrue(result.validationErrors.any { it.contains("Public neighborhood") })
+        assertTrue(result.validationErrors.any { it.contains("Protected street address") })
+    }
+
+    @Test
+    fun draftCanBeSavedWithoutAppearingInBrowse() {
+        val result = repository.saveHostEvent(
+            draft = validHostDraft().copy(id = "event-local-draft"),
+            status = EventStatus.DRAFT,
+        )
+
+        assertTrue(result.isSuccess)
+        assertTrue(repository.hostEvents(SeededYardSaleData.HOST_AVERY_ID).any { it.id == "event-local-draft" })
+        assertFalse(repository.publicPreviews(now).any { it.id == "event-local-draft" })
+    }
+
+    @Test
+    fun publishedHostEventAppearsInBrowseAndKeepsExactAddressProtected() {
+        val result = repository.saveHostEvent(
+            draft = validHostDraft().copy(id = "event-local-published"),
+            status = EventStatus.PUBLISHED,
+        )
+        val preview = repository.publicPreviews(now).firstOrNull { it.id == "event-local-published" }
+
+        assertTrue(result.isSuccess)
+        assertNotNull(preview)
+        assertFalse(preview.toString().contains("900 Hidden Lane"))
+    }
+
+    @Test
+    fun hostCanEditProtectedAddressAndCancelRevokesReveal() {
+        repository.saveHostEvent(
+            draft = validHostDraft().copy(id = "event-local-edit"),
+            status = EventStatus.PUBLISHED,
+        )
+        repository.saveHostEvent(
+            draft = validHostDraft().copy(
+                id = "event-local-edit",
+                title = "Edited title",
+                exactStreetAddress = "901 Hidden Lane",
+            ),
+            status = EventStatus.PUBLISHED,
+        )
+        repository.submitRsvp("event-local-edit", "shopper-edit")
+
+        assertEquals("901 Hidden Lane", repository.exactLocationFor("event-local-edit", "shopper-edit", now)?.streetAddress)
+        assertTrue(repository.cancelHostEvent("event-local-edit"))
+        assertNull(repository.exactLocationFor("event-local-edit", "shopper-edit", now))
+    }
+
+    private fun validHostDraft(): HostEventDraft =
+        HostEventDraft(
+            hostId = SeededYardSaleData.HOST_AVERY_ID,
+            title = "Saturday Shed Cleanout",
+            description = "Garden tools, storage bins, and a folding table.",
+            startsAtEpochMillis = now + 10_000L,
+            endsAtEpochMillis = now + 20_000L,
+            publicNeighborhood = "Maple Ridge",
+            publicCity = "Riverton",
+            publicAreaDescription = "Near the south park entrance",
+            publicDistanceLabel = "3 mi",
+            exactStreetAddress = "900 Hidden Lane",
+            exactCity = "Riverton",
+            exactRegion = "WA",
+            exactPostalCode = "98002",
+            exactLatitude = 47.611,
+            exactLongitude = -122.202,
+            accessInstructions = "Knock on the garage door.",
+            categories = listOf("garden", "storage"),
+            acceptedPaymentTypes = listOf("Cash"),
+            accessibilityNotes = listOf("Flat driveway"),
+        )
 }
