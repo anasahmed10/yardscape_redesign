@@ -36,6 +36,49 @@ These rules are mandatory for every agent working in this repository.
 11. Prefer small, focused changes that preserve existing module boundaries.
 12. Do not introduce paid services, public legal commitments, store deployment changes, or broad architecture rewrites without explicit maintainer approval.
 
+## Stack Optimization Guidelines
+YardScape must remain a Kotlin Multiplatform product for Android, iOS, and web. Mobile versions are prioritized for now, with Android as the fastest validation target, but agents must keep iOS and web buildability in mind when changing shared code.
+
+### Platform Strategy
+- Optimize first for the shared Kotlin and shared Compose path. Android may lead product validation, but do not solve routine product behavior in Android-only code.
+- Treat iOS and web as compatibility targets during MVP work. They do not need feature parity ahead of Android, but shared code changes should avoid Android-specific assumptions unless isolated behind platform source sets.
+- Keep platform entry points thin:
+  - `app/androidApp` should bootstrap Android UI, permissions, platform integrations, manifests, and Android-specific configuration.
+  - `app/iosApp` should wrap the shared framework and contain Swift or iOS-specific glue only when needed.
+  - `app/webApp` should bootstrap JS/Wasm browser entry points and web-specific resources.
+  - `app/shared` should own shared Compose screens, navigation state, repository interfaces, API clients, and user-facing workflow state.
+  - `core` should own pure domain models, validation, privacy policy, and business rules.
+- Use `expect`/`actual` or small adapter interfaces for platform capabilities such as maps, photo picking, notifications, calendar export, deep links, browser storage, and permissions.
+
+### Shared Domain And API Contracts
+- Keep privacy-critical rules in `core` and reuse them from both the server and app. Do not duplicate location reveal logic in UI-only or server-only branches.
+- Public models and DTOs must stay separate from protected models and DTOs. Public responses may contain approximate location only; exact address and precise coordinates belong only in protected location flows.
+- Prefer stable shared DTO contracts with `kotlinx.serialization` for Ktor server and Ktor client work. Manual JSON parsing or rendering is acceptable only for short bootstrap code that has a follow-up ticket to replace it.
+- New repository APIs that may touch network or persistence should be suspend-friendly, even when the current implementation uses seeded in-memory data.
+
+### UI And App State
+- Build new user workflows in shared Compose unless a platform-native surface is explicitly required.
+- Split shared Compose by workflow as it grows: browse, event detail, RSVP, host editor, theme, and reusable components. Avoid letting `App.kt` become the long-term owner of all UI.
+- Use Material 3 through a shared theme/design system. Avoid adding one-off colors, typography, or component styling that cannot be reused across mobile and web targets.
+- Android workflow smoke tests are the first priority for interaction validation, but shared app state and privacy transitions should have common tests wherever possible.
+
+### Backend And Persistence
+- Keep Ktor as the server stack and Ktor Client as the shared networking stack.
+- Use seeded or in-memory data for MVP workflows until the Browse -> Detail -> RSVP -> Location Reveal loop is stable.
+- Introduce PostgreSQL, PostGIS, and Flyway in focused Phase 2 tickets. Do not combine persistence, auth, moderation, and UI rewrites in one agent change.
+- Persistence work must preserve the public/protected location boundary and plan for reveal audit logs, revocation, expiry, deletion, and retention.
+
+### Dependency And Build Choices
+- Add dependencies only when they work across the relevant Kotlin Multiplatform targets or are isolated to platform/server source sets.
+- Prefer libraries already aligned with Kotlin Multiplatform, Compose Multiplatform, Ktor, kotlinx.serialization, coroutines, and Material 3.
+- Avoid introducing paid services, cloud-only SDKs, analytics, crash reporting, maps billing, auth providers, or storage vendors without maintainer approval.
+- Keep Android debug builds and shared tests fast enough for agents to run routinely. Broader checks are reserved for cross-module, release-sensitive, or platform-compatibility work.
+
+### Agent Ticketing Guidance
+- Create or use focused tickets for stack optimization work. Good ticket shapes include serialization migration, repository API normalization, UI module splitting, shared theme introduction, platform build validation, and persistence foundation.
+- Do not bury stack migrations inside unrelated feature tickets unless the migration is required to complete that feature safely.
+- When a stack optimization changes agent workflow or durable architecture rules, update this file and the relevant docs in the same PR.
+
 ## Privacy And Safety Rules
 YardScape's trust model depends on limiting location disclosure.
 
