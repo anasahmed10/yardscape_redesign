@@ -36,6 +36,49 @@ These rules are mandatory for every agent working in this repository.
 11. Prefer small, focused changes that preserve existing module boundaries.
 12. Do not introduce paid services, public legal commitments, store deployment changes, or broad architecture rewrites without explicit maintainer approval.
 
+## Stack Optimization Guidelines
+YardScape must remain a Kotlin Multiplatform product for Android, iOS, and web. Mobile versions are prioritized for now, with Android as the fastest validation target, but agents must keep iOS and web buildability in mind when changing shared code.
+
+### Platform Strategy
+- Optimize first for the shared Kotlin and shared Compose path. Android may lead product validation, but do not solve routine product behavior in Android-only code.
+- Treat iOS and web as compatibility targets during MVP work. They do not need feature parity ahead of Android, but shared code changes should avoid Android-specific assumptions unless isolated behind platform source sets.
+- Keep platform entry points thin:
+  - `app/androidApp` should bootstrap Android UI, permissions, platform integrations, manifests, and Android-specific configuration.
+  - `app/iosApp` should wrap the shared framework and contain Swift or iOS-specific glue only when needed.
+  - `app/webApp` should bootstrap JS/Wasm browser entry points and web-specific resources.
+  - `app/shared` should own shared Compose screens, navigation state, repository interfaces, API clients, and user-facing workflow state.
+  - `core` should own pure domain models, validation, privacy policy, and business rules.
+- Use `expect`/`actual` or small adapter interfaces for platform capabilities such as maps, photo picking, notifications, calendar export, deep links, browser storage, and permissions.
+
+### Shared Domain And API Contracts
+- Keep privacy-critical rules in `core` and reuse them from both the server and app. Do not duplicate location reveal logic in UI-only or server-only branches.
+- Public models and DTOs must stay separate from protected models and DTOs. Public responses may contain approximate location only; exact address and precise coordinates belong only in protected location flows.
+- Prefer stable shared DTO contracts with `kotlinx.serialization` for Ktor server and Ktor client work. Manual JSON parsing or rendering is acceptable only for short bootstrap code that has a follow-up ticket to replace it.
+- New repository APIs that may touch network or persistence should be suspend-friendly, even when the current implementation uses seeded in-memory data.
+
+### UI And App State
+- Build new user workflows in shared Compose unless a platform-native surface is explicitly required.
+- Split shared Compose by workflow as it grows: browse, event detail, RSVP, host editor, theme, and reusable components. Avoid letting `App.kt` become the long-term owner of all UI.
+- Use Material 3 through a shared theme/design system. Avoid adding one-off colors, typography, or component styling that cannot be reused across mobile and web targets.
+- Android workflow smoke tests are the first priority for interaction validation, but shared app state and privacy transitions should have common tests wherever possible.
+
+### Backend And Persistence
+- Keep Ktor as the server stack and Ktor Client as the shared networking stack.
+- Use seeded or in-memory data for MVP workflows until the Browse -> Detail -> RSVP -> Location Reveal loop is stable.
+- Introduce PostgreSQL, PostGIS, and Flyway in focused Phase 2 tickets. Do not combine persistence, auth, moderation, and UI rewrites in one agent change.
+- Persistence work must preserve the public/protected location boundary and plan for reveal audit logs, revocation, expiry, deletion, and retention.
+
+### Dependency And Build Choices
+- Add dependencies only when they work across the relevant Kotlin Multiplatform targets or are isolated to platform/server source sets.
+- Prefer libraries already aligned with Kotlin Multiplatform, Compose Multiplatform, Ktor, kotlinx.serialization, coroutines, and Material 3.
+- Avoid introducing paid services, cloud-only SDKs, analytics, crash reporting, maps billing, auth providers, or storage vendors without maintainer approval.
+- Keep Android debug builds and shared tests fast enough for agents to run routinely. Broader checks are reserved for cross-module, release-sensitive, or platform-compatibility work.
+
+### Agent Ticketing Guidance
+- Create or use focused tickets for stack optimization work. Good ticket shapes include serialization migration, repository API normalization, UI module splitting, shared theme introduction, platform build validation, and persistence foundation.
+- Do not bury stack migrations inside unrelated feature tickets unless the migration is required to complete that feature safely.
+- When a stack optimization changes agent workflow or durable architecture rules, update this file and the relevant docs in the same PR.
+
 ## Privacy And Safety Rules
 YardScape's trust model depends on limiting location disclosure.
 
@@ -102,6 +145,7 @@ Agents may complete normal feature, bug fix, test, and documentation work while 
 - Inspect the current implementation before editing. Do not ask for file paths, package names, commands, or architecture facts that can be discovered locally.
 - Implement the smallest useful change, add or update tests when behavior changes, run the matching validation commands, commit, push, open a Pull Request, review the resulting diff, make it ready for review if it was created as a draft, and merge it when validation and merge requirements are satisfied.
 - Agents are expected to complete normal queue tickets end-to-end on their own, including PR review and merge, when the work is within the approved autonomous scope and does not involve the restricted areas listed below.
+- After making and testing changes, agents must review their own PRs as if the PR came from another agent: inspect the final diff, check privacy-sensitive surfaces, confirm validation results, address issues, and merge when repository rules and the approval policy allow it.
 - Reference the ticket from the PR body with `Refs #<issue-number>`.
 - Use sensible defaults for routine implementation details and note them in the final report.
 - Interrupt the user only for product, security, privacy, cost, account, legal, release, or architecture decisions that cannot be inferred safely.
@@ -131,7 +175,7 @@ Use the narrowest validation that proves the change.
 
 | Change type | Required validation |
 | --- | --- |
-| Docs-only changes | No Gradle task required unless commands, generated examples, workflows, or release instructions changed. |
+| Docs-only changes | No Gradle task required unless commands, generated examples, workflows, or release instructions changed; markdown-only edits may be merged in a PR without test execution. |
 | Core domain or privacy policy logic | `.\gradlew.bat :app:shared:testAndroidHostTest` and any focused common tests that apply. |
 | Shared Compose UI or Android workflow | `.\gradlew.bat :app:shared:testAndroidHostTest` and `.\gradlew.bat :app:androidApp:assembleDebug`. |
 | Server routes or API behavior | `.\gradlew.bat :server:test`. |
@@ -142,6 +186,8 @@ Use the narrowest validation that proves the change.
 - The repository is expected to live at `anasahmed10/yardscape` or the canonical GitHub name chosen by the maintainer, with private visibility during bootstrap.
 - The default branch is `main`.
 - Pull Requests target `main` until a release branch exists.
+- The `Agent validation` GitHub Actions workflow runs on Pull Requests to `main` and pushes to `main`. It maps to the validation matrix by running shared Android host tests, server tests, and Android debug assembly as separate jobs.
+- CI must use debug/test Gradle tasks only. Do not require production credentials, release signing material, store deployment setup, or paid services for unattended PR validation.
 - When a release branch is created, update this section and target feature/fix PRs there.
 - Agents may merge their own PRs for normal queue work after local validation, GitHub checks if configured, secret scanning, and self-review are complete. If GitHub does not allow self-approval, record that limitation and proceed when repository rules permit merging.
 - Do not merge automatically until local validation, GitHub checks if configured, secret scanning, and review expectations are satisfied.
@@ -166,7 +212,9 @@ Use the narrowest validation that proves the change.
 | 1 | Initial Kotlin Multiplatform scaffold | Done |
 | 2 | Agent instructions, privacy guidance, and roadmap | Done |
 | 3 | Configurable display name baseline | Done |
-| 4 | Domain models and seeded MVP data | Planned |
-| 5 | Shared Compose Browse -> Detail -> RSVP flow | Planned |
-| 6 | Ktor MVP API with protected exact-location reveal | Planned |
-| 7 | Android workflow smoke test | Planned |
+| 4 | Domain models and seeded MVP data | Done |
+| 5 | Shared Compose Browse -> Detail -> RSVP flow | Done |
+| 6 | Ktor MVP API with protected exact-location reveal | Done |
+| 7 | Android workflow smoke test | Done |
+| 8 | GitHub Actions validation for agent PRs | Done |
+| 9 | Post-MVP backend design | Done |

@@ -36,11 +36,22 @@ options:
 Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
 
 - Android tests: `./gradlew :app:shared:testAndroidHostTest`
+- Android RSVP reveal smoke test: connect an Android device or start an emulator, then run `./gradlew :app:androidApp:connectedDebugAndroidTest`
 - Server tests: `./gradlew :server:test`
 - Web tests:
     - Wasm target: `./gradlew :app:shared:wasmJsTest`
     - JS target: `./gradlew :app:shared:jsTest`
 - iOS tests: `./gradlew :app:shared:iosSimulatorArm64Test`
+
+The Android RSVP reveal smoke test opens the seeded Browse screen, selects the Maple Ridge event, confirms the exact address is hidden before RSVP, submits the MVP auto-accepted RSVP, and verifies the exact address is shown only after acceptance. Shared host/privacy tests cover cancelled, revoked, and expired reveal states that are not directly reachable from the default Browse path.
+
+### Pull Request validation
+
+Pull Requests to `main` run the `Agent validation` GitHub Actions workflow. The workflow uses debug/test tasks only and does not require production secrets or signing files:
+
+- `Shared Android host tests`: `bash ./gradlew --no-daemon :app:shared:testAndroidHostTest`
+- `Server tests`: `bash ./gradlew --no-daemon :server:test`
+- `Android debug assembly`: `bash ./gradlew --no-daemon :app:androidApp:assembleDebug`
 
 ---
 
