@@ -1,5 +1,6 @@
 package com.naslabs.yardscape
 
+import com.naslabs.yardscape.api.eventApi
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
@@ -16,5 +17,6 @@ fun Application.module() {
         get("/") {
             call.respondText(sayHello("Ktor"))
         }
+        eventApi()
     }
 }
