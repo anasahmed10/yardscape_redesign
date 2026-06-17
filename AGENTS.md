@@ -142,6 +142,8 @@ Use the narrowest validation that proves the change.
 - The repository is expected to live at `anasahmed10/yardscape` or the canonical GitHub name chosen by the maintainer, with private visibility during bootstrap.
 - The default branch is `main`.
 - Pull Requests target `main` until a release branch exists.
+- The `Agent validation` GitHub Actions workflow runs on Pull Requests to `main` and pushes to `main`. It maps to the validation matrix by running shared Android host tests, server tests, and Android debug assembly as separate jobs.
+- CI must use debug/test Gradle tasks only. Do not require production credentials, release signing material, store deployment setup, or paid services for unattended PR validation.
 - When a release branch is created, update this section and target feature/fix PRs there.
 - Agents may merge their own PRs for normal queue work after local validation, GitHub checks if configured, secret scanning, and self-review are complete. If GitHub does not allow self-approval, record that limitation and proceed when repository rules permit merging.
 - Do not merge automatically until local validation, GitHub checks if configured, secret scanning, and review expectations are satisfied.
