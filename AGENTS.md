@@ -131,7 +131,7 @@ Use the narrowest validation that proves the change.
 
 | Change type | Required validation |
 | --- | --- |
-| Docs-only changes | No Gradle task required unless commands, generated examples, workflows, or release instructions changed. |
+| Docs-only changes | No Gradle task required unless commands, generated examples, workflows, or release instructions changed; markdown-only edits may be merged in a PR without test execution. |
 | Core domain or privacy policy logic | `.\gradlew.bat :app:shared:testAndroidHostTest` and any focused common tests that apply. |
 | Shared Compose UI or Android workflow | `.\gradlew.bat :app:shared:testAndroidHostTest` and `.\gradlew.bat :app:androidApp:assembleDebug`. |
 | Server routes or API behavior | `.\gradlew.bat :server:test`. |
