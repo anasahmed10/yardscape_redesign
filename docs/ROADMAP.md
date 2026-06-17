@@ -25,6 +25,8 @@ Exit criteria:
 ## Phase 2: Improvement Roadmap
 Goal: turn the testable workflow into a useful alpha for a limited community.
 
+Backend planning details live in [Post-MVP Backend Design](./POST_MVP_BACKEND_DESIGN.md).
+
 - Add account basics: email or phone sign-in, profile, session handling, and sign-out.
 - Add persistence with PostgreSQL and PostGIS for radius, neighborhood, and map-style searches.
 - Add database migrations with Flyway.

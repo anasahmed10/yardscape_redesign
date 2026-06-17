@@ -168,7 +168,9 @@ Use the narrowest validation that proves the change.
 | 1 | Initial Kotlin Multiplatform scaffold | Done |
 | 2 | Agent instructions, privacy guidance, and roadmap | Done |
 | 3 | Configurable display name baseline | Done |
-| 4 | Domain models and seeded MVP data | Planned |
-| 5 | Shared Compose Browse -> Detail -> RSVP flow | Planned |
-| 6 | Ktor MVP API with protected exact-location reveal | Planned |
-| 7 | Android workflow smoke test | In Review |
+| 4 | Domain models and seeded MVP data | Done |
+| 5 | Shared Compose Browse -> Detail -> RSVP flow | Done |
+| 6 | Ktor MVP API with protected exact-location reveal | Done |
+| 7 | Android workflow smoke test | Done |
+| 8 | GitHub Actions validation for agent PRs | Done |
+| 9 | Post-MVP backend design | Done |
