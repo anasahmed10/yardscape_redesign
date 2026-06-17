@@ -156,8 +156,9 @@ Use the narrowest validation that proves the change.
 6. Add or update tests when behavior changes.
 7. Run the most focused validation command that proves the change.
 8. Open the PR, review the diff and checks, resolve any issues, make the PR ready, and merge it when repository rules allow.
-9. Report commands that could not be run and why.
-10. Update this file when a durable architectural or workflow rule changes.
+9. Update the roadmap or milestone table in this file or the relevant docs when the completed change advances, closes, or reshapes planned work.
+10. Report commands that could not be run and why.
+11. Update this file when a durable architectural or workflow rule changes.
 
 ## Current Milestones
 | # | Milestone | Status |
