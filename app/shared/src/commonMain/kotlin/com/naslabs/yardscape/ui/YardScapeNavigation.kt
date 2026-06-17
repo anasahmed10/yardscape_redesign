@@ -20,6 +20,16 @@ sealed interface YardScapeRoute {
     data class HostCreateEdit(val eventId: String? = null) : YardScapeRoute
 }
 
+object YardScapeTestTags {
+    const val BrowseScreen: String = "browse-screen"
+    const val LocationAccessPanel: String = "event-detail-location-access"
+    const val ExactLocationContent: String = "event-detail-exact-location"
+    const val RsvpAction: String = "event-detail-rsvp-action"
+    const val RsvpConfirmAction: String = "rsvp-confirm-action"
+
+    fun browseEventCard(eventId: String): String = "browse-event-card-$eventId"
+}
+
 class YardScapeAppState(
     private val repository: YardSaleEventRepository = SeededYardSaleEventRepository(),
     private val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,

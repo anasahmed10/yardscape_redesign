@@ -169,4 +169,4 @@ Use the narrowest validation that proves the change.
 | 4 | Domain models and seeded MVP data | Planned |
 | 5 | Shared Compose Browse -> Detail -> RSVP flow | Planned |
 | 6 | Ktor MVP API with protected exact-location reveal | Planned |
-| 7 | Android workflow smoke test | Planned |
+| 7 | Android workflow smoke test | In Review |

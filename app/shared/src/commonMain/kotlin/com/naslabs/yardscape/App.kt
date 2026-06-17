@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -45,6 +46,7 @@ import com.naslabs.yardscape.ui.HostEventItem
 import com.naslabs.yardscape.ui.LocationRevealState
 import com.naslabs.yardscape.ui.YardScapeAppState
 import com.naslabs.yardscape.ui.YardScapeRoute
+import com.naslabs.yardscape.ui.YardScapeTestTags
 import com.naslabs.yardscape.ui.toDetailSections
 
 @Composable
@@ -374,6 +376,7 @@ private fun BrowseScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .testTag(YardScapeTestTags.BrowseScreen)
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -419,6 +422,7 @@ private fun EventPreviewCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .testTag(YardScapeTestTags.browseEventCard(event.id))
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
@@ -536,7 +540,9 @@ private fun PublicEventDetailScreen(
                 )
                 if (state.shouldShowRsvpAction) {
                     Button(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(YardScapeTestTags.RsvpAction),
                         onClick = onRsvp,
                     ) {
                         Text("RSVP")
@@ -578,7 +584,9 @@ private fun PhotoStrip(descriptions: List<String>) {
 @Composable
 private fun LocationAccessPanel(revealState: LocationRevealState) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(YardScapeTestTags.LocationAccessPanel),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = when (revealState) {
@@ -597,6 +605,10 @@ private fun LocationAccessPanel(revealState: LocationRevealState) {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
+                modifier = when (revealState) {
+                    is LocationRevealState.Revealed -> Modifier.testTag(YardScapeTestTags.ExactLocationContent)
+                    else -> Modifier
+                },
                 text = revealState.message,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -630,7 +642,9 @@ private fun RsvpScreen(
         )
         Spacer(modifier = Modifier.height(14.dp))
         Button(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(YardScapeTestTags.RsvpConfirmAction),
             onClick = onConfirm,
         ) {
             Text("Confirm RSVP")
