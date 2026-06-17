@@ -4,11 +4,14 @@ import com.naslabs.yardscape.data.PublicEventDetail
 import com.naslabs.yardscape.data.SeededYardSaleData
 import com.naslabs.yardscape.data.SeededYardSaleEventRepository
 import com.naslabs.yardscape.data.YardSaleEventRepository
+import com.naslabs.yardscape.data.HostEventDraft
+import com.naslabs.yardscape.data.HostEventSaveResult
 import com.naslabs.yardscape.domain.EventStatus
 import com.naslabs.yardscape.domain.ExactAddress
 import com.naslabs.yardscape.domain.LocationVisibility
 import com.naslabs.yardscape.domain.PublicEventPreview
 import com.naslabs.yardscape.domain.RsvpStatus
+import com.naslabs.yardscape.domain.YardSaleEvent
 
 sealed interface YardScapeRoute {
     data object Browse : YardScapeRoute
@@ -21,6 +24,7 @@ class YardScapeAppState(
     private val repository: YardSaleEventRepository = SeededYardSaleEventRepository(),
     private val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
     private val shopperId: String = SeededYardSaleData.SHOPPER_WITHOUT_ACCESS_ID,
+    private val hostId: String = SeededYardSaleData.HOST_AVERY_ID,
 ) {
     var route: YardScapeRoute = YardScapeRoute.Browse
         private set
@@ -71,6 +75,62 @@ class YardScapeAppState(
     fun returnToBrowse() {
         route = YardScapeRoute.Browse
     }
+
+    fun hostEventItems(): List<HostEventItem> =
+        repository.hostEvents(hostId).map { it.toHostEventItem(nowEpochMillis) }
+
+    fun hostEditorState(eventId: String?): HostEditorState =
+        HostEditorState(
+            draft = repository.hostEvent(eventId.orEmpty())?.toHostEventDraft()
+                ?: blankHostEventDraft(),
+            validationErrors = emptyList(),
+        )
+
+    fun saveHostDraft(draft: HostEventDraft): HostEditorState =
+        hostStateFrom(draft, repository.saveHostEvent(draft, EventStatus.DRAFT))
+
+    fun publishHostEvent(draft: HostEventDraft): HostEditorState =
+        hostStateFrom(draft, repository.saveHostEvent(draft, EventStatus.PUBLISHED))
+
+    fun cancelHostEvent(eventId: String) {
+        repository.cancelHostEvent(eventId)
+        route = YardScapeRoute.HostCreateEdit(eventId)
+    }
+
+    fun hideHostEvent(eventId: String) {
+        repository.hideHostEvent(eventId)
+        route = YardScapeRoute.HostCreateEdit(eventId)
+    }
+
+    private fun blankHostEventDraft(): HostEventDraft =
+        HostEventDraft(
+            hostId = hostId,
+            title = "",
+            description = "",
+            startsAtEpochMillis = nowEpochMillis + MILLIS_PER_DAY,
+            endsAtEpochMillis = nowEpochMillis + MILLIS_PER_DAY + 5L * MILLIS_PER_HOUR,
+            publicNeighborhood = "",
+            publicCity = "",
+            publicAreaDescription = "",
+            exactStreetAddress = "",
+            exactCity = "",
+            exactRegion = "",
+            exactPostalCode = "",
+            exactLatitude = 0.0,
+            exactLongitude = 0.0,
+            categories = emptyList(),
+            acceptedPaymentTypes = emptyList(),
+            accessibilityNotes = emptyList(),
+        )
+
+    private fun hostStateFrom(originalDraft: HostEventDraft, result: HostEventSaveResult): HostEditorState {
+        val draft = result.event?.toHostEventDraft() ?: originalDraft
+        return HostEditorState(
+            draft = draft,
+            validationErrors = result.validationErrors,
+            savedEventId = result.event?.id,
+        )
+    }
 }
 
 data class BrowseEventItem(
@@ -80,6 +140,20 @@ data class BrowseEventItem(
     val locationLabel: String,
     val categoryLabels: List<String>,
     val statusLabel: String,
+)
+
+data class HostEventItem(
+    val id: String,
+    val title: String,
+    val statusLabel: String,
+    val dateLabel: String,
+    val publicLocationLabel: String,
+)
+
+data class HostEditorState(
+    val draft: HostEventDraft,
+    val validationErrors: List<String>,
+    val savedEventId: String? = draft.id,
 )
 
 data class EventDetailState(
@@ -142,6 +216,43 @@ fun PublicEventPreview.toBrowseEventItem(nowEpochMillis: Long): BrowseEventItem 
         ).joinToString(" - "),
         categoryLabels = categories,
         statusLabel = status.name.lowercase().replaceFirstChar { it.uppercase() },
+    )
+
+fun YardSaleEvent.toHostEventItem(nowEpochMillis: Long): HostEventItem =
+    HostEventItem(
+        id = id,
+        title = title,
+        statusLabel = status.name.lowercase().replaceFirstChar { it.uppercase() },
+        dateLabel = saleWindow.toBrowseDateLabel(nowEpochMillis),
+        publicLocationLabel = listOf(
+            location.publicLocation.neighborhood,
+            location.publicLocation.city,
+        ).filter { it.isNotBlank() }.joinToString(" - "),
+    )
+
+fun YardSaleEvent.toHostEventDraft(): HostEventDraft =
+    HostEventDraft(
+        id = id,
+        hostId = host.id,
+        title = title,
+        description = description,
+        startsAtEpochMillis = saleWindow.startsAtEpochMillis,
+        endsAtEpochMillis = saleWindow.endsAtEpochMillis,
+        publicNeighborhood = location.publicLocation.neighborhood,
+        publicCity = location.publicLocation.city,
+        publicAreaDescription = location.publicLocation.areaDescription,
+        publicDistanceLabel = location.publicLocation.distanceLabel,
+        exactStreetAddress = location.exactAddress.streetAddress,
+        exactUnit = location.exactAddress.unit,
+        exactCity = location.exactAddress.city,
+        exactRegion = location.exactAddress.region,
+        exactPostalCode = location.exactAddress.postalCode,
+        exactLatitude = location.exactAddress.latitude,
+        exactLongitude = location.exactAddress.longitude,
+        accessInstructions = location.exactAddress.accessInstructions,
+        categories = categories,
+        acceptedPaymentTypes = acceptedPaymentTypes,
+        accessibilityNotes = accessibilityNotes,
     )
 
 fun PublicEventDetail.toDetailSections(nowEpochMillis: Long): List<Pair<String, String>> =

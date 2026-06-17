@@ -2,6 +2,7 @@ package com.naslabs.yardscape.ui
 
 import com.naslabs.yardscape.data.SeededYardSaleData
 import com.naslabs.yardscape.data.SeededYardSaleEventRepository
+import com.naslabs.yardscape.data.HostEventDraft
 import com.naslabs.yardscape.domain.LocationVisibility
 import com.naslabs.yardscape.domain.Rsvp
 import com.naslabs.yardscape.domain.RsvpStatus
@@ -116,4 +117,56 @@ class YardScapeAppStateTest {
         assertIs<LocationRevealState.Cancelled>(cancelledState?.revealState)
         assertFalse(cancelledState.toString().contains("418 Juniper Avenue"))
     }
+
+    @Test
+    fun hostCanPublishLocalEventIntoBrowse() {
+        val state = YardScapeAppState()
+
+        val result = state.publishHostEvent(validHostDraft(id = "event-app-publish"))
+
+        assertEquals("event-app-publish", result.savedEventId)
+        assertFalse(result.validationErrors.any())
+        assertEquals(true, state.browseItems().any { it.id == "event-app-publish" })
+        assertFalse(state.browseItems().joinToString().contains("900 Hidden Lane"))
+    }
+
+    @Test
+    fun invalidHostPublishReturnsValidationErrors() {
+        val state = YardScapeAppState()
+
+        val result = state.publishHostEvent(
+            validHostDraft(id = "event-app-invalid").copy(
+                startsAtEpochMillis = null,
+                exactStreetAddress = "",
+            ),
+        )
+
+        assertEquals("event-app-invalid", result.draft.id)
+        assertEquals(false, result.validationErrors.isEmpty())
+        assertFalse(state.browseItems().any { it.id == "event-app-invalid" })
+    }
+
+    private fun validHostDraft(id: String): HostEventDraft =
+        HostEventDraft(
+            id = id,
+            hostId = SeededYardSaleData.HOST_AVERY_ID,
+            title = "Saturday Shed Cleanout",
+            description = "Garden tools and storage bins.",
+            startsAtEpochMillis = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + 10_000L,
+            endsAtEpochMillis = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + 20_000L,
+            publicNeighborhood = "Maple Ridge",
+            publicCity = "Riverton",
+            publicAreaDescription = "Near the south park entrance",
+            publicDistanceLabel = "3 mi",
+            exactStreetAddress = "900 Hidden Lane",
+            exactCity = "Riverton",
+            exactRegion = "WA",
+            exactPostalCode = "98002",
+            exactLatitude = 47.611,
+            exactLongitude = -122.202,
+            accessInstructions = "Knock on the garage door.",
+            categories = listOf("garden", "storage"),
+            acceptedPaymentTypes = listOf("Cash"),
+            accessibilityNotes = listOf("Flat driveway"),
+        )
 }
