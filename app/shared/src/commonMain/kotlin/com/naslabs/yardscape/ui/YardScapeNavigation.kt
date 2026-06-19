@@ -6,6 +6,9 @@ import com.naslabs.yardscape.data.SeededYardSaleEventRepository
 import com.naslabs.yardscape.data.YardSaleEventRepository
 import com.naslabs.yardscape.data.HostEventDraft
 import com.naslabs.yardscape.data.HostEventSaveResult
+import com.naslabs.yardscape.data.MapLocationSearchRepository
+import com.naslabs.yardscape.data.MapSelectedLocation
+import com.naslabs.yardscape.data.SeededMapLocationSearchRepository
 import com.naslabs.yardscape.domain.EventStatus
 import com.naslabs.yardscape.domain.ExactAddress
 import com.naslabs.yardscape.domain.LocationVisibility
@@ -32,6 +35,7 @@ object YardScapeTestTags {
 
 class YardScapeAppState(
     private val repository: YardSaleEventRepository = SeededYardSaleEventRepository(),
+    private val mapLocationSearchRepository: MapLocationSearchRepository = SeededMapLocationSearchRepository(),
     private val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
     private val shopperId: String = SeededYardSaleData.SHOPPER_WITHOUT_ACCESS_ID,
     private val hostId: String = SeededYardSaleData.HOST_AVERY_ID,
@@ -88,6 +92,9 @@ class YardScapeAppState(
 
     fun hostEventItems(): List<HostEventItem> =
         repository.hostEvents(hostId).map { it.toHostEventItem(nowEpochMillis) }
+
+    fun hostLocationSuggestions(): List<MapSelectedLocation> =
+        mapLocationSearchRepository.hostLocationSuggestions()
 
     fun hostEditorState(eventId: String?): HostEditorState =
         HostEditorState(
@@ -150,6 +157,7 @@ data class BrowseEventItem(
     val locationLabel: String,
     val categoryLabels: List<String>,
     val statusLabel: String,
+    val photoDescription: String?,
 )
 
 data class HostEventItem(
@@ -226,6 +234,7 @@ fun PublicEventPreview.toBrowseEventItem(nowEpochMillis: Long): BrowseEventItem 
         ).joinToString(" - "),
         categoryLabels = categories,
         statusLabel = status.name.lowercase().replaceFirstChar { it.uppercase() },
+        photoDescription = photos.firstOrNull()?.description,
     )
 
 fun YardSaleEvent.toHostEventItem(nowEpochMillis: Long): HostEventItem =
@@ -260,6 +269,20 @@ fun YardSaleEvent.toHostEventDraft(): HostEventDraft =
         exactLatitude = location.exactAddress.latitude,
         exactLongitude = location.exactAddress.longitude,
         accessInstructions = location.exactAddress.accessInstructions,
+        selectedMapLocation = MapSelectedLocation(
+            providerPlaceId = "saved:${id}",
+            displayName = location.publicLocation.areaDescription,
+            formattedAddress = location.exactAddress.streetAddress,
+            streetAddress = location.exactAddress.streetAddress,
+            city = location.exactAddress.city,
+            region = location.exactAddress.region,
+            postalCode = location.exactAddress.postalCode,
+            latitude = location.exactAddress.latitude,
+            longitude = location.exactAddress.longitude,
+            publicNeighborhood = location.publicLocation.neighborhood,
+            publicAreaDescription = location.publicLocation.areaDescription,
+            publicDistanceLabel = location.publicLocation.distanceLabel,
+        ),
         categories = categories,
         acceptedPaymentTypes = acceptedPaymentTypes,
         accessibilityNotes = accessibilityNotes,

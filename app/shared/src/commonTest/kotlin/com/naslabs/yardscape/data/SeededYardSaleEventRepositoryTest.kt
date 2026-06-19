@@ -119,8 +119,49 @@ class SeededYardSaleEventRepositoryTest {
 
         assertFalse(result.isSuccess)
         assertTrue(result.validationErrors.any { it.contains("Start time") })
-        assertTrue(result.validationErrors.any { it.contains("Public neighborhood") })
-        assertTrue(result.validationErrors.any { it.contains("Protected street address") })
+        assertTrue(result.validationErrors.any { it.contains("Map location") })
+        assertTrue(result.validationErrors.any { it.contains("Protected map street address") })
+    }
+
+    @Test
+    fun selectedMapLocationFillsPublicAndProtectedLocationForPublish() {
+        val result = repository.saveHostEvent(
+            draft = validHostDraft().copy(
+                id = "event-map-selected",
+                publicNeighborhood = "",
+                publicCity = "",
+                publicAreaDescription = "",
+                publicDistanceLabel = null,
+                exactStreetAddress = "",
+                exactCity = "",
+                exactRegion = "",
+                exactPostalCode = "",
+                exactLatitude = 0.0,
+                exactLongitude = 0.0,
+            ).withMapSelectedLocation(
+                MapSelectedLocation(
+                    providerPlaceId = "maps-test-maple-ridge",
+                    displayName = "Maple Ridge driveway",
+                    formattedAddress = "900 Hidden Lane, Riverton, WA 98002",
+                    streetAddress = "900 Hidden Lane",
+                    city = "Riverton",
+                    region = "WA",
+                    postalCode = "98002",
+                    latitude = 47.611,
+                    longitude = -122.202,
+                    publicNeighborhood = "Maple Ridge",
+                    publicAreaDescription = "Near the south park entrance",
+                    publicDistanceLabel = "3 mi",
+                ),
+            ),
+            status = EventStatus.PUBLISHED,
+        )
+        val preview = repository.publicPreviews(now).firstOrNull { it.id == "event-map-selected" }
+
+        assertTrue(result.isSuccess)
+        assertNotNull(preview)
+        assertEquals("Maple Ridge", preview.publicLocation.neighborhood)
+        assertFalse(preview.toString().contains("900 Hidden Lane"))
     }
 
     @Test

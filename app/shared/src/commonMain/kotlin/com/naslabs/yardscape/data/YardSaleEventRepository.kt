@@ -72,9 +72,25 @@ data class HostEventDraft(
     val exactLatitude: Double,
     val exactLongitude: Double,
     val accessInstructions: String? = null,
+    val selectedMapLocation: MapSelectedLocation? = null,
     val categories: List<String>,
     val acceptedPaymentTypes: List<String>,
     val accessibilityNotes: List<String>,
+)
+
+data class MapSelectedLocation(
+    val providerPlaceId: String,
+    val displayName: String,
+    val formattedAddress: String,
+    val streetAddress: String,
+    val city: String,
+    val region: String,
+    val postalCode: String,
+    val latitude: Double,
+    val longitude: Double,
+    val publicNeighborhood: String,
+    val publicAreaDescription: String,
+    val publicDistanceLabel: String? = null,
 )
 
 data class HostEventSaveResult(
@@ -99,13 +115,13 @@ fun HostEventDraft.validateFor(status: EventStatus): List<String> {
         ) {
             errors += "End time must be after start time."
         }
-        if (publicNeighborhood.isBlank()) errors += "Public neighborhood is required to publish."
-        if (publicCity.isBlank()) errors += "Public city is required to publish."
-        if (publicAreaDescription.isBlank()) errors += "Public area description is required to publish."
-        if (exactStreetAddress.isBlank()) errors += "Protected street address is required to publish."
-        if (exactCity.isBlank()) errors += "Protected city is required to publish."
-        if (exactRegion.isBlank()) errors += "Protected region is required to publish."
-        if (exactPostalCode.isBlank()) errors += "Protected postal code is required to publish."
+        if (resolvedPublicNeighborhood().isBlank()) errors += "Map location is required to publish."
+        if (resolvedPublicCity().isBlank()) errors += "Map location city is required to publish."
+        if (resolvedPublicAreaDescription().isBlank()) errors += "Map location public area is required to publish."
+        if (resolvedExactStreetAddress().isBlank()) errors += "Protected map street address is required to publish."
+        if (resolvedExactCity().isBlank()) errors += "Protected map city is required to publish."
+        if (resolvedExactRegion().isBlank()) errors += "Protected map region is required to publish."
+        if (resolvedExactPostalCode().isBlank()) errors += "Protected map postal code is required to publish."
     }
     return errors
 }
@@ -133,23 +149,68 @@ fun HostEventDraft.toYardSaleEvent(
         status = status,
         location = EventLocation(
             publicLocation = PublicLocation(
-                neighborhood = publicNeighborhood,
-                city = publicCity,
-                areaDescription = publicAreaDescription,
-                distanceLabel = publicDistanceLabel,
+                neighborhood = resolvedPublicNeighborhood(),
+                city = resolvedPublicCity(),
+                areaDescription = resolvedPublicAreaDescription(),
+                distanceLabel = resolvedPublicDistanceLabel(),
             ),
             exactAddress = ExactAddress(
-                streetAddress = exactStreetAddress,
+                streetAddress = resolvedExactStreetAddress(),
                 unit = exactUnit,
-                city = exactCity,
-                region = exactRegion,
-                postalCode = exactPostalCode,
-                latitude = exactLatitude,
-                longitude = exactLongitude,
+                city = resolvedExactCity(),
+                region = resolvedExactRegion(),
+                postalCode = resolvedExactPostalCode(),
+                latitude = resolvedExactLatitude(),
+                longitude = resolvedExactLongitude(),
                 accessInstructions = accessInstructions,
             ),
         ),
     )
 }
+
+fun HostEventDraft.withMapSelectedLocation(location: MapSelectedLocation): HostEventDraft =
+    copy(
+        selectedMapLocation = location,
+        publicNeighborhood = location.publicNeighborhood,
+        publicCity = location.city,
+        publicAreaDescription = location.publicAreaDescription,
+        publicDistanceLabel = location.publicDistanceLabel,
+        exactStreetAddress = location.streetAddress,
+        exactCity = location.city,
+        exactRegion = location.region,
+        exactPostalCode = location.postalCode,
+        exactLatitude = location.latitude,
+        exactLongitude = location.longitude,
+    )
+
+private fun HostEventDraft.resolvedPublicNeighborhood(): String =
+    selectedMapLocation?.publicNeighborhood ?: publicNeighborhood
+
+private fun HostEventDraft.resolvedPublicCity(): String =
+    selectedMapLocation?.city ?: publicCity
+
+private fun HostEventDraft.resolvedPublicAreaDescription(): String =
+    selectedMapLocation?.publicAreaDescription ?: publicAreaDescription
+
+private fun HostEventDraft.resolvedPublicDistanceLabel(): String? =
+    selectedMapLocation?.publicDistanceLabel ?: publicDistanceLabel
+
+private fun HostEventDraft.resolvedExactStreetAddress(): String =
+    selectedMapLocation?.streetAddress ?: exactStreetAddress
+
+private fun HostEventDraft.resolvedExactCity(): String =
+    selectedMapLocation?.city ?: exactCity
+
+private fun HostEventDraft.resolvedExactRegion(): String =
+    selectedMapLocation?.region ?: exactRegion
+
+private fun HostEventDraft.resolvedExactPostalCode(): String =
+    selectedMapLocation?.postalCode ?: exactPostalCode
+
+private fun HostEventDraft.resolvedExactLatitude(): Double =
+    selectedMapLocation?.latitude ?: exactLatitude
+
+private fun HostEventDraft.resolvedExactLongitude(): Double =
+    selectedMapLocation?.longitude ?: exactLongitude
 
 private const val DEFAULT_DRAFT_WINDOW_MILLIS = 4L * 60L * 60L * 1_000L
