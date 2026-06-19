@@ -56,7 +56,9 @@ import com.naslabs.yardscape.ui.LocationRevealState
 import com.naslabs.yardscape.ui.YardScapeAppState
 import com.naslabs.yardscape.ui.YardScapeRoute
 import com.naslabs.yardscape.ui.YardScapeTestTags
+import com.naslabs.yardscape.ui.toHostClockTimeLabel
 import com.naslabs.yardscape.ui.toDetailSections
+import com.naslabs.yardscape.ui.withHostClockTime
 
 @Composable
 @Preview
@@ -115,7 +117,7 @@ fun App() {
                     HostCreateEditScreen(
                         hostEvents = appState.hostEventItems(),
                         editorState = editorState,
-                        locationSuggestions = appState.hostLocationSuggestions(),
+                        onAddressSearch = appState::searchHostLocations,
                         onDraftChanged = { draft ->
                             editorState = editorState.copy(
                                 draft = draft,
@@ -211,7 +213,7 @@ private val PhotoClay = Color(0xFFE09B72)
 private fun HostCreateEditScreen(
     hostEvents: List<HostEventItem>,
     editorState: HostEditorState,
-    locationSuggestions: List<MapSelectedLocation>,
+    onAddressSearch: (String) -> List<MapSelectedLocation>,
     onDraftChanged: (HostEventDraft) -> Unit,
     onNew: () -> Unit,
     onEdit: (String) -> Unit,
@@ -294,7 +296,7 @@ private fun HostCreateEditScreen(
         item {
             HostEventForm(
                 state = editorState,
-                locationSuggestions = locationSuggestions,
+                onAddressSearch = onAddressSearch,
                 onDraftChanged = onDraftChanged,
                 onSaveDraft = onSaveDraft,
                 onPublish = onPublish,
@@ -308,7 +310,7 @@ private fun HostCreateEditScreen(
 @Composable
 private fun HostEventForm(
     state: HostEditorState,
-    locationSuggestions: List<MapSelectedLocation>,
+    onAddressSearch: (String) -> List<MapSelectedLocation>,
     onDraftChanged: (HostEventDraft) -> Unit,
     onSaveDraft: () -> Unit,
     onPublish: () -> Unit,
@@ -316,6 +318,12 @@ private fun HostEventForm(
     onHideEvent: () -> Unit,
 ) {
     val draft = state.draft
+    var startTimeText by remember(draft.id) {
+        mutableStateOf(draft.startsAtEpochMillis?.toHostClockTimeLabel().orEmpty())
+    }
+    var endTimeText by remember(draft.id) {
+        mutableStateOf(draft.endsAtEpochMillis?.toHostClockTimeLabel().orEmpty())
+    }
     Column(
         modifier = Modifier.padding(bottom = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -351,11 +359,33 @@ private fun HostEventForm(
 
         HostTextField("Title", draft.title) { onDraftChanged(draft.copy(title = it)) }
         HostTextField("Description", draft.description) { onDraftChanged(draft.copy(description = it)) }
-        HostTextField("Start epoch millis", draft.startsAtEpochMillis?.toString().orEmpty()) {
-            onDraftChanged(draft.copy(startsAtEpochMillis = it.toLongOrNull()))
+        HostTimeField("Start time", startTimeText) { input ->
+            startTimeText = input
+            val anchor = draft.startsAtEpochMillis
+                ?: draft.endsAtEpochMillis
+                ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS
+            val start = anchor.withHostClockTime(input)
+            if (input.isBlank() || start != null) {
+                onDraftChanged(draft.copy(startsAtEpochMillis = start))
+            }
         }
-        HostTextField("End epoch millis", draft.endsAtEpochMillis?.toString().orEmpty()) {
-            onDraftChanged(draft.copy(endsAtEpochMillis = it.toLongOrNull()))
+        HostTimeField("End time", endTimeText) { input ->
+            endTimeText = input
+            val anchor = draft.endsAtEpochMillis
+                ?: draft.startsAtEpochMillis
+                ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS
+            val parsedEnd = anchor.withHostClockTime(input)
+            if (input.isBlank() || parsedEnd != null) {
+                val end = parsedEnd?.let { candidate ->
+                    val start = draft.startsAtEpochMillis
+                    if (start != null && candidate <= start) {
+                        candidate + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS
+                    } else {
+                        candidate
+                    }
+                }
+                onDraftChanged(draft.copy(endsAtEpochMillis = end))
+            }
         }
         HostTextField("Categories", draft.categories.joinToString(", ")) {
             onDraftChanged(draft.copy(categories = it.toCsvList()))
@@ -369,7 +399,7 @@ private fun HostEventForm(
 
         MapLocationPicker(
             selectedLocation = draft.selectedMapLocation,
-            suggestions = locationSuggestions,
+            onAddressSearch = onAddressSearch,
             onLocationSelected = { location ->
                 onDraftChanged(draft.withMapSelectedLocation(location))
             },
@@ -407,12 +437,19 @@ private fun HostEventForm(
 @Composable
 private fun MapLocationPicker(
     selectedLocation: MapSelectedLocation?,
-    suggestions: List<MapSelectedLocation>,
+    onAddressSearch: (String) -> List<MapSelectedLocation>,
     onLocationSelected: (MapSelectedLocation) -> Unit,
 ) {
+    var addressQuery by remember(selectedLocation?.providerPlaceId) {
+        mutableStateOf(selectedLocation?.formattedAddress.orEmpty())
+    }
+    val autocompleteResults = remember(addressQuery) {
+        onAddressSearch(addressQuery)
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         FormSectionLabel("Map location")
-        PrivacyNote("Use Maps to select the sale address. Shoppers only see the approximate area until RSVP access is granted.")
+        PrivacyNote("Search for the sale address with Maps autocomplete. Shoppers only see the approximate area until RSVP access is granted.")
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
@@ -438,11 +475,39 @@ private fun MapLocationPicker(
                 if (selectedLocation != null) {
                     InfoChip(text = "${selectedLocation.publicNeighborhood} - ${selectedLocation.city}")
                 }
-                suggestions.forEach { location ->
-                    MapLocationSuggestionButton(
-                        location = location,
-                        onLocationSelected = onLocationSelected,
+
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = addressQuery,
+                    onValueChange = { addressQuery = it },
+                    label = { Text("Search address") },
+                    placeholder = { Text("Start typing a street address") },
+                    shape = RoundedCornerShape(8.dp),
+                    singleLine = true,
+                )
+
+                when {
+                    addressQuery.trim().length < 3 -> Text(
+                        text = "Enter at least 3 characters to search.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+
+                    autocompleteResults.isEmpty() -> Text(
+                        text = "No address matches found.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    else -> autocompleteResults.forEach { location ->
+                        MapLocationSuggestionButton(
+                            location = location,
+                            onLocationSelected = {
+                                addressQuery = location.formattedAddress
+                                onLocationSelected(location)
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -458,12 +523,42 @@ private fun MapLocationSuggestionButton(
         modifier = Modifier.fillMaxWidth(),
         onClick = { onLocationSelected(location) },
     ) {
-        Text(
-            text = "Use ${location.displayName}",
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = location.displayName,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = location.formattedAddress,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
+}
+
+@Composable
+private fun HostTimeField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        modifier = Modifier.fillMaxWidth(),
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        placeholder = { Text("9:00 AM") },
+        supportingText = { Text("Use a clock time, such as 9:00 AM or 14:30.") },
+        singleLine = true,
+        shape = RoundedCornerShape(8.dp),
+    )
 }
 
 @Composable
@@ -485,6 +580,8 @@ private fun String.toCsvList(): List<String> =
     split(",")
         .map { it.trim() }
         .filter { it.isNotEmpty() }
+
+private const val HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS = 24L * 60L * 60L * 1_000L
 
 @Composable
 private fun BrowseScreen(
