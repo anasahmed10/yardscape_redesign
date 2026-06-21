@@ -93,8 +93,8 @@ class YardScapeAppState(
     fun hostEventItems(): List<HostEventItem> =
         repository.hostEvents(hostId).map { it.toHostEventItem(nowEpochMillis) }
 
-    fun hostLocationSuggestions(): List<MapSelectedLocation> =
-        mapLocationSearchRepository.hostLocationSuggestions()
+    fun searchHostLocations(query: String): List<MapSelectedLocation> =
+        mapLocationSearchRepository.searchHostLocations(query)
 
     fun hostEditorState(eventId: String?): HostEditorState =
         HostEditorState(

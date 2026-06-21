@@ -1,11 +1,28 @@
 package com.naslabs.yardscape.data
 
 interface MapLocationSearchRepository {
-    fun hostLocationSuggestions(): List<MapSelectedLocation>
+    fun searchHostLocations(query: String): List<MapSelectedLocation>
 }
 
 class SeededMapLocationSearchRepository : MapLocationSearchRepository {
-    override fun hostLocationSuggestions(): List<MapSelectedLocation> =
+    override fun searchHostLocations(query: String): List<MapSelectedLocation> {
+        val normalizedQuery = query.trim().lowercase()
+        if (normalizedQuery.length < MIN_AUTOCOMPLETE_QUERY_LENGTH) return emptyList()
+
+        return locations.filter { location ->
+            listOf(
+                location.displayName,
+                location.formattedAddress,
+                location.streetAddress,
+                location.city,
+                location.region,
+                location.postalCode,
+                location.publicNeighborhood,
+            ).any { field -> field.lowercase().contains(normalizedQuery) }
+        }
+    }
+
+    private val locations: List<MapSelectedLocation> =
         listOf(
             MapSelectedLocation(
                 providerPlaceId = "maps-demo-maple-ridge",
@@ -37,3 +54,5 @@ class SeededMapLocationSearchRepository : MapLocationSearchRepository {
             ),
         )
 }
+
+private const val MIN_AUTOCOMPLETE_QUERY_LENGTH = 3

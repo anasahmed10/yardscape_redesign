@@ -18,17 +18,21 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,7 +62,6 @@ import com.naslabs.yardscape.ui.YardScapeRoute
 import com.naslabs.yardscape.ui.YardScapeTestTags
 import com.naslabs.yardscape.ui.toHostClockTimeLabel
 import com.naslabs.yardscape.ui.toDetailSections
-import com.naslabs.yardscape.ui.withHostClockTime
 
 @Composable
 @Preview
@@ -265,6 +268,22 @@ private fun HostCreateEditScreen(
             }
         }
 
+        item {
+            HostEventForm(
+                state = editorState,
+                onAddressSearch = onAddressSearch,
+                onDraftChanged = onDraftChanged,
+                onSaveDraft = onSaveDraft,
+                onPublish = onPublish,
+                onCancelEvent = onCancelEvent,
+                onHideEvent = onHideEvent,
+            )
+        }
+
+        item {
+            FormSectionLabel("Your listings")
+        }
+
         items(hostEvents, key = { it.id }) { event ->
             Card(
                 modifier = Modifier
@@ -292,18 +311,6 @@ private fun HostCreateEditScreen(
                 }
             }
         }
-
-        item {
-            HostEventForm(
-                state = editorState,
-                onAddressSearch = onAddressSearch,
-                onDraftChanged = onDraftChanged,
-                onSaveDraft = onSaveDraft,
-                onPublish = onPublish,
-                onCancelEvent = onCancelEvent,
-                onHideEvent = onHideEvent,
-            )
-        }
     }
 }
 
@@ -318,12 +325,6 @@ private fun HostEventForm(
     onHideEvent: () -> Unit,
 ) {
     val draft = state.draft
-    var startTimeText by remember(draft.id) {
-        mutableStateOf(draft.startsAtEpochMillis?.toHostClockTimeLabel().orEmpty())
-    }
-    var endTimeText by remember(draft.id) {
-        mutableStateOf(draft.endsAtEpochMillis?.toHostClockTimeLabel().orEmpty())
-    }
     Column(
         modifier = Modifier.padding(bottom = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -357,45 +358,9 @@ private fun HostEventForm(
             }
         }
 
+        FormSectionLabel("Listing basics")
         HostTextField("Title", draft.title) { onDraftChanged(draft.copy(title = it)) }
         HostTextField("Description", draft.description) { onDraftChanged(draft.copy(description = it)) }
-        HostTimeField("Start time", startTimeText) { input ->
-            startTimeText = input
-            val anchor = draft.startsAtEpochMillis
-                ?: draft.endsAtEpochMillis
-                ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS
-            val start = anchor.withHostClockTime(input)
-            if (input.isBlank() || start != null) {
-                onDraftChanged(draft.copy(startsAtEpochMillis = start))
-            }
-        }
-        HostTimeField("End time", endTimeText) { input ->
-            endTimeText = input
-            val anchor = draft.endsAtEpochMillis
-                ?: draft.startsAtEpochMillis
-                ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS
-            val parsedEnd = anchor.withHostClockTime(input)
-            if (input.isBlank() || parsedEnd != null) {
-                val end = parsedEnd?.let { candidate ->
-                    val start = draft.startsAtEpochMillis
-                    if (start != null && candidate <= start) {
-                        candidate + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS
-                    } else {
-                        candidate
-                    }
-                }
-                onDraftChanged(draft.copy(endsAtEpochMillis = end))
-            }
-        }
-        HostTextField("Categories", draft.categories.joinToString(", ")) {
-            onDraftChanged(draft.copy(categories = it.toCsvList()))
-        }
-        HostTextField("Payment notes", draft.acceptedPaymentTypes.joinToString(", ")) {
-            onDraftChanged(draft.copy(acceptedPaymentTypes = it.toCsvList()))
-        }
-        HostTextField("Accessibility notes", draft.accessibilityNotes.joinToString(", ")) {
-            onDraftChanged(draft.copy(accessibilityNotes = it.toCsvList()))
-        }
 
         MapLocationPicker(
             selectedLocation = draft.selectedMapLocation,
@@ -406,6 +371,43 @@ private fun HostEventForm(
         )
         HostTextField("Access instructions", draft.accessInstructions.orEmpty()) {
             onDraftChanged(draft.copy(accessInstructions = it.ifBlank { null }))
+        }
+
+        FormSectionLabel("Sale schedule")
+        HostTimePickerField(
+            label = "Start time",
+            value = draft.startsAtEpochMillis,
+            fallbackValue = draft.endsAtEpochMillis
+                ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS,
+            onTimeSelected = { start ->
+                onDraftChanged(draft.copy(startsAtEpochMillis = start))
+            },
+        )
+        HostTimePickerField(
+            label = "End time",
+            value = draft.endsAtEpochMillis,
+            fallbackValue = draft.startsAtEpochMillis
+                ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS,
+            onTimeSelected = { selectedEnd ->
+                val start = draft.startsAtEpochMillis
+                val end = if (start != null && selectedEnd <= start) {
+                    selectedEnd + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS
+                } else {
+                    selectedEnd
+                }
+                onDraftChanged(draft.copy(endsAtEpochMillis = end))
+            },
+        )
+
+        FormSectionLabel("Sale details")
+        HostTextField("Categories", draft.categories.joinToString(", ")) {
+            onDraftChanged(draft.copy(categories = it.toCsvList()))
+        }
+        HostTextField("Payment notes", draft.acceptedPaymentTypes.joinToString(", ")) {
+            onDraftChanged(draft.copy(acceptedPaymentTypes = it.toCsvList()))
+        }
+        HostTextField("Accessibility notes", draft.accessibilityNotes.joinToString(", ")) {
+            onDraftChanged(draft.copy(accessibilityNotes = it.toCsvList()))
         }
 
         Column(
@@ -543,21 +545,89 @@ private fun MapLocationSuggestionButton(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HostTimeField(
+private fun HostTimePickerField(
     label: String,
-    value: String,
-    onValueChange: (String) -> Unit,
+    value: Long?,
+    fallbackValue: Long,
+    onTimeSelected: (Long) -> Unit,
 ) {
-    OutlinedTextField(
+    var showPicker by remember { mutableStateOf(false) }
+    val displayValue = value?.toHostClockTimeLabel() ?: "Select time"
+    OutlinedButton(
         modifier = Modifier.fillMaxWidth(),
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        placeholder = { Text("9:00 AM") },
-        supportingText = { Text("Use a clock time, such as 9:00 AM or 14:30.") },
-        singleLine = true,
+        onClick = { showPicker = true },
         shape = RoundedCornerShape(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = displayValue,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = ForestInk,
+                )
+            }
+            Text("Change", style = MaterialTheme.typography.labelLarge)
+        }
+    }
+
+    if (showPicker) {
+        HostTimePickerDialog(
+            title = label,
+            initialEpochMillis = value ?: fallbackValue,
+            onDismiss = { showPicker = false },
+            onConfirm = { selectedHour, selectedMinute ->
+                val anchor = value ?: fallbackValue
+                onTimeSelected(anchor.withClockTime(selectedHour, selectedMinute))
+                showPicker = false
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HostTimePickerDialog(
+    title: String,
+    initialEpochMillis: Long,
+    onDismiss: () -> Unit,
+    onConfirm: (hour: Int, minute: Int) -> Unit,
+) {
+    val timePickerState = rememberTimePickerState(
+        initialHour = initialEpochMillis.hostHourOfDay(),
+        initialMinute = initialEpochMillis.hostMinuteOfHour(),
+        is24Hour = false,
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            TimePicker(state = timePickerState)
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(timePickerState.hour, timePickerState.minute)
+                },
+            ) {
+                Text("Set")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
     )
 }
 
@@ -581,6 +651,24 @@ private fun String.toCsvList(): List<String> =
         .map { it.trim() }
         .filter { it.isNotEmpty() }
 
+private fun Long.hostHourOfDay(): Int =
+    (floorMod(HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS) / HOST_FORM_MILLIS_PER_HOUR).toInt()
+
+private fun Long.hostMinuteOfHour(): Int =
+    ((floorMod(HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS) % HOST_FORM_MILLIS_PER_HOUR) / HOST_FORM_MILLIS_PER_MINUTE).toInt()
+
+private fun Long.withClockTime(hour: Int, minute: Int): Long {
+    val dayStart = this - floorMod(HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS)
+    return dayStart + hour * HOST_FORM_MILLIS_PER_HOUR + minute * HOST_FORM_MILLIS_PER_MINUTE
+}
+
+private fun Long.floorMod(other: Long): Long {
+    val mod = this % other
+    return if (mod < 0) mod + other else mod
+}
+
+private const val HOST_FORM_MILLIS_PER_MINUTE = 60L * 1_000L
+private const val HOST_FORM_MILLIS_PER_HOUR = 60L * HOST_FORM_MILLIS_PER_MINUTE
 private const val HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS = 24L * 60L * 60L * 1_000L
 
 @Composable
