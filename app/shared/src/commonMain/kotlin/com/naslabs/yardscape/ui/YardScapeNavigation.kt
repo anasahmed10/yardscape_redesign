@@ -93,8 +93,8 @@ class YardScapeAppState(
     fun hostEventItems(): List<HostEventItem> =
         repository.hostEvents(hostId).map { it.toHostEventItem(nowEpochMillis) }
 
-    fun hostLocationSuggestions(): List<MapSelectedLocation> =
-        mapLocationSearchRepository.hostLocationSuggestions()
+    fun searchHostLocations(query: String): List<MapSelectedLocation> =
+        mapLocationSearchRepository.searchHostLocations(query)
 
     fun hostEditorState(eventId: String?): HostEditorState =
         HostEditorState(
@@ -330,6 +330,64 @@ private fun ExactAddress.displayLabel(): String =
         accessInstructions,
     ).joinToString("\n")
 
+fun Long.toHostClockTimeLabel(): String {
+    val minutesSinceMidnight = (floorMod(MILLIS_PER_DAY) / MILLIS_PER_MINUTE).toInt()
+    val hour24 = minutesSinceMidnight / 60
+    val minute = minutesSinceMidnight % 60
+    val hour12 = when (val normalized = hour24 % 12) {
+        0 -> 12
+        else -> normalized
+    }
+    val minuteLabel = minute.toString().padStart(2, '0')
+    val meridiem = if (hour24 < 12) "AM" else "PM"
+    return "$hour12:$minuteLabel $meridiem"
+}
+
+fun Long.withHostClockTime(input: String): Long? {
+    val parsedMinutes = input.toClockMinutesSinceMidnight() ?: return null
+    val dayStart = this - floorMod(MILLIS_PER_DAY)
+    return dayStart + parsedMinutes * MILLIS_PER_MINUTE
+}
+
+fun String.toClockMinutesSinceMidnight(): Int? {
+    val compactInput = trim().lowercase().replace(".", "")
+    if (compactInput.isBlank()) return null
+
+    val meridiem = when {
+        compactInput.endsWith("am") -> "am"
+        compactInput.endsWith("pm") -> "pm"
+        else -> null
+    }
+    val timePart = when (meridiem) {
+        null -> compactInput
+        else -> compactInput.removeSuffix(meridiem).trim()
+    }
+    val parts = timePart.split(":")
+    if (parts.size > 2 || parts.any { it.isBlank() }) return null
+
+    val hourInput = parts[0].toIntOrNull() ?: return null
+    val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    if (minute !in 0..59) return null
+
+    val hour24 = when (meridiem) {
+        "am" -> when (hourInput) {
+            in 1..11 -> hourInput
+            12 -> 0
+            else -> return null
+        }
+        "pm" -> when (hourInput) {
+            in 1..11 -> hourInput + 12
+            12 -> 12
+            else -> return null
+        }
+        else -> when (hourInput) {
+            in 0..23 -> hourInput
+            else -> return null
+        }
+    }
+    return hour24 * 60 + minute
+}
+
 private fun com.naslabs.yardscape.domain.SaleWindow.toBrowseDateLabel(
     nowEpochMillis: Long,
 ): String {
@@ -362,4 +420,5 @@ private fun Long.floorMod(other: Long): Long =
     this - floorDiv(other) * other
 
 private const val MILLIS_PER_HOUR = 60L * 60L * 1_000L
+private const val MILLIS_PER_MINUTE = 60L * 1_000L
 private const val MILLIS_PER_DAY = 24L * MILLIS_PER_HOUR

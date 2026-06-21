@@ -145,6 +145,7 @@ Agents may complete normal feature, bug fix, test, and documentation work while 
 - Inspect the current implementation before editing. Do not ask for file paths, package names, commands, or architecture facts that can be discovered locally.
 - Implement the smallest useful change, add or update tests when behavior changes, run the matching validation commands, commit, push, open a Pull Request, review the resulting diff, make it ready for review if it was created as a draft, and merge it when validation and merge requirements are satisfied.
 - Agents are expected to complete normal queue tickets end-to-end on their own, including PR review and merge, when the work is within the approved autonomous scope and does not involve the restricted areas listed below.
+- After any validated code, test, or workflow change, agents should complete the repository workflow end-to-end by creating a PR, reviewing it as if another agent authored it, confirming the validation evidence, and merging it once local validation, required GitHub checks, secret scanning, and repository rules allow.
 - After making and testing changes, agents must review their own PRs as if the PR came from another agent: inspect the final diff, check privacy-sensitive surfaces, confirm validation results, address issues, and merge when repository rules and the approval policy allow it.
 - Reference the ticket from the PR body with `Refs #<issue-number>`.
 - Use sensible defaults for routine implementation details and note them in the final report.
@@ -201,7 +202,7 @@ Use the narrowest validation that proves the change.
 5. Preserve the privacy boundary between public approximate location and protected exact location.
 6. Add or update tests when behavior changes.
 7. Run the most focused validation command that proves the change.
-8. Open the PR, review the diff and checks, resolve any issues, make the PR ready, and merge it when repository rules allow.
+8. Open the PR after validation, review the diff and checks as if another agent authored it, resolve any issues, make it ready if it was created as a draft, and merge it when repository rules allow.
 9. Update the roadmap or milestone table in this file or the relevant docs when the completed change advances, closes, or reshapes planned work.
 10. Report commands that could not be run and why.
 11. Update this file when a durable architectural or workflow rule changes.
