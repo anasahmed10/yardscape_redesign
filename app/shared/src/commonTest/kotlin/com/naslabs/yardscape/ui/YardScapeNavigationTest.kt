@@ -54,7 +54,7 @@ class YardScapeNavigationTest {
     fun routePathsRoundTripForDeepLinkShapedState() {
         val routes = listOf(
             YardScapeRoute.Browse,
-            YardScapeRoute.Rsvps,
+            YardScapeRoute.Saved,
             YardScapeRoute.Host,
             YardScapeRoute.Account,
             YardScapeRoute.EventDetail("event-123"),
@@ -74,7 +74,7 @@ class YardScapeNavigationTest {
     fun navigationLabelsNeverContainProtectedLocationData() {
         val routes = listOf(
             YardScapeRoute.Browse,
-            YardScapeRoute.Rsvps,
+            YardScapeRoute.Saved,
             YardScapeRoute.Host,
             YardScapeRoute.Account,
             YardScapeRoute.EventDetail(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID),

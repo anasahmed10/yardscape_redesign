@@ -18,7 +18,7 @@ import com.naslabs.yardscape.ui.HostDashboardScreen
 import com.naslabs.yardscape.ui.HostCreateEditScreen
 import com.naslabs.yardscape.ui.PublicEventDetailScreen
 import com.naslabs.yardscape.ui.RsvpScreen
-import com.naslabs.yardscape.ui.RsvpsDestinationScreen
+import com.naslabs.yardscape.ui.SavedDestinationScreen
 import com.naslabs.yardscape.ui.YardScapeAppShell
 import com.naslabs.yardscape.ui.YardScapeAppState
 import com.naslabs.yardscape.ui.YardScapePrimaryDestination
@@ -48,15 +48,27 @@ fun App(appState: YardScapeAppState) {
             ) {
                 when (val currentRoute = appState.route) {
                     YardScapeRoute.Browse -> BrowseScreen(
-                        events = appState.browseItems(),
+                        state = appState.discoveryState(),
                         dataAvailability = appState.dataAvailability,
                         onEventSelected = appState::openEvent,
                         onHostSelected = {
                             appState.navigateTo(YardScapePrimaryDestination.Host)
                         },
+                        onQueryChanged = appState::updateDiscoveryQuery,
+                        onDateChanged = appState::updateDiscoveryDate,
+                        onDistanceChanged = appState::updateDiscoveryDistance,
+                        onCategoryToggled = appState::toggleDiscoveryCategory,
+                        onDisplayModeChanged = appState::updateDiscoveryDisplayMode,
+                        onResetFilters = appState::clearDiscoveryFilters,
+                        onSavedToggled = { appState.toggleSavedEvent(it) },
                     )
 
-                    YardScapeRoute.Rsvps -> RsvpsDestinationScreen()
+                    YardScapeRoute.Saved -> SavedDestinationScreen(
+                        events = appState.savedItems(),
+                        onEventSelected = appState::openEvent,
+                        onUnsave = { appState.toggleSavedEvent(it) },
+                        onBrowse = { appState.navigateTo(YardScapePrimaryDestination.Browse) },
+                    )
                     YardScapeRoute.Host -> HostDashboardScreen(
                         events = appState.hostEventItems(),
                         onCreateEvent = { appState.openHostCreateEdit() },
