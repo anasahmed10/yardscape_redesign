@@ -1,0 +1,100 @@
+package com.naslabs.yardscape.ui
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.naslabs.yardscape.domain.UserRole
+
+@Composable
+fun RsvpsDestinationScreen() {
+    PrimaryPlaceholderScreen(
+        title = "My RSVPs",
+        message = "Track upcoming, pending, and past attendance here. Exact locations remain governed by each RSVP's access state.",
+    )
+}
+
+@Composable
+fun AccountDestinationScreen(activeUserRole: UserRole) {
+    PrimaryPlaceholderScreen(
+        title = "Account",
+        message = "Review the ${activeUserRole.name.lowercase()} mock profile, trust signals, and safety controls here.",
+    )
+}
+
+@Composable
+fun HostDashboardScreen(
+    events: List<HostEventItem>,
+    onCreateEvent: () -> Unit,
+    onEditEvent: (String) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Column(
+                modifier = Modifier.padding(top = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("Host tools", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "Create and manage your sales in a workspace separated from public shopper previews.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(modifier = Modifier.fillMaxWidth(), onClick = onCreateEvent) {
+                    Text("Create a sale")
+                }
+            }
+        }
+        items(events, key = { it.id }) { event ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onEditEvent(event.id) },
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(event.title, fontWeight = FontWeight.SemiBold)
+                    Text("${event.statusLabel} • ${event.dateLabel}")
+                    Text(
+                        event.publicLocationLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrimaryPlaceholderScreen(title: String, message: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(message, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
