@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -33,8 +34,13 @@ fun YardScapeAppShell(
             .testTag(YardScapeTestTags.AppShell),
     ) {
         AppShellHeader(route = route, activeUserRole = activeUserRole)
-        Box(modifier = Modifier.weight(1f)) {
-            content()
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            Box(modifier = Modifier.widthIn(max = 960.dp).fillMaxSize()) {
+                content()
+            }
         }
         NavigationBar {
             YardScapePrimaryDestination.entries.forEach { destination ->
@@ -81,7 +87,7 @@ private fun AppShellHeader(route: YardScapeRoute, activeUserRole: UserRole) {
                 )
             }
             Text(
-                text = "${activeUserRole.name.lowercase().replaceFirstChar { it.uppercase() }} scenario",
+                text = "Mock ${activeUserRole.name.lowercase()} data",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
