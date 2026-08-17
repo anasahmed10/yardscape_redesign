@@ -18,6 +18,8 @@ interface YardSaleEventRepository {
 
     fun rsvpFor(eventId: String, shopperId: String): Rsvp?
 
+    fun rsvpsForEvent(eventId: String): List<Rsvp> = emptyList()
+
     fun exactLocationFor(
         eventId: String,
         shopperId: String,

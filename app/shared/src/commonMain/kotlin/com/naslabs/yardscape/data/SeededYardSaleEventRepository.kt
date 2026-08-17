@@ -48,6 +48,9 @@ class SeededYardSaleEventRepository(
     override fun rsvpFor(eventId: String, shopperId: String): Rsvp? =
         rsvps.firstOrNull { it.eventId == eventId && it.shopperId == shopperId }
 
+    override fun rsvpsForEvent(eventId: String): List<Rsvp> =
+        rsvps.filter { it.eventId == eventId }
+
     override fun exactLocationFor(
         eventId: String,
         shopperId: String,

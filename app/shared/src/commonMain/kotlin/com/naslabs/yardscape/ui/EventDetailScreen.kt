@@ -84,6 +84,12 @@ fun PublicEventDetailScreen(
             LocationAccessPanel(revealState = state.revealState)
         }
 
+        if (state.attendanceState == EventAttendanceState.AtCapacity) {
+            item {
+                PrivacyNote(text = "This sale is at capacity, so new RSVPs are paused.")
+            }
+        }
+
         item {
             Column(
                 modifier = Modifier.padding(bottom = 18.dp),
