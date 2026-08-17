@@ -36,6 +36,12 @@ interface YardSaleEventRepository {
 
     fun expireRsvpAccess(eventId: String, shopperId: String): Rsvp? = null
 
+    fun acceptRsvp(eventId: String, shopperId: String): Rsvp? = null
+
+    fun declineRsvp(eventId: String, shopperId: String): Rsvp? = null
+
+    fun removeRsvp(eventId: String, shopperId: String): Rsvp? = null
+
     fun hostEvents(hostId: String): List<YardSaleEvent>
 
     fun hostEvent(eventId: String): YardSaleEvent?

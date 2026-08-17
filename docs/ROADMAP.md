@@ -30,6 +30,7 @@ Deterministic UX states and their privacy assertions live in [Mock Scenario Cata
 Primary role navigation and internal route behavior live in [Shared App Shell](./APP_SHELL.md).
 Mock search, filters, map mode, and saved-state behavior live in [Shopper Discovery](./SHOPPER_DISCOVERY.md).
 The resumable multi-step creation journey and mock backend findings live in [Host Editor Flow](./HOST_EDITOR_FLOW.md).
+Host attendance states, reveal consequences, and API-policy findings live in [Host Attendance Management](./HOST_ATTENDANCE.md).
 
 - Add account basics: email or phone sign-in, profile, session handling, and sign-out.
 - Add persistence with PostgreSQL and PostGIS for radius, neighborhood, and map-style searches.

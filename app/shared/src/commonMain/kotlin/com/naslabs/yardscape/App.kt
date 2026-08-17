@@ -16,6 +16,7 @@ import com.naslabs.yardscape.ui.AccountDestinationScreen
 import com.naslabs.yardscape.ui.BrowseScreen
 import com.naslabs.yardscape.ui.HostDashboardScreen
 import com.naslabs.yardscape.ui.HostCreateEditScreen
+import com.naslabs.yardscape.ui.HostAttendanceScreen
 import com.naslabs.yardscape.ui.MyRsvpsScreen
 import com.naslabs.yardscape.ui.PublicEventDetailScreen
 import com.naslabs.yardscape.ui.RsvpScreen
@@ -87,6 +88,7 @@ fun App(appState: YardScapeAppState) {
                         events = appState.hostEventItems(),
                         onCreateEvent = { appState.openHostCreateEdit() },
                         onEditEvent = appState::openHostCreateEdit,
+                        onManageAttendees = { appState.openHostAttendees(it) },
                     )
                     YardScapeRoute.Account -> AccountDestinationScreen(appState.activeUserRole)
 
@@ -104,6 +106,15 @@ fun App(appState: YardScapeAppState) {
                     is YardScapeRoute.HostCreateEdit -> HostEditorRoute(
                         appState = appState,
                         route = currentRoute,
+                    )
+
+                    is YardScapeRoute.HostAttendees -> HostAttendanceScreen(
+                        state = appState.hostAttendanceState(currentRoute.eventId),
+                        pendingAction = appState.pendingHostAttendeeAction,
+                        onBack = { appState.navigateBack() },
+                        onRequestAction = appState::requestHostAttendeeAction,
+                        onDismissAction = appState::dismissHostAttendeeAction,
+                        onConfirmAction = appState::confirmHostAttendeeAction,
                     )
                 }
             }

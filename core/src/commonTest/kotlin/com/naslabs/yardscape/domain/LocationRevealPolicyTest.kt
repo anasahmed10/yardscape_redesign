@@ -53,6 +53,7 @@ class LocationRevealPolicyTest {
             RsvpStatus.WAITLISTED,
             RsvpStatus.DECLINED,
             RsvpStatus.CANCELLED,
+            RsvpStatus.REMOVED,
         ).forEach { status ->
             val rsvp = rsvp(status = status, locationVisibility = LocationVisibility.RSVP_ACCEPTED)
 

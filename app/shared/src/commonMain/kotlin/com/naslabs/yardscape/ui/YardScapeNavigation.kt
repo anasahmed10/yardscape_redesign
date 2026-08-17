@@ -100,6 +100,12 @@ sealed interface YardScapeRoute {
         override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Host
     }
 
+    data class HostAttendees(val eventId: String) : YardScapeRoute {
+        override val path: String = "/host/events/$eventId/attendees"
+        override val destinationLabel: String = "Manage attendees"
+        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Host
+    }
+
     companion object {
         fun fromPath(path: String): YardScapeRoute? {
             val segments = path.substringBefore('?').substringBefore('#')
@@ -119,6 +125,9 @@ sealed interface YardScapeRoute {
                 segments.size == 4 &&
                     segments[0] == "host" && segments[1] == "events" && segments[3] == "edit" ->
                     HostCreateEdit(segments[2])
+                segments.size == 4 &&
+                    segments[0] == "host" && segments[1] == "events" && segments[3] == "attendees" ->
+                    HostAttendees(segments[2])
                 else -> null
             }
         }
@@ -154,6 +163,12 @@ class YardScapeAppState(
     initialRoute: YardScapeRoute = YardScapeRoute.Browse,
 ) {
     private val hostEditorSessions = mutableMapOf<String, HostEditorState>()
+    private val hostAttendancePolicies = mutableMapOf(
+        SeededYardSaleData.FAMILY_GARAGE_EVENT_ID to HostAttendancePolicy(
+            attendeeCap = 2,
+            approvalMode = HostRsvpApprovalMode.ManualReview,
+        ),
+    )
     var route: YardScapeRoute by mutableStateOf(initialRoute)
         private set
 
@@ -176,6 +191,9 @@ class YardScapeAppState(
         private set
 
     var directionsEventId: String? by mutableStateOf(null)
+        private set
+
+    var pendingHostAttendeeAction: PendingHostAttendeeAction? by mutableStateOf(null)
         private set
 
     val activePrimaryDestination: YardScapePrimaryDestination
@@ -210,6 +228,7 @@ class YardScapeAppState(
             }
             is YardScapeRoute.Rsvp -> YardScapeRoute.EventDetail(current.eventId, current.origin)
             is YardScapeRoute.HostCreateEdit -> YardScapeRoute.Host
+            is YardScapeRoute.HostAttendees -> YardScapeRoute.Host
         }
         return true
     }
@@ -400,6 +419,75 @@ class YardScapeAppState(
         route = YardScapeRoute.HostCreateEdit(eventId)
     }
 
+    fun openHostAttendees(eventId: String): Boolean {
+        val event = repository.hostEvent(eventId) ?: return false
+        if (event.host.id != hostId) return false
+        route = YardScapeRoute.HostAttendees(eventId)
+        return true
+    }
+
+    fun updateHostAttendancePolicy(eventId: String, policy: HostAttendancePolicy): Boolean {
+        val event = repository.hostEvent(eventId) ?: return false
+        if (event.host.id != hostId) return false
+        if (policy.attendeeCap != null && policy.attendeeCap < 1) return false
+        hostAttendancePolicies[eventId] = policy
+        return true
+    }
+
+    fun hostAttendanceState(eventId: String): HostAttendanceState? {
+        val event = repository.hostEvent(eventId) ?: return null
+        if (event.host.id != hostId) return null
+        val attendees = repository.rsvpsForEvent(eventId).map { rsvp ->
+            val uiState = rsvp.toHostAttendeeUiState(event.status, event.saleWindow.hasEnded(nowEpochMillis))
+            HostAttendeeItem(
+                shopperId = rsvp.shopperId,
+                displayName = rsvp.shopperId.toMockAttendeeDisplayName(),
+                state = uiState,
+                hasLocationAccess = uiState == HostAttendeeUiState.Accepted &&
+                    repository.exactLocationFor(eventId, rsvp.shopperId, nowEpochMillis) != null,
+            )
+        }.sortedWith(compareBy({ it.state.ordinal }, { it.displayName }))
+        return HostAttendanceState(
+            eventId = eventId,
+            eventTitle = event.title,
+            policy = hostAttendancePolicies[eventId] ?: HostAttendancePolicy(),
+            attendees = attendees,
+        )
+    }
+
+    fun requestHostAttendeeAction(
+        eventId: String,
+        shopperId: String,
+        action: HostAttendeeAction,
+    ): Boolean {
+        val state = hostAttendanceState(eventId) ?: return false
+        val attendee = state.attendees.firstOrNull { it.shopperId == shopperId } ?: return false
+        if (action !in attendee.availableActions) return false
+        if (action == HostAttendeeAction.Accept && state.isAtCapacity) return false
+        pendingHostAttendeeAction = PendingHostAttendeeAction(eventId, shopperId, attendee.displayName, action)
+        return true
+    }
+
+    fun dismissHostAttendeeAction() {
+        pendingHostAttendeeAction = null
+    }
+
+    fun confirmHostAttendeeAction(): Boolean {
+        val pending = pendingHostAttendeeAction ?: return false
+        pendingHostAttendeeAction = null
+        val updated = when (pending.action) {
+            HostAttendeeAction.Accept -> {
+                if (hostAttendanceState(pending.eventId)?.isAtCapacity == true) return false
+                repository.acceptRsvp(pending.eventId, pending.shopperId)
+            }
+            HostAttendeeAction.Decline -> repository.declineRsvp(pending.eventId, pending.shopperId)
+            HostAttendeeAction.Remove -> repository.removeRsvp(pending.eventId, pending.shopperId)
+            HostAttendeeAction.Revoke -> repository.revokeRsvpAccess(pending.eventId, pending.shopperId)
+        }
+        directionsEventId = null
+        return updated != null
+    }
+
     fun returnToBrowse() {
         navigateTo(YardScapePrimaryDestination.Browse)
     }
@@ -463,10 +551,14 @@ class YardScapeAppState(
     fun publishHostEvent(state: HostEditorState): HostEditorState {
         val errors = state.publishErrors()
         if (errors.isNotEmpty()) return rememberHostEditorState(state.copy(validationErrors = errors, pendingConfirmation = null))
-        return rememberHostEditorState(
+        val published = rememberHostEditorState(
             hostStateFrom(state, repository.saveHostEvent(state.draft, EventStatus.PUBLISHED))
                 .copy(step = HostEditorStep.Preview, pendingConfirmation = null),
         )
+        published.savedEventId?.let { eventId ->
+            hostAttendancePolicies[eventId] = HostAttendancePolicy(state.attendeeCap, state.approvalMode)
+        }
+        return published
     }
 
     fun publishHostEvent(draft: HostEventDraft): HostEditorState =
