@@ -91,6 +91,8 @@ On macOS or Linux:
 
 For iOS, open [app/iosApp](./app/iosApp) in Xcode and run the app from there.
 
+Cross-platform trigger rules and exact JS, Wasm, and iOS commands are documented in [Platform Compatibility Validation](./docs/PLATFORM_VALIDATION.md).
+
 ## Validation
 
 Use the narrowest command that proves the change:
@@ -99,7 +101,10 @@ Use the narrowest command that proves the change:
 | --- | --- |
 | Shared domain or privacy policy logic | `.\gradlew.bat :app:shared:testAndroidHostTest` |
 | Shared Compose UI or Android workflow | `.\gradlew.bat :app:shared:testAndroidHostTest` and `.\gradlew.bat :app:androidApp:assembleDebug` |
+| Shared KMP contracts, dependencies, or common UI | Android checks plus `./gradlew :app:webApp:composeCompatibilityBrowserDistribution` and, on Apple Silicon macOS, `./gradlew :app:shared:iosSimulatorArm64Test` |
 | Server routes or API behavior | `.\gradlew.bat :server:test` |
+| Web behavior | `./gradlew :app:webApp:composeCompatibilityBrowserDistribution`; manually launch the changed JS/Wasm target for interaction smoke testing |
+| iOS wrapper or platform code | `./gradlew :app:shared:iosSimulatorArm64Test` plus the unsigned Xcode simulator build documented above |
 | Broad or release-sensitive changes | `.\gradlew.bat check` |
 
 The Android RSVP reveal smoke test is available with a connected device or emulator:

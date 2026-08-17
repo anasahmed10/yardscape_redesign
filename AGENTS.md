@@ -174,13 +174,17 @@ Useful run commands:
 ## Validation Matrix
 Use the narrowest validation that proves the change.
 
+The full cross-platform trigger matrix and macOS/Linux constraints are documented in [Platform Compatibility Validation](./docs/PLATFORM_VALIDATION.md).
+
 | Change type | Required validation |
 | --- | --- |
 | Docs-only changes | No Gradle task required unless commands, generated examples, workflows, or release instructions changed; markdown-only edits may be merged in a PR without test execution. |
 | Core domain or privacy policy logic | `.\gradlew.bat :app:shared:testAndroidHostTest` and any focused common tests that apply. |
 | Shared Compose UI or Android workflow | `.\gradlew.bat :app:shared:testAndroidHostTest` and `.\gradlew.bat :app:androidApp:assembleDebug`. |
+| Shared KMP contracts, dependencies, or common UI | Android checks plus `./gradlew :app:webApp:composeCompatibilityBrowserDistribution` and, on Apple Silicon macOS, `./gradlew :app:shared:iosSimulatorArm64Test`. |
 | Server routes or API behavior | `.\gradlew.bat :server:test`. |
-| Web app behavior | `.\gradlew.bat :app:webApp:wasmJsBrowserDevelopmentRun` for manual smoke testing when feasible. |
+| Web app behavior | `./gradlew :app:webApp:composeCompatibilityBrowserDistribution` plus a manual JS/Wasm smoke run when interaction behavior changed. |
+| iOS wrapper or platform behavior | `./gradlew :app:shared:iosSimulatorArm64Test` plus an unsigned Xcode simulator build. Report unavailable Xcode hosts explicitly. |
 | Broad or release-sensitive changes | `.\gradlew.bat check` plus targeted platform checks. |
 
 ## GitHub And Release Workflow
@@ -220,3 +224,4 @@ Use the narrowest validation that proves the change.
 | 8 | GitHub Actions validation for agent PRs | Done |
 | 9 | Post-MVP backend design | Done |
 | 10 | JS and Wasm mock preview compatibility | Done |
+| 11 | Periodic iOS and web compatibility validation | Done |
