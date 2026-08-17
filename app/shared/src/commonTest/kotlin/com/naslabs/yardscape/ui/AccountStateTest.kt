@@ -72,7 +72,7 @@ class AccountStateTest {
         assertTrue(shopper.myRsvpItems().isEmpty())
         val signedOutDetail = assertNotNull(shopper.detailStateFor(acceptedEventId))
         assertFalse(signedOutDetail.revealState is LocationRevealState.Revealed)
-        assertFalse(signedOutDetail.toString().contains("123 Cedar Street"))
+        assertFalse(signedOutDetail.toString().contains("418 Juniper Avenue"))
 
         val host = YardScapeAppState(activeUserRole = UserRole.HOST)
         assertTrue(host.hostEventItems().isNotEmpty())
