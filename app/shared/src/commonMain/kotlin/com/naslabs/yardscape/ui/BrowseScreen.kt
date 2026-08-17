@@ -1,7 +1,6 @@
 package com.naslabs.yardscape.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -23,10 +22,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -140,7 +140,9 @@ private fun DiscoveryControls(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = "Search sales" },
             value = state.filters.query,
             onValueChange = onQueryChanged,
             label = { Text("Search sales") },
@@ -254,17 +256,16 @@ private fun ApproximateMapPreview(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             events.forEach { event ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onEventSelected(event.id) },
-                ) {
+                Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text("● ${event.locationLabel}", fontWeight = FontWeight.SemiBold)
                         Text(event.title)
+                        OutlinedButton(onClick = { onEventSelected(event.id) }) {
+                            Text("Open event")
+                        }
                         OutlinedButton(onClick = { onSavedToggled(event.id) }) {
                             Text(if (event.id in savedEventIds) "Unsave" else "Save")
                         }
@@ -368,9 +369,7 @@ internal fun EventPreviewCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag(YardScapeTestTags.browseEventCard(event.id))
-            .clip(MaterialTheme.shapes.small)
-            .clickable(onClick = onClick),
+            .testTag("event-preview-${event.id}"),
         shape = MaterialTheme.shapes.small,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
@@ -423,6 +422,14 @@ internal fun EventPreviewCard(
                 event.categoryLabels.forEach { label ->
                     CategoryChip(label = label)
                 }
+            }
+            OutlinedButton(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(YardScapeTestTags.browseEventCard(event.id)),
+                onClick = onClick,
+            ) {
+                Text("View sale")
             }
             OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onSavedToggle) {
                 Text(if (isSaved) "Unsave" else "Save sale")

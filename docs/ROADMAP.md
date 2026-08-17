@@ -33,6 +33,8 @@ The resumable multi-step creation journey and mock backend findings live in [Hos
 Host attendance states, reveal consequences, and API-policy findings live in [Host Attendance Management](./HOST_ATTENDANCE.md).
 Mock session states, trust wording, safety placement, and authentication follow-ups live in [Mock Account, Trust, and Safety Surfaces](./MOCK_ACCOUNT_AND_SAFETY.md).
 Shared Material 3 color, typography, spacing, shape, and component conventions live in [Shared UI Design System](./UI_DESIGN_SYSTEM.md).
+The completed responsive flow review and accessibility evidence live in [Mock Flow Usability Review](./MOCK_FLOW_USABILITY_REVIEW.md).
+The validated repository methods, DTO boundaries, errors, and privacy invariants live in [Backend Contract Freeze](./BACKEND_CONTRACT_FREEZE.md).
 
 - Replace the mock account/session controller with reviewed email or phone authentication while preserving anonymous browsing, explicit expiry, and protected-state clearing.
 - Add persistence with PostgreSQL and PostGIS for radius, neighborhood, and map-style searches.

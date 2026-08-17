@@ -1,6 +1,5 @@
 package com.naslabs.yardscape.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -105,9 +104,7 @@ fun HostDashboardScreen(
         }
         items(events, key = { it.id }) { event ->
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onEditEvent(event.id) },
+                modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.small,
             ) {
                 Column(
@@ -121,6 +118,10 @@ fun HostDashboardScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onEditEvent(event.id) },
+                    ) { Text("Edit sale") }
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { onManageAttendees(event.id) },

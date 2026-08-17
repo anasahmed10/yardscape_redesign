@@ -17,6 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import com.naslabs.yardscape.domain.REPORT_DETAILS_MAX_LENGTH
 import com.naslabs.yardscape.domain.ReportReason
@@ -64,10 +66,12 @@ fun ShopperSafetyScreen(
                 BlockForm(state = state, onRequestMutation = onRequestBlockMutation)
             }
         }
-        item {
-            PrivacyNote(
-                "Do not include an exact address, access instructions, private contact details, or payment information in a report.",
-            )
+        if (state.action == ShopperSafetyAction.Report) {
+            item {
+                PrivacyNote(
+                    "Do not include an exact address, access instructions, private contact details, or payment information in a report.",
+                )
+            }
         }
     }
 
@@ -118,7 +122,9 @@ private fun ReportForm(
                 }
             }
             OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { contentDescription = "Optional report details" },
                 value = state.details,
                 onValueChange = { if (it.length <= REPORT_DETAILS_MAX_LENGTH) onDetailsChanged(it) },
                 label = { Text("Optional details") },

@@ -225,3 +225,4 @@ The full cross-platform trigger matrix and macOS/Linux constraints are documente
 | 9 | Post-MVP backend design | Done |
 | 10 | JS and Wasm mock preview compatibility | Done |
 | 11 | Periodic iOS and web compatibility validation | Done |
+| 12 | UI-first usability review and initial backend contract freeze | Done |
