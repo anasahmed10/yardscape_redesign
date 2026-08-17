@@ -11,7 +11,7 @@ The shared Compose shell keeps shopper and host mock workflows reachable on Andr
 | Host | Host workspace | A distinct dashboard for creating and editing host-owned events. |
 | Account | Account workspace | Stable entry point for upcoming mock profile, trust, and safety surfaces. |
 
-The active primary destination remains selected for nested routes. My RSVPs (`/rsvps`) keeps Saved selected and returns to Saved on Back. Event Detail and RSVP retain either Browse or Saved as their shopper origin; host create/edit belongs to Host. Back from RSVP returns to the same event, back from Event Detail returns to its shopper origin, and back from host create/edit returns to the Host dashboard.
+The active primary destination remains selected for nested routes. My RSVPs (`/rsvps`) keeps Saved selected and returns to Saved on Back. Event Detail and RSVP retain either Browse or Saved as their shopper origin; host create/edit and attendee management (`/host/events/{eventId}/attendees`) belong to Host. Back from RSVP returns to the same event, back from Event Detail returns to its shopper origin, and back from either host workflow returns to the Host dashboard.
 
 ## Route-shaped state
 

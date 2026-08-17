@@ -103,6 +103,30 @@ class SeededYardSaleEventRepository(
             rsvp.copy(locationVisibility = LocationVisibility.EXPIRED)
         }
 
+    override fun acceptRsvp(eventId: String, shopperId: String): Rsvp? =
+        updateRsvp(eventId, shopperId) { rsvp ->
+            rsvp.copy(
+                status = RsvpStatus.ACCEPTED,
+                locationVisibility = LocationVisibility.RSVP_ACCEPTED,
+            )
+        }
+
+    override fun declineRsvp(eventId: String, shopperId: String): Rsvp? =
+        updateRsvp(eventId, shopperId) { rsvp ->
+            rsvp.copy(
+                status = RsvpStatus.DECLINED,
+                locationVisibility = LocationVisibility.PUBLIC_APPROXIMATION,
+            )
+        }
+
+    override fun removeRsvp(eventId: String, shopperId: String): Rsvp? =
+        updateRsvp(eventId, shopperId) { rsvp ->
+            rsvp.copy(
+                status = RsvpStatus.REMOVED,
+                locationVisibility = LocationVisibility.REVOKED,
+            )
+        }
+
     override fun hostEvents(hostId: String): List<YardSaleEvent> =
         events
             .filter { it.host.id == hostId }
@@ -356,6 +380,55 @@ object SeededYardSaleData {
             shopperId = SHOPPER_WITH_ACCEPTED_ACCESS_ID,
             status = RsvpStatus.ACCEPTED,
             locationVisibility = LocationVisibility.RSVP_ACCEPTED,
+        ),
+        Rsvp(
+            id = "rsvp-accepted-family",
+            eventId = FAMILY_GARAGE_EVENT_ID,
+            shopperId = "shopper-host-accepted",
+            status = RsvpStatus.ACCEPTED,
+            locationVisibility = LocationVisibility.RSVP_ACCEPTED,
+        ),
+        Rsvp(
+            id = "rsvp-waitlisted-family",
+            eventId = FAMILY_GARAGE_EVENT_ID,
+            shopperId = "shopper-host-waitlisted",
+            status = RsvpStatus.WAITLISTED,
+            locationVisibility = LocationVisibility.RSVP_REQUESTED,
+        ),
+        Rsvp(
+            id = "rsvp-declined-family",
+            eventId = FAMILY_GARAGE_EVENT_ID,
+            shopperId = "shopper-host-declined",
+            status = RsvpStatus.DECLINED,
+            locationVisibility = LocationVisibility.PUBLIC_APPROXIMATION,
+        ),
+        Rsvp(
+            id = "rsvp-cancelled-family",
+            eventId = FAMILY_GARAGE_EVENT_ID,
+            shopperId = "shopper-host-cancelled",
+            status = RsvpStatus.CANCELLED,
+            locationVisibility = LocationVisibility.PUBLIC_APPROXIMATION,
+        ),
+        Rsvp(
+            id = "rsvp-removed-family",
+            eventId = FAMILY_GARAGE_EVENT_ID,
+            shopperId = "shopper-host-removed",
+            status = RsvpStatus.REMOVED,
+            locationVisibility = LocationVisibility.REVOKED,
+        ),
+        Rsvp(
+            id = "rsvp-revoked-family",
+            eventId = FAMILY_GARAGE_EVENT_ID,
+            shopperId = "shopper-host-revoked",
+            status = RsvpStatus.ACCEPTED,
+            locationVisibility = LocationVisibility.REVOKED,
+        ),
+        Rsvp(
+            id = "rsvp-expired-family",
+            eventId = FAMILY_GARAGE_EVENT_ID,
+            shopperId = "shopper-host-expired",
+            status = RsvpStatus.ACCEPTED,
+            locationVisibility = LocationVisibility.EXPIRED,
         ),
         Rsvp(
             id = "rsvp-revoked-cancelled",

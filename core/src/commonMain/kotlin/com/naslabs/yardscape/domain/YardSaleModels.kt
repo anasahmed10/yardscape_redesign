@@ -110,6 +110,7 @@ enum class RsvpStatus {
     WAITLISTED,
     CANCELLED,
     DECLINED,
+    REMOVED,
 }
 
 enum class UserRole {

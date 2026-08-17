@@ -62,6 +62,7 @@ class YardScapeNavigationTest {
             YardScapeRoute.Rsvp("event-123"),
             YardScapeRoute.HostCreateEdit(),
             YardScapeRoute.HostCreateEdit("event-123"),
+            YardScapeRoute.HostAttendees("event-123"),
         )
 
         routes.forEach { route ->
@@ -69,6 +70,18 @@ class YardScapeNavigationTest {
         }
         assertEquals(YardScapeRoute.EventDetail("event-123"), YardScapeRoute.fromPath("/events/event-123?tab=overview"))
         assertNull(YardScapeRoute.fromPath("/private/location/123-cedar-street"))
+    }
+
+    @Test
+    fun hostAttendeeManagementIsNestedUnderHostAndReturnsThere() {
+        val state = YardScapeAppState(activeUserRole = com.naslabs.yardscape.domain.UserRole.HOST)
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+
+        assertTrue(state.openHostAttendees(eventId))
+        assertEquals(YardScapeRoute.HostAttendees(eventId), state.route)
+        assertEquals(YardScapePrimaryDestination.Host, state.activePrimaryDestination)
+        assertTrue(state.navigateBack())
+        assertEquals(YardScapeRoute.Host, state.route)
     }
 
     @Test

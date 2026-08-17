@@ -13,6 +13,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -89,6 +90,7 @@ fun HostDashboardScreen(
     events: List<HostEventItem>,
     onCreateEvent: () -> Unit,
     onEditEvent: (String) -> Unit,
+    onManageAttendees: (String) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -129,6 +131,10 @@ fun HostDashboardScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onManageAttendees(event.id) },
+                    ) { Text("Manage attendees") }
                 }
             }
         }
