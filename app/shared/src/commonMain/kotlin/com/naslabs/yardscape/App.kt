@@ -21,6 +21,7 @@ import com.naslabs.yardscape.ui.MyRsvpsScreen
 import com.naslabs.yardscape.ui.PublicEventDetailScreen
 import com.naslabs.yardscape.ui.RsvpScreen
 import com.naslabs.yardscape.ui.SavedDestinationScreen
+import com.naslabs.yardscape.ui.ShopperSafetyScreen
 import com.naslabs.yardscape.ui.YardScapeAppShell
 import com.naslabs.yardscape.ui.YardScapeAppState
 import com.naslabs.yardscape.ui.YardScapePrimaryDestination
@@ -104,11 +105,24 @@ fun App(appState: YardScapeAppState) {
                         state = appState.selectedEventDetailState(),
                         onBack = { appState.navigateBack() },
                         onRsvp = { appState.openRsvp(currentRoute.eventId) },
+                        onReport = { appState.openReport(currentRoute.eventId) },
+                        onBlock = { appState.openBlock(currentRoute.eventId) },
                     )
 
                     is YardScapeRoute.Rsvp -> RsvpScreen(
                         onConfirm = { appState.confirmRsvp(currentRoute.eventId) },
                         onBack = { appState.navigateBack() },
+                    )
+
+                    is YardScapeRoute.EventSafety -> ShopperSafetyScreen(
+                        state = appState.shopperSafetyState,
+                        onBack = { appState.navigateBack() },
+                        onReasonChanged = appState::updateSafetyReportReason,
+                        onDetailsChanged = appState::updateSafetyReportDetails,
+                        onSubmitReport = appState::submitSafetyReport,
+                        onRequestBlockMutation = appState::requestBlockMutation,
+                        onDismissBlockMutation = appState::dismissBlockMutation,
+                        onConfirmBlockMutation = appState::confirmBlockMutation,
                     )
 
                     is YardScapeRoute.HostCreateEdit -> HostEditorRoute(

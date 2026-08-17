@@ -12,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,6 +27,8 @@ fun PublicEventDetailScreen(
     state: EventDetailState?,
     onBack: () -> Unit,
     onRsvp: () -> Unit,
+    onReport: () -> Unit,
+    onBlock: () -> Unit,
 ) {
     if (state == null) {
         RoutePlaceholderScreen(title = "Event unavailable", onBack = onBack)
@@ -86,6 +89,17 @@ fun PublicEventDetailScreen(
 
         item {
             PrivacyNote(text = "Marketplace safety: visit only during listed hours, do not enter private areas, and leave if the situation feels unsafe.")
+        }
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+                OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onReport) {
+                    Text("Report sale")
+                }
+                TextButton(modifier = Modifier.fillMaxWidth(), onClick = onBlock) {
+                    Text(if (state.revealState is LocationRevealState.Blocked) "Review blocked host" else "Block host")
+                }
+            }
         }
 
         if (state.attendanceState == EventAttendanceState.AtCapacity) {

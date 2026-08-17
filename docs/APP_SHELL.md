@@ -23,10 +23,12 @@ The active primary destination remains selected for nested routes. My RSVPs (`/r
 - `/account`
 - `/events/{eventId}`
 - `/events/{eventId}/rsvp`
+- `/events/{eventId}/safety/report`
+- `/events/{eventId}/safety/block`
 - `/host/events/new`
 - `/host/events/{eventId}/edit`
 - `/host/events/{eventId}/attendees`
 
-`YardScapeAppState.navigateToPath` updates internal navigation for tests and future platform adapters. It does not register Android intents, browser URLs, or iOS universal links.
+`YardScapeAppState.navigateToPath` updates internal navigation for tests and future platform adapters. Event safety routes retain the Browse or Saved origin through mock sign-in and return to the same public event context. It does not register Android intents, browser URLs, or iOS universal links.
 
 Destination and context labels are fixed product copy. They never include event addresses, coordinates, access instructions, or other protected location content.

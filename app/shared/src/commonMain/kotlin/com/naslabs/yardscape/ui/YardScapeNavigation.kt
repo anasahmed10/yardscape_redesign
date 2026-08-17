@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.naslabs.yardscape.data.PublicEventDetail
+import com.naslabs.yardscape.data.BlockedHostUpdate
 import com.naslabs.yardscape.data.SeededYardSaleData
 import com.naslabs.yardscape.data.SeededYardSaleEventRepository
 import com.naslabs.yardscape.data.YardSaleEventRepository
@@ -14,12 +15,17 @@ import com.naslabs.yardscape.data.MapLocationSearchRepository
 import com.naslabs.yardscape.data.MapSelectedLocation
 import com.naslabs.yardscape.data.SeededMapLocationSearchRepository
 import com.naslabs.yardscape.data.SeededHostPhotoPicker
+import com.naslabs.yardscape.data.SeededShopperSafetyRepository
+import com.naslabs.yardscape.data.SafetyRepositoryResult
+import com.naslabs.yardscape.data.ShopperSafetyRepository
 import com.naslabs.yardscape.domain.EventStatus
 import com.naslabs.yardscape.domain.ExactAddress
 import com.naslabs.yardscape.domain.LocationVisibility
 import com.naslabs.yardscape.domain.PublicEventPreview
 import com.naslabs.yardscape.domain.Rsvp
 import com.naslabs.yardscape.domain.RsvpStatus
+import com.naslabs.yardscape.domain.ReportReason
+import com.naslabs.yardscape.domain.SafetyReportDraft
 import com.naslabs.yardscape.domain.UserRole
 import com.naslabs.yardscape.domain.YardSaleEvent
 
@@ -31,6 +37,11 @@ enum class YardScapePrimaryDestination(
     Saved(label = "Saved", contextLabel = "Shopper workspace"),
     Host(label = "Host", contextLabel = "Host workspace"),
     Account(label = "Account", contextLabel = "Account workspace"),
+}
+
+enum class ShopperSafetyAction(val pathSegment: String, val label: String) {
+    Report(pathSegment = "report", label = "Report sale"),
+    Block(pathSegment = "block", label = "Block host"),
 }
 
 sealed interface YardScapeRoute {
@@ -94,6 +105,20 @@ sealed interface YardScapeRoute {
         override val primaryDestination: YardScapePrimaryDestination = origin
     }
 
+    data class EventSafety(
+        val eventId: String,
+        val action: ShopperSafetyAction,
+        val origin: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse,
+    ) : YardScapeRoute {
+        init {
+            require(origin == YardScapePrimaryDestination.Browse || origin == YardScapePrimaryDestination.Saved)
+        }
+
+        override val path: String = "/events/$eventId/safety/${action.pathSegment}"
+        override val destinationLabel: String = action.label
+        override val primaryDestination: YardScapePrimaryDestination = origin
+    }
+
     data class HostCreateEdit(val eventId: String? = null) : YardScapeRoute {
         override val path: String = eventId?.let { "/host/events/$it/edit" } ?: "/host/events/new"
         override val destinationLabel: String = if (eventId == null) "Create sale" else "Edit sale"
@@ -121,6 +146,9 @@ sealed interface YardScapeRoute {
                 segments == listOf("account") -> Account
                 segments.size == 2 && segments[0] == "events" -> EventDetail(segments[1])
                 segments.size == 3 && segments[0] == "events" && segments[2] == "rsvp" -> Rsvp(segments[1])
+                segments.size == 4 && segments[0] == "events" && segments[2] == "safety" ->
+                    ShopperSafetyAction.entries.firstOrNull { it.pathSegment == segments[3] }
+                        ?.let { EventSafety(segments[1], it) }
                 segments == listOf("host", "events", "new") -> HostCreateEdit()
                 segments.size == 4 &&
                     segments[0] == "host" && segments[1] == "events" && segments[3] == "edit" ->
@@ -155,6 +183,7 @@ class YardScapeAppState(
     private val mapLocationSearchRepository: MapLocationSearchRepository = SeededMapLocationSearchRepository(),
     private val hostPhotoPicker: HostPhotoPicker = SeededHostPhotoPicker(),
     private val accountSessionController: AccountSessionController = SeededAccountSessionController(),
+    private val shopperSafetyRepository: ShopperSafetyRepository = SeededShopperSafetyRepository(),
     initialAccountStatus: MockSessionStatus = MockSessionStatus.SignedIn,
     private val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
     private val shopperId: String = SeededYardSaleData.SHOPPER_WITHOUT_ACCESS_ID,
@@ -185,6 +214,12 @@ class YardScapeAppState(
     var pendingProtectedAction: PendingProtectedAction? by mutableStateOf(null)
         private set
 
+    var shopperSafetyState: ShopperSafetyUiState? by mutableStateOf(null)
+        private set
+
+    var blockedEventIds: Set<String> by mutableStateOf(emptySet())
+        private set
+
     var discoveryFilters: DiscoveryFilters by mutableStateOf(DiscoveryFilters())
         private set
 
@@ -209,6 +244,12 @@ class YardScapeAppState(
     var pendingHostAttendeeAction: PendingHostAttendeeAction? by mutableStateOf(null)
         private set
 
+    init {
+        (initialRoute as? YardScapeRoute.EventSafety)?.let { safetyRoute ->
+            openShopperSafety(safetyRoute.eventId, safetyRoute.action, safetyRoute.origin)
+        }
+    }
+
     val activePrimaryDestination: YardScapePrimaryDestination
         get() = route.primaryDestination
 
@@ -229,7 +270,7 @@ class YardScapeAppState(
         activeUserRole = role
         accountState = accountSessionController.signIn(role, accountState.notificationPreferences)
         pendingProtectedAction = null
-        route = pending?.resumePath?.let(YardScapeRoute::fromPath) ?: YardScapeRoute.Account
+        route = pending?.resumeRoute ?: YardScapeRoute.Account
     }
 
     fun signOutMock() {
@@ -261,6 +302,7 @@ class YardScapeAppState(
         pendingRsvpCancellationEventId = null
         pendingHostAttendeeAction = null
         pendingProtectedAction = null
+        shopperSafetyState = null
     }
 
     fun navigateToPath(path: String): Boolean {
@@ -268,6 +310,7 @@ class YardScapeAppState(
         when (target) {
             YardScapeRoute.MyRsvps -> openMyRsvps()
             is YardScapeRoute.Rsvp -> openRsvp(target.eventId)
+            is YardScapeRoute.EventSafety -> openShopperSafety(target.eventId, target.action, target.origin)
             is YardScapeRoute.HostCreateEdit -> openHostCreateEdit(target.eventId)
             is YardScapeRoute.HostAttendees -> openHostAttendees(target.eventId)
             else -> route = target
@@ -288,6 +331,7 @@ class YardScapeAppState(
                 else -> YardScapeRoute.Browse
             }
             is YardScapeRoute.Rsvp -> YardScapeRoute.EventDetail(current.eventId, current.origin)
+            is YardScapeRoute.EventSafety -> YardScapeRoute.EventDetail(current.eventId, current.origin)
             is YardScapeRoute.HostCreateEdit -> YardScapeRoute.Host
             is YardScapeRoute.HostAttendees -> YardScapeRoute.Host
         }
@@ -295,7 +339,9 @@ class YardScapeAppState(
     }
 
     fun browseItems(): List<BrowseEventItem> =
-        repository.publicPreviews(nowEpochMillis).map { it.toBrowseEventItem(nowEpochMillis) }
+        repository.publicPreviews(nowEpochMillis)
+            .filterNot { it.id in blockedEventIds }
+            .map { it.toBrowseEventItem(nowEpochMillis) }
 
     fun discoveryState(): ShopperDiscoveryState {
         val allItems = browseItems()
@@ -347,7 +393,7 @@ class YardScapeAppState(
     fun openMyRsvps() {
         val gate = protectedActionDecision(ProtectedAction.RevealLocation)
         if (gate is ProtectedActionDecision.SignInRequired) {
-            pendingProtectedAction = PendingProtectedAction(ProtectedAction.RevealLocation, YardScapeRoute.MyRsvps.path)
+            pendingProtectedAction = PendingProtectedAction(ProtectedAction.RevealLocation, YardScapeRoute.MyRsvps)
             accountState = accountState.copy(signInReason = gate.message)
             route = YardScapeRoute.Account
             return
@@ -373,7 +419,9 @@ class YardScapeAppState(
                     ).joinToString(" - "),
                     state = uiState,
                     group = uiState.toGroup(),
-                    exactAddress = exactAddress.takeIf { uiState == ShopperRsvpUiState.Accepted },
+                    exactAddress = exactAddress.takeIf {
+                        uiState == ShopperRsvpUiState.Accepted && rsvp.eventId !in blockedEventIds
+                    },
                     reminderAdded = rsvp.eventId in reminderEventIds,
                     calendarExportPrepared = rsvp.eventId in calendarExportEventIds,
                 )
@@ -426,7 +474,14 @@ class YardScapeAppState(
         return updated.locationVisibility == LocationVisibility.REVOKED
     }
 
-    fun blockHostForEvent(eventId: String): Boolean = revokeRsvpAccess(eventId)
+    fun blockHostForEvent(eventId: String): Boolean =
+        when (val result = shopperSafetyRepository.blockHostForEvent(eventId)) {
+            is SafetyRepositoryResult.Success -> {
+                applyBlockedHostUpdate(result.value)
+                true
+            }
+            else -> false
+        }
 
     fun expireRsvpAccess(eventId: String): Boolean {
         val updated = repository.expireRsvpAccess(eventId, shopperId) ?: return false
@@ -446,7 +501,7 @@ class YardScapeAppState(
             eventId = eventId,
             shopperId = shopperId,
             nowEpochMillis = nowEpochMillis,
-        ).takeIf { accountState.isSignedIn }
+        ).takeIf { accountState.isSignedIn && eventId !in blockedEventIds }
         return EventDetailState(
             detail = detail,
             attendanceState = if (eventCapacitySource.isAtCapacity(eventId)) {
@@ -454,11 +509,15 @@ class YardScapeAppState(
             } else {
                 EventAttendanceState.Available
             },
-            revealState = detail.toLocationRevealState(
-                rsvpStatus = rsvp?.status,
-                locationVisibility = rsvp?.locationVisibility,
-                exactAddress = exactAddress,
-            ),
+            revealState = if (eventId in blockedEventIds) {
+                LocationRevealState.Blocked
+            } else {
+                detail.toLocationRevealState(
+                    rsvpStatus = rsvp?.status,
+                    locationVisibility = rsvp?.locationVisibility,
+                    exactAddress = exactAddress,
+                )
+            },
         )
     }
 
@@ -470,11 +529,15 @@ class YardScapeAppState(
     }
 
     fun openRsvp(eventId: String) {
+        if (eventId in blockedEventIds) {
+            route = YardScapeRoute.EventDetail(eventId)
+            return
+        }
         val gate = protectedActionDecision(ProtectedAction.Rsvp)
         if (gate is ProtectedActionDecision.SignInRequired) {
             pendingProtectedAction = PendingProtectedAction(
                 ProtectedAction.Rsvp,
-                YardScapeRoute.EventDetail(eventId).path,
+                YardScapeRoute.EventDetail(eventId),
             )
             accountState = accountState.copy(signInReason = gate.message)
             route = YardScapeRoute.Account
@@ -492,6 +555,13 @@ class YardScapeAppState(
             openRsvp(eventId)
             return
         }
+        if (eventId in blockedEventIds) {
+            val origin = route.primaryDestination.takeIf {
+                it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.Saved
+            } ?: YardScapePrimaryDestination.Browse
+            route = YardScapeRoute.EventDetail(eventId, origin)
+            return
+        }
         repository.submitRsvp(eventId, shopperId)
         val origin = (route as? YardScapeRoute.Rsvp)
             ?.takeIf { it.eventId == eventId }
@@ -500,11 +570,158 @@ class YardScapeAppState(
         route = YardScapeRoute.EventDetail(eventId, origin)
     }
 
+    fun openReport(eventId: String) {
+        openShopperSafety(eventId, ShopperSafetyAction.Report)
+    }
+
+    fun openBlock(eventId: String) {
+        openShopperSafety(eventId, ShopperSafetyAction.Block)
+    }
+
+    private fun openShopperSafety(
+        eventId: String,
+        action: ShopperSafetyAction,
+        requestedOrigin: YardScapePrimaryDestination? = null,
+    ) {
+        val detail = repository.publicEventDetail(eventId) ?: return
+        val origin = requestedOrigin ?: route.primaryDestination.takeIf {
+            it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.Saved
+        } ?: YardScapePrimaryDestination.Browse
+        val target = YardScapeRoute.EventSafety(eventId, action, origin)
+        shopperSafetyState = shopperSafetyState
+            ?.takeIf { it.eventId == eventId && it.action == action }
+            ?.copy(isBlocked = eventId in blockedEventIds)
+            ?: ShopperSafetyUiState(
+                eventId = eventId,
+                eventTitle = detail.title,
+                action = action,
+                isBlocked = eventId in blockedEventIds,
+            )
+        val protectedAction = when (action) {
+            ShopperSafetyAction.Report -> ProtectedAction.Report
+            ShopperSafetyAction.Block -> ProtectedAction.Block
+        }
+        when (val gate = protectedActionDecision(protectedAction)) {
+            ProtectedActionDecision.Allowed -> route = target
+            is ProtectedActionDecision.SignInRequired -> {
+                pendingProtectedAction = PendingProtectedAction(protectedAction, target)
+                accountState = accountState.copy(signInReason = gate.message)
+                route = YardScapeRoute.Account
+            }
+        }
+    }
+
+    fun updateSafetyReportReason(reason: ReportReason) {
+        shopperSafetyState = shopperSafetyState?.copy(
+            reason = reason,
+            reportState = ReportSubmissionState.Idle,
+        )
+    }
+
+    fun updateSafetyReportDetails(details: String) {
+        shopperSafetyState = shopperSafetyState?.copy(
+            details = details,
+            reportState = ReportSubmissionState.Idle,
+        )
+    }
+
+    fun submitSafetyReport() {
+        val state = shopperSafetyState ?: return
+        val result = shopperSafetyRepository.submitReport(
+            SafetyReportDraft(eventId = state.eventId, reason = state.reason, details = state.details),
+        )
+        shopperSafetyState = state.copy(
+            reportState = when (result) {
+                is SafetyRepositoryResult.Success -> ReportSubmissionState.Submitted(result.value.id)
+                is SafetyRepositoryResult.ValidationFailure -> ReportSubmissionState.Failed(
+                    SafetyFailureKind.Validation,
+                    result.messages.joinToString(" "),
+                )
+                is SafetyRepositoryResult.Offline -> ReportSubmissionState.Failed(
+                    SafetyFailureKind.Offline,
+                    result.message,
+                )
+                is SafetyRepositoryResult.ServerError -> ReportSubmissionState.Failed(
+                    SafetyFailureKind.Server,
+                    result.message,
+                )
+            },
+        )
+    }
+
+    fun requestBlockMutation() {
+        val state = shopperSafetyState ?: return
+        shopperSafetyState = state.copy(
+            pendingBlockMutation = if (state.isBlocked) BlockMutation.Unblock else BlockMutation.Block,
+            blockState = BlockMutationState.Idle,
+        )
+    }
+
+    fun dismissBlockMutation() {
+        shopperSafetyState = shopperSafetyState?.copy(pendingBlockMutation = null)
+    }
+
+    fun confirmBlockMutation() {
+        val state = shopperSafetyState ?: return
+        val mutation = state.pendingBlockMutation ?: return
+        val result = when (mutation) {
+            BlockMutation.Block -> shopperSafetyRepository.blockHostForEvent(state.eventId)
+            BlockMutation.Unblock -> shopperSafetyRepository.unblockHostForEvent(state.eventId)
+        }
+        shopperSafetyState = when (result) {
+            is SafetyRepositoryResult.Success -> {
+                applyBlockedHostUpdate(result.value)
+                state.copy(
+                    isBlocked = result.value.isBlocked,
+                    pendingBlockMutation = null,
+                    blockState = BlockMutationState.Completed(
+                        isBlocked = result.value.isBlocked,
+                        message = if (result.value.isBlocked) {
+                            "Host blocked. Their sales and protected locations are no longer active."
+                        } else {
+                            "Host unblocked for discovery. Previous RSVP and location access remain revoked."
+                        },
+                    ),
+                )
+            }
+            is SafetyRepositoryResult.ValidationFailure -> state.copy(
+                pendingBlockMutation = null,
+                blockState = BlockMutationState.Failed(
+                    SafetyFailureKind.Validation,
+                    result.messages.joinToString(" "),
+                ),
+            )
+            is SafetyRepositoryResult.Offline -> state.copy(
+                pendingBlockMutation = null,
+                blockState = BlockMutationState.Failed(SafetyFailureKind.Offline, result.message),
+            )
+            is SafetyRepositoryResult.ServerError -> state.copy(
+                pendingBlockMutation = null,
+                blockState = BlockMutationState.Failed(SafetyFailureKind.Server, result.message),
+            )
+        }
+    }
+
+    private fun applyBlockedHostUpdate(update: BlockedHostUpdate) {
+        if (update.isBlocked) {
+            blockedEventIds = blockedEventIds + update.affectedEventIds
+            update.affectedEventIds.forEach { eventId ->
+                repository.revokeRsvpAccess(eventId, shopperId)
+            }
+            directionsEventId = null
+            if (pendingRsvpCancellationEventId in update.affectedEventIds) {
+                pendingRsvpCancellationEventId = null
+            }
+        } else {
+            blockedEventIds = blockedEventIds - update.affectedEventIds
+        }
+    }
+
     fun openHostCreateEdit(eventId: String? = null) {
         val target = YardScapeRoute.HostCreateEdit(eventId)
         val gate = protectedActionDecision(ProtectedAction.HostManagement)
         if (gate is ProtectedActionDecision.SignInRequired) {
-            pendingProtectedAction = PendingProtectedAction(ProtectedAction.HostManagement, target.path)
+            pendingProtectedAction = PendingProtectedAction(ProtectedAction.HostManagement, target)
             accountState = accountState.copy(signInReason = gate.message)
             route = YardScapeRoute.Account
             return
@@ -517,7 +734,7 @@ class YardScapeAppState(
         if (!accountState.isSignedIn) {
             pendingProtectedAction = PendingProtectedAction(
                 ProtectedAction.HostManagement,
-                YardScapeRoute.HostAttendees(eventId).path,
+                YardScapeRoute.HostAttendees(eventId),
             )
             val gate = protectedActionDecision(ProtectedAction.HostManagement)
             accountState = accountState.copy(signInReason = (gate as? ProtectedActionDecision.SignInRequired)?.message)
@@ -746,7 +963,8 @@ data class EventDetailState(
     val shouldShowRsvpAction: Boolean =
         detail.status == EventStatus.PUBLISHED &&
             attendanceState == EventAttendanceState.Available &&
-            revealState !is LocationRevealState.Revealed
+            revealState !is LocationRevealState.Revealed &&
+            revealState !is LocationRevealState.Blocked
 }
 
 sealed interface AppDataAvailability {
@@ -800,6 +1018,12 @@ sealed interface LocationRevealState {
         override val title: String = "Sale cancelled"
         override val message: String =
             "This event is no longer active, so exact-location access is hidden."
+    }
+
+    data object Blocked : LocationRevealState {
+        override val title: String = "Protected location unavailable"
+        override val message: String =
+            "You blocked this host. Unblocking can restore discovery, but it will not restore this RSVP or exact-location access."
     }
 
     data class Revealed(val exactAddress: ExactAddress) : LocationRevealState {

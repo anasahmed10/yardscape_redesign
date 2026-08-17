@@ -109,5 +109,5 @@ class SeededAccountSessionController : AccountSessionController {
 
 data class PendingProtectedAction(
     val action: ProtectedAction,
-    val resumePath: String? = null,
+    val resumeRoute: YardScapeRoute? = null,
 )

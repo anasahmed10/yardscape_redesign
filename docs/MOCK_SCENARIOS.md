@@ -44,7 +44,12 @@ Do not replace a production entry point with a scenario launch. A future debug m
 | Expired account session | Protected state is cleared while public browsing remains available. |
 | Shopper profile | Confirmed facts remain separate from community activity. |
 | Host profile | Host trust language avoids identity or safety guarantees. |
+| Report validation | A missing reason is rejected and no success is claimed. |
+| Report offline | The failed submission stays retryable and does not alter discovery. |
+| Report server error | The service failure stays visible and does not claim receipt. |
+| Block host | Confirmation explains the consequence; success removes every sale from that host and clears protected access. |
+| Block offline | Failure leaves discovery, RSVP, and location state unchanged. |
 | Offline | Browse reports offline state while privacy-safe seeded previews remain visible. |
 | Recoverable refresh error | Browse reports a recoverable error and retry guidance. |
 
-Scenario metadata contains no protected fixture values. Protected locations remain behind the repository interface, and app-visible detail state contains an exact address only for an accepted, active mock session (or the signed-in owning host editor). Pending-attendee counts are also gated to the signed-in event owner.
+Scenario metadata contains no protected fixture values. Protected locations remain behind the repository interface, and app-visible detail state contains an exact address only for an accepted, active mock session (or the signed-in owning host editor). A successful block is an overriding local deny for every event from that host; unblocking restores discovery only and never revives the previous RSVP or reveal grant. Pending-attendee counts are also gated to the signed-in event owner.
