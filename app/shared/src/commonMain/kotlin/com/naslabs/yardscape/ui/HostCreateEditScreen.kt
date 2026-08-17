@@ -39,13 +39,16 @@ import com.naslabs.yardscape.data.HostEventDraft
 import com.naslabs.yardscape.data.MapSelectedLocation
 import com.naslabs.yardscape.data.SeededYardSaleData
 import com.naslabs.yardscape.data.withMapSelectedLocation
+import com.naslabs.yardscape.domain.EventPhoto
 
 @Composable
 fun HostCreateEditScreen(
     hostEvents: List<HostEventItem>,
     editorState: HostEditorState,
+    availablePhotos: List<EventPhoto>,
     onAddressSearch: (String) -> List<MapSelectedLocation>,
-    onDraftChanged: (HostEventDraft) -> Unit,
+    onEditorStateChanged: (HostEditorState) -> Unit,
+    onStepSelected: (HostEditorStep) -> Unit,
     onNew: () -> Unit,
     onEdit: (String) -> Unit,
     onSaveDraft: () -> Unit,
@@ -99,12 +102,11 @@ fun HostCreateEditScreen(
         item {
             HostEventForm(
                 state = editorState,
+                availablePhotos = availablePhotos,
                 onAddressSearch = onAddressSearch,
-                onDraftChanged = onDraftChanged,
+                onEditorStateChanged = onEditorStateChanged,
+                onStepSelected = onStepSelected,
                 onSaveDraft = onSaveDraft,
-                onPublish = onPublish,
-                onCancelEvent = onCancelEvent,
-                onHideEvent = onHideEvent,
             )
         }
 
@@ -140,29 +142,69 @@ fun HostCreateEditScreen(
             }
         }
     }
+
+    editorState.pendingConfirmation?.let { action ->
+        AlertDialog(
+            onDismissRequest = {
+                onEditorStateChanged(editorState.dismissConfirmation())
+            },
+            title = { Text(action.title) },
+            text = { Text(action.message) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        when (action) {
+                            HostConfirmationAction.Publish -> onPublish()
+                            HostConfirmationAction.Hide -> onHideEvent()
+                            HostConfirmationAction.Cancel -> onCancelEvent()
+                        }
+                    },
+                ) { Text(action.confirmLabel) }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { onEditorStateChanged(editorState.dismissConfirmation()) },
+                ) { Text("Go back") }
+            },
+        )
+    }
 }
 
 @Composable
 private fun HostEventForm(
     state: HostEditorState,
+    availablePhotos: List<EventPhoto>,
     onAddressSearch: (String) -> List<MapSelectedLocation>,
-    onDraftChanged: (HostEventDraft) -> Unit,
+    onEditorStateChanged: (HostEditorState) -> Unit,
+    onStepSelected: (HostEditorStep) -> Unit,
     onSaveDraft: () -> Unit,
-    onPublish: () -> Unit,
-    onCancelEvent: () -> Unit,
-    onHideEvent: () -> Unit,
 ) {
     val draft = state.draft
+    fun updateDraft(updated: HostEventDraft) {
+        onEditorStateChanged(state.copy(draft = updated, validationErrors = emptyList()))
+    }
     Column(
         modifier = Modifier.padding(bottom = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = "Create / Edit",
+            text = "${state.step.ordinal + 1} of ${HostEditorStep.entries.size}: ${state.step.label}",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = ForestInk,
         )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            HostEditorStep.entries.forEach { step ->
+                if (step == state.step) {
+                    Button(onClick = { onStepSelected(step) }) { Text(step.label) }
+                } else {
+                    OutlinedButton(onClick = { onStepSelected(step) }) { Text(step.label) }
+                }
+            }
+        }
         if (state.validationErrors.isNotEmpty()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -186,81 +228,182 @@ private fun HostEventForm(
             }
         }
 
-        FormSectionLabel("Listing basics")
-        HostTextField("Title", draft.title) { onDraftChanged(draft.copy(title = it)) }
-        HostTextField("Description", draft.description) { onDraftChanged(draft.copy(description = it)) }
-
-        MapLocationPicker(
-            selectedLocation = draft.selectedMapLocation,
-            onAddressSearch = onAddressSearch,
-            onLocationSelected = { location ->
-                onDraftChanged(draft.withMapSelectedLocation(location))
-            },
-        )
-        HostTextField("Access instructions", draft.accessInstructions.orEmpty()) {
-            onDraftChanged(draft.copy(accessInstructions = it.ifBlank { null }))
-        }
-
-        FormSectionLabel("Sale schedule")
-        HostTimePickerField(
-            label = "Start time",
-            value = draft.startsAtEpochMillis,
-            fallbackValue = draft.endsAtEpochMillis
-                ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS,
-            onTimeSelected = { start ->
-                onDraftChanged(draft.copy(startsAtEpochMillis = start))
-            },
-        )
-        HostTimePickerField(
-            label = "End time",
-            value = draft.endsAtEpochMillis,
-            fallbackValue = draft.startsAtEpochMillis
-                ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS,
-            onTimeSelected = { selectedEnd ->
-                val start = draft.startsAtEpochMillis
-                val end = if (start != null && selectedEnd <= start) {
-                    selectedEnd + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS
-                } else {
-                    selectedEnd
-                }
-                onDraftChanged(draft.copy(endsAtEpochMillis = end))
-            },
-        )
-
-        FormSectionLabel("Sale details")
-        HostTextField("Categories", draft.categories.joinToString(", ")) {
-            onDraftChanged(draft.copy(categories = it.toCsvList()))
-        }
-        HostTextField("Payment notes", draft.acceptedPaymentTypes.joinToString(", ")) {
-            onDraftChanged(draft.copy(acceptedPaymentTypes = it.toCsvList()))
-        }
-        HostTextField("Accessibility notes", draft.accessibilityNotes.joinToString(", ")) {
-            onDraftChanged(draft.copy(accessibilityNotes = it.toCsvList()))
-        }
-
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Button(modifier = Modifier.fillMaxWidth(), onClick = onSaveDraft) {
-                Text("Save draft")
+        when (state.step) {
+            HostEditorStep.Basics -> {
+                HostTextField("Title", draft.title) { updateDraft(draft.copy(title = it)) }
+                HostTextField("Description", draft.description) { updateDraft(draft.copy(description = it)) }
             }
+            HostEditorStep.Schedule -> {
+                HostTimePickerField(
+                    "Start time",
+                    draft.startsAtEpochMillis,
+                    draft.endsAtEpochMillis ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS,
+                ) { updateDraft(draft.copy(startsAtEpochMillis = it)) }
+                HostTimePickerField(
+                    "End time",
+                    draft.endsAtEpochMillis,
+                    draft.startsAtEpochMillis ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS,
+                ) { selectedEnd ->
+                    val start = draft.startsAtEpochMillis
+                    updateDraft(draft.copy(endsAtEpochMillis = if (start != null && selectedEnd <= start) selectedEnd + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS else selectedEnd))
+                }
+            }
+            HostEditorStep.Location -> {
+                MapLocationPicker(
+                    selectedLocation = draft.selectedMapLocation,
+                    onAddressSearch = onAddressSearch,
+                    onLocationSelected = { updateDraft(draft.withMapSelectedLocation(it)) },
+                )
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Protected location details", fontWeight = FontWeight.Bold)
+                        Text("These fields never appear in the public preview.")
+                        Text(draft.exactStreetAddress.ifBlank { "Select a map address" })
+                        HostTextField("Private access instructions", draft.accessInstructions.orEmpty()) {
+                            updateDraft(draft.copy(accessInstructions = it.ifBlank { null }))
+                        }
+                    }
+                }
+            }
+            HostEditorStep.SaleDetails -> {
+                HostTextField("Categories", draft.categories.joinToString(", ")) { updateDraft(draft.copy(categories = it.toCsvList())) }
+                HostTextField("Payment notes", draft.acceptedPaymentTypes.joinToString(", ")) { updateDraft(draft.copy(acceptedPaymentTypes = it.toCsvList())) }
+                HostTextField("Accessibility notes", draft.accessibilityNotes.joinToString(", ")) { updateDraft(draft.copy(accessibilityNotes = it.toCsvList())) }
+            }
+            HostEditorStep.Photos -> HostPhotosStep(draft, availablePhotos, ::updateDraft)
+            HostEditorStep.RsvpSettings -> HostRsvpSettingsStep(state, onEditorStateChanged)
+            HostEditorStep.Preview -> HostPreviewStep(
+                state = state,
+                onSaveDraft = onSaveDraft,
+                onRequestConfirmation = { onEditorStateChanged(state.requestConfirmation(it)) },
+            )
+        }
+
+        if (state.step != HostEditorStep.Preview) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (state.step.ordinal > 0) {
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = { onStepSelected(HostEditorStep.entries[state.step.ordinal - 1]) },
+                    ) { Text("Back") }
+                }
+                Button(
+                    modifier = Modifier.weight(1f),
+                    onClick = { onStepSelected(HostEditorStep.entries[state.step.ordinal + 1]) },
+                ) { Text("Continue") }
+            }
+            TextButton(onClick = onSaveDraft) { Text("Save draft and leave later") }
+        }
+    }
+}
+
+@Composable
+private fun HostPhotosStep(
+    draft: HostEventDraft,
+    availablePhotos: List<EventPhoto>,
+    onDraftChanged: (HostEventDraft) -> Unit,
+) {
+    FormSectionLabel("Mock photo picker")
+    Text(
+        "Choose seeded photos now; a platform photo service can replace this picker later.",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    availablePhotos.filter { candidate -> draft.photos.none { it.url == candidate.url } }.forEach { photo ->
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { onDraftChanged(draft.copy(photos = draft.photos + photo)) },
+        ) { Text("Add ${photo.description ?: "photo"}") }
+    }
+    draft.photos.forEachIndexed { index, photo ->
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Photo ${index + 1}", fontWeight = FontWeight.Bold)
+                HostTextField("Caption", photo.description.orEmpty()) { caption ->
+                    onDraftChanged(draft.copy(photos = draft.photos.replaceAt(index, photo.copy(description = caption.ifBlank { null }))))
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(
+                        enabled = index > 0,
+                        onClick = { onDraftChanged(draft.copy(photos = draft.photos.move(index, index - 1))) },
+                    ) { Text("Move up") }
+                    OutlinedButton(
+                        enabled = index < draft.photos.lastIndex,
+                        onClick = { onDraftChanged(draft.copy(photos = draft.photos.move(index, index + 1))) },
+                    ) { Text("Move down") }
+                    TextButton(
+                        onClick = { onDraftChanged(draft.copy(photos = draft.photos.filterIndexed { itemIndex, _ -> itemIndex != index })) },
+                    ) { Text("Remove") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HostRsvpSettingsStep(
+    state: HostEditorState,
+    onEditorStateChanged: (HostEditorState) -> Unit,
+) {
+    FormSectionLabel("Attendance policy")
+    HostTextField("Attendee cap (optional)", state.attendeeCapInput) { input ->
+        onEditorStateChanged(
+            state.copy(
+                attendeeCapInput = input,
+                validationErrors = emptyList(),
+            ),
+        )
+    }
+    HostRsvpApprovalMode.entries.forEach { mode ->
+        if (mode == state.approvalMode) {
             Button(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = onPublish,
-                colors = ButtonDefaults.buttonColors(containerColor = Clay),
-            ) {
-                Text("Publish")
-            }
+                onClick = { onEditorStateChanged(state.copy(approvalMode = mode, validationErrors = emptyList())) },
+            ) { Text(mode.label) }
+        } else {
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onEditorStateChanged(state.copy(approvalMode = mode, validationErrors = emptyList())) },
+            ) { Text(mode.label) }
         }
-        if (state.savedEventId != null) {
-            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onHideEvent) {
-                Text("Hide from search")
-            }
-            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCancelEvent) {
-                Text("Cancel event")
-            }
+    }
+    PrivacyNote("Attendee limits and manual approval are mock state for backend contract review; exact location remains protected until acceptance.")
+}
+
+@Composable
+private fun HostPreviewStep(
+    state: HostEditorState,
+    onSaveDraft: () -> Unit,
+    onRequestConfirmation: (HostConfirmationAction) -> Unit,
+) {
+    val preview = state.publicPreview()
+    FormSectionLabel("Public shopper preview")
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(preview.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(preview.description)
+            Text(preview.scheduleLabel)
+            Text(preview.approximateLocationLabel)
+            if (preview.categories.isNotEmpty()) Text(preview.categories.joinToString(" · "))
+            preview.photoCaptions.forEach { Text("Photo: $it") }
+            Text(preview.rsvpSummary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            PrivacyNote("Preview contains approximate location only. Protected address and access instructions are omitted.")
         }
+    }
+    Button(modifier = Modifier.fillMaxWidth(), onClick = onSaveDraft) { Text("Save draft") }
+    Button(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = { onRequestConfirmation(HostConfirmationAction.Publish) },
+        colors = ButtonDefaults.buttonColors(containerColor = Clay),
+    ) { Text("Review and publish") }
+    if (state.savedEventId != null) {
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { onRequestConfirmation(HostConfirmationAction.Hide) },
+        ) { Text("Hide from search") }
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { onRequestConfirmation(HostConfirmationAction.Cancel) },
+        ) { Text("Cancel event") }
     }
 }
 
@@ -478,6 +621,17 @@ private fun String.toCsvList(): List<String> =
     split(",")
         .map { it.trim() }
         .filter { it.isNotEmpty() }
+
+private fun <T> List<T>.replaceAt(index: Int, value: T): List<T> =
+    mapIndexed { itemIndex, item -> if (itemIndex == index) value else item }
+
+private fun <T> List<T>.move(fromIndex: Int, toIndex: Int): List<T> {
+    if (fromIndex !in indices || toIndex !in indices) return this
+    val mutable = toMutableList()
+    val item = mutable.removeAt(fromIndex)
+    mutable.add(toIndex, item)
+    return mutable
+}
 
 private fun Long.hostHourOfDay(): Int =
     (floorMod(HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS) / HOST_FORM_MILLIS_PER_HOUR).toInt()

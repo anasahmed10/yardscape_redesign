@@ -119,24 +119,26 @@ private fun HostEditorRoute(appState: YardScapeAppState, route: YardScapeRoute.H
     HostCreateEditScreen(
         hostEvents = appState.hostEventItems(),
         editorState = editorState,
+        availablePhotos = appState.availableHostPhotos(),
         onAddressSearch = appState::searchHostLocations,
-        onDraftChanged = { draft ->
-            editorState = editorState.copy(draft = draft, validationErrors = emptyList())
+        onEditorStateChanged = { updated ->
+            editorState = appState.rememberHostEditorState(updated)
         },
+        onStepSelected = { step -> editorState = appState.moveHostEditor(editorState, step) },
         onNew = { appState.openHostCreateEdit() },
         onEdit = appState::openHostCreateEdit,
-        onSaveDraft = { editorState = appState.saveHostDraft(editorState.draft) },
-        onPublish = { editorState = appState.publishHostEvent(editorState.draft) },
+        onSaveDraft = { editorState = appState.saveHostDraft(editorState) },
+        onPublish = { editorState = appState.publishHostEvent(editorState) },
         onCancelEvent = {
             editorState.savedEventId?.let { eventId ->
                 appState.cancelHostEvent(eventId)
-                editorState = appState.hostEditorState(eventId)
+                editorState = appState.rememberHostEditorState(editorState.copy(pendingConfirmation = null))
             }
         },
         onHideEvent = {
             editorState.savedEventId?.let { eventId ->
                 appState.hideHostEvent(eventId)
-                editorState = appState.hostEditorState(eventId)
+                editorState = appState.rememberHostEditorState(editorState.copy(pendingConfirmation = null))
             }
         },
         onBack = { appState.navigateBack() },

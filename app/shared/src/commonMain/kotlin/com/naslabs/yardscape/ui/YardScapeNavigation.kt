@@ -9,9 +9,11 @@ import com.naslabs.yardscape.data.SeededYardSaleEventRepository
 import com.naslabs.yardscape.data.YardSaleEventRepository
 import com.naslabs.yardscape.data.HostEventDraft
 import com.naslabs.yardscape.data.HostEventSaveResult
+import com.naslabs.yardscape.data.HostPhotoPicker
 import com.naslabs.yardscape.data.MapLocationSearchRepository
 import com.naslabs.yardscape.data.MapSelectedLocation
 import com.naslabs.yardscape.data.SeededMapLocationSearchRepository
+import com.naslabs.yardscape.data.SeededHostPhotoPicker
 import com.naslabs.yardscape.domain.EventStatus
 import com.naslabs.yardscape.domain.ExactAddress
 import com.naslabs.yardscape.domain.LocationVisibility
@@ -142,6 +144,7 @@ object YardScapeTestTags {
 class YardScapeAppState(
     private val repository: YardSaleEventRepository = SeededYardSaleEventRepository(),
     private val mapLocationSearchRepository: MapLocationSearchRepository = SeededMapLocationSearchRepository(),
+    private val hostPhotoPicker: HostPhotoPicker = SeededHostPhotoPicker(),
     private val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
     private val shopperId: String = SeededYardSaleData.SHOPPER_WITHOUT_ACCESS_ID,
     private val hostId: String = SeededYardSaleData.HOST_AVERY_ID,
@@ -150,6 +153,7 @@ class YardScapeAppState(
     private val eventCapacitySource: EventCapacitySource = EventCapacitySource.None,
     initialRoute: YardScapeRoute = YardScapeRoute.Browse,
 ) {
+    private val hostEditorSessions = mutableMapOf<String, HostEditorState>()
     var route: YardScapeRoute by mutableStateOf(initialRoute)
         private set
 
@@ -392,6 +396,7 @@ class YardScapeAppState(
     }
 
     fun openHostCreateEdit(eventId: String? = null) {
+        if (eventId == null) hostEditorSessions.remove(NEW_HOST_SESSION_KEY)
         route = YardScapeRoute.HostCreateEdit(eventId)
     }
 
@@ -412,18 +417,60 @@ class YardScapeAppState(
     fun searchHostLocations(query: String): List<MapSelectedLocation> =
         mapLocationSearchRepository.searchHostLocations(query)
 
-    fun hostEditorState(eventId: String?): HostEditorState =
-        HostEditorState(
-            draft = repository.hostEvent(eventId.orEmpty())?.toHostEventDraft()
-                ?: blankHostEventDraft(),
-            validationErrors = emptyList(),
+    fun availableHostPhotos() = hostPhotoPicker.availablePhotos()
+
+    fun hostEditorState(eventId: String?): HostEditorState {
+        val sessionKey = eventId ?: NEW_HOST_SESSION_KEY
+        return hostEditorSessions.getOrPut(sessionKey) {
+            HostEditorState(
+                draft = repository.hostEvent(eventId.orEmpty())?.toHostEventDraft()
+                    ?: blankHostEventDraft(),
+                validationErrors = emptyList(),
+            )
+        }
+    }
+
+    fun rememberHostEditorState(state: HostEditorState): HostEditorState {
+        hostEditorSessions[state.savedEventId ?: state.draft.id ?: NEW_HOST_SESSION_KEY] = state
+        return state
+    }
+
+    fun moveHostEditor(state: HostEditorState, target: HostEditorStep): HostEditorState {
+        val movingForward = target.ordinal > state.step.ordinal
+        val firstInvalidStep = if (movingForward) {
+            HostEditorStep.entries
+                .filter { it.ordinal >= state.step.ordinal && it.ordinal < target.ordinal }
+                .firstOrNull { state.errorsFor(it).isNotEmpty() }
+        } else {
+            null
+        }
+        val errors = firstInvalidStep?.let(state::errorsFor).orEmpty()
+        return rememberHostEditorState(
+            state.copy(
+                step = firstInvalidStep ?: target,
+                validationErrors = errors,
+                pendingConfirmation = null,
+            ),
         )
+    }
+
+    fun saveHostDraft(state: HostEditorState): HostEditorState =
+        rememberHostEditorState(hostStateFrom(state, repository.saveHostEvent(state.draft, EventStatus.DRAFT)))
 
     fun saveHostDraft(draft: HostEventDraft): HostEditorState =
-        hostStateFrom(draft, repository.saveHostEvent(draft, EventStatus.DRAFT))
+        saveHostDraft(HostEditorState(draft = draft, validationErrors = emptyList()))
+
+    fun publishHostEvent(state: HostEditorState): HostEditorState {
+        val errors = state.publishErrors()
+        if (errors.isNotEmpty()) return rememberHostEditorState(state.copy(validationErrors = errors, pendingConfirmation = null))
+        return rememberHostEditorState(
+            hostStateFrom(state, repository.saveHostEvent(state.draft, EventStatus.PUBLISHED))
+                .copy(step = HostEditorStep.Preview, pendingConfirmation = null),
+        )
+    }
 
     fun publishHostEvent(draft: HostEventDraft): HostEditorState =
-        hostStateFrom(draft, repository.saveHostEvent(draft, EventStatus.PUBLISHED))
+        publishHostEvent(HostEditorState(draft = draft, validationErrors = emptyList()))
 
     fun cancelHostEvent(eventId: String) {
         repository.cancelHostEvent(eventId)
@@ -456,9 +503,9 @@ class YardScapeAppState(
             accessibilityNotes = emptyList(),
         )
 
-    private fun hostStateFrom(originalDraft: HostEventDraft, result: HostEventSaveResult): HostEditorState {
-        val draft = result.event?.toHostEventDraft() ?: originalDraft
-        return HostEditorState(
+    private fun hostStateFrom(originalState: HostEditorState, result: HostEventSaveResult): HostEditorState {
+        val draft = result.event?.toHostEventDraft() ?: originalState.draft
+        return originalState.copy(
             draft = draft,
             validationErrors = result.validationErrors,
             savedEventId = result.event?.id,
@@ -487,12 +534,6 @@ data class HostEventItem(
     val statusLabel: String,
     val dateLabel: String,
     val publicLocationLabel: String,
-)
-
-data class HostEditorState(
-    val draft: HostEventDraft,
-    val validationErrors: List<String>,
-    val savedEventId: String? = draft.id,
 )
 
 data class EventDetailState(
@@ -663,6 +704,7 @@ fun YardSaleEvent.toHostEventDraft(): HostEventDraft =
         categories = categories,
         acceptedPaymentTypes = acceptedPaymentTypes,
         accessibilityNotes = accessibilityNotes,
+        photos = photos,
     )
 
 fun PublicEventDetail.toDetailSections(nowEpochMillis: Long): List<Pair<String, String>> =
@@ -828,3 +870,4 @@ private fun Long.floorMod(other: Long): Long =
 private const val MILLIS_PER_HOUR = 60L * 60L * 1_000L
 private const val MILLIS_PER_MINUTE = 60L * 1_000L
 private const val MILLIS_PER_DAY = 24L * MILLIS_PER_HOUR
+private const val NEW_HOST_SESSION_KEY = "new-host-event"

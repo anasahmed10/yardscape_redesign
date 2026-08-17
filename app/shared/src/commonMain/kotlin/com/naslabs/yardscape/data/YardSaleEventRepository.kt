@@ -86,6 +86,7 @@ data class HostEventDraft(
     val categories: List<String>,
     val acceptedPaymentTypes: List<String>,
     val accessibilityNotes: List<String>,
+    val photos: List<EventPhoto> = emptyList(),
 )
 
 data class MapSelectedLocation(
@@ -112,11 +113,11 @@ data class HostEventSaveResult(
 
 fun HostEventDraft.validateFor(status: EventStatus): List<String> {
     val errors = mutableListOf<String>()
-    if (title.isBlank()) errors += "Title is required."
-    if (description.isBlank()) errors += "Description is required."
-    if (categories.isEmpty()) errors += "At least one category is required."
 
     if (status == EventStatus.PUBLISHED) {
+        if (title.isBlank()) errors += "Title is required."
+        if (description.isBlank()) errors += "Description is required."
+        if (categories.isEmpty()) errors += "At least one category is required."
         if (startsAtEpochMillis == null) errors += "Start time is required to publish."
         if (endsAtEpochMillis == null) errors += "End time is required to publish."
         if (startsAtEpochMillis != null &&
@@ -152,7 +153,7 @@ fun HostEventDraft.toYardSaleEvent(
             endsAtEpochMillis = if (end > start) end else start + DEFAULT_DRAFT_WINDOW_MILLIS,
         ),
         categories = categories.ifEmpty { listOf("general") },
-        photos = emptyList(),
+        photos = photos,
         acceptedPaymentTypes = acceptedPaymentTypes,
         accessibilityNotes = accessibilityNotes,
         host = host,
