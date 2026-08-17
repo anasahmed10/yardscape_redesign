@@ -29,6 +29,7 @@ Backend planning details live in [Post-MVP Backend Design](./POST_MVP_BACKEND_DE
 Deterministic UX states and their privacy assertions live in [Mock Scenario Catalog](./MOCK_SCENARIOS.md).
 Primary role navigation and internal route behavior live in [Shared App Shell](./APP_SHELL.md).
 Mock search, filters, map mode, and saved-state behavior live in [Shopper Discovery](./SHOPPER_DISCOVERY.md).
+The resumable multi-step creation journey and mock backend findings live in [Host Editor Flow](./HOST_EDITOR_FLOW.md).
 
 - Add account basics: email or phone sign-in, profile, session handling, and sign-out.
 - Add persistence with PostgreSQL and PostGIS for radius, neighborhood, and map-style searches.
