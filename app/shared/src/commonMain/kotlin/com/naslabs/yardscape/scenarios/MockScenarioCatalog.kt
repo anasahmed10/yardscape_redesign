@@ -10,6 +10,7 @@ import com.naslabs.yardscape.domain.SaleWindow
 import com.naslabs.yardscape.domain.UserRole
 import com.naslabs.yardscape.ui.AppDataAvailability
 import com.naslabs.yardscape.ui.EventCapacitySource
+import com.naslabs.yardscape.ui.MockSessionStatus
 import com.naslabs.yardscape.ui.YardScapeAppState
 import com.naslabs.yardscape.ui.YardScapeRoute
 
@@ -28,6 +29,10 @@ enum class MockScenarioId {
     EventAtCapacity,
     HostWithDrafts,
     HostWithPendingAttendees,
+    SignedOutAccount,
+    SessionExpiredAccount,
+    ShopperProfile,
+    HostProfile,
     Offline,
     RecoverableError,
 }
@@ -42,6 +47,7 @@ class MockScenario internal constructor(
     private val initialRoute: YardScapeRoute = YardScapeRoute.Browse,
     private val dataAvailability: AppDataAvailability = AppDataAvailability.Available,
     private val atCapacityEventIds: Set<String> = emptySet(),
+    private val initialAccountStatus: MockSessionStatus = MockSessionStatus.SignedIn,
     private val repositoryFactory: () -> YardSaleEventRepository,
 ) {
     fun createAppState(): YardScapeAppState = YardScapeAppState(
@@ -52,6 +58,7 @@ class MockScenario internal constructor(
         activeUserRole = activeUserRole,
         dataAvailability = dataAvailability,
         eventCapacitySource = EventCapacitySource { it in atCapacityEventIds },
+        initialAccountStatus = initialAccountStatus,
         initialRoute = initialRoute,
     )
 }
@@ -189,6 +196,37 @@ object MockScenarioCatalog {
             repositoryFactory = { seeded() },
         ),
         scenario(
+            id = MockScenarioId.SignedOutAccount,
+            name = "Signed-out account",
+            assertions = listOf("Public browsing remains available", "Protected actions request sign-in"),
+            initialRoute = YardScapeRoute.Account,
+            accountStatus = MockSessionStatus.SignedOut,
+            repositoryFactory = { seeded() },
+        ),
+        scenario(
+            id = MockScenarioId.SessionExpiredAccount,
+            name = "Expired account session",
+            assertions = listOf("Protected state is cleared", "Public browsing remains available"),
+            initialRoute = YardScapeRoute.Account,
+            accountStatus = MockSessionStatus.Expired,
+            repositoryFactory = { seeded() },
+        ),
+        scenario(
+            id = MockScenarioId.ShopperProfile,
+            name = "Shopper profile",
+            assertions = listOf("Confirmed facts are separate from community activity"),
+            initialRoute = YardScapeRoute.Account,
+            repositoryFactory = { seeded() },
+        ),
+        scenario(
+            id = MockScenarioId.HostProfile,
+            name = "Host profile",
+            assertions = listOf("Host trust language avoids identity guarantees"),
+            role = UserRole.HOST,
+            initialRoute = YardScapeRoute.Account,
+            repositoryFactory = { seeded() },
+        ),
+        scenario(
             id = MockScenarioId.Offline,
             name = "Offline",
             assertions = listOf("Browse reports offline state", "Seeded previews remain privacy-safe"),
@@ -220,6 +258,7 @@ private fun scenario(
     initialRoute: YardScapeRoute = YardScapeRoute.Browse,
     availability: AppDataAvailability = AppDataAvailability.Available,
     atCapacityEventIds: Set<String> = emptySet(),
+    accountStatus: MockSessionStatus = MockSessionStatus.SignedIn,
     repositoryFactory: () -> YardSaleEventRepository,
 ): MockScenario = MockScenario(
     id = id,
@@ -230,6 +269,7 @@ private fun scenario(
     initialRoute = initialRoute,
     dataAvailability = availability,
     atCapacityEventIds = atCapacityEventIds,
+    initialAccountStatus = accountStatus,
     repositoryFactory = repositoryFactory,
 )
 

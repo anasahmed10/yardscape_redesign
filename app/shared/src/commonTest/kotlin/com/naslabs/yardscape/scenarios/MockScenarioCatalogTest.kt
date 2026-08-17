@@ -5,6 +5,7 @@ import com.naslabs.yardscape.domain.UserRole
 import com.naslabs.yardscape.ui.AppDataAvailability
 import com.naslabs.yardscape.ui.EventAttendanceState
 import com.naslabs.yardscape.ui.LocationRevealState
+import com.naslabs.yardscape.ui.MockSessionStatus
 import com.naslabs.yardscape.ui.YardScapeRoute
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -90,6 +91,21 @@ class MockScenarioCatalogTest {
         val shopper = MockScenarioCatalog.createAppState(MockScenarioId.PendingRsvp)
 
         assertEquals(0, shopper.pendingAttendeeCount(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID))
+    }
+
+    @Test
+    fun accountScenariosCoverSignedOutExpiredAndRoleProfiles() {
+        val signedOut = MockScenarioCatalog.createAppState(MockScenarioId.SignedOutAccount)
+        val expired = MockScenarioCatalog.createAppState(MockScenarioId.SessionExpiredAccount)
+        val shopper = MockScenarioCatalog.createAppState(MockScenarioId.ShopperProfile)
+        val host = MockScenarioCatalog.createAppState(MockScenarioId.HostProfile)
+
+        assertEquals(MockSessionStatus.SignedOut, signedOut.accountState.sessionStatus)
+        assertTrue(signedOut.browseItems().isNotEmpty())
+        assertEquals(MockSessionStatus.Expired, expired.accountState.sessionStatus)
+        assertFalse(expired.accountState.isSignedIn)
+        assertEquals(UserRole.SHOPPER, shopper.accountState.activeProfile?.role)
+        assertEquals(UserRole.HOST, host.accountState.activeProfile?.role)
     }
 
     private fun detailState(id: MockScenarioId) =

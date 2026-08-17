@@ -31,8 +31,9 @@ Primary role navigation and internal route behavior live in [Shared App Shell](.
 Mock search, filters, map mode, and saved-state behavior live in [Shopper Discovery](./SHOPPER_DISCOVERY.md).
 The resumable multi-step creation journey and mock backend findings live in [Host Editor Flow](./HOST_EDITOR_FLOW.md).
 Host attendance states, reveal consequences, and API-policy findings live in [Host Attendance Management](./HOST_ATTENDANCE.md).
+Mock session states, trust wording, safety placement, and authentication follow-ups live in [Mock Account, Trust, and Safety Surfaces](./MOCK_ACCOUNT_AND_SAFETY.md).
 
-- Add account basics: email or phone sign-in, profile, session handling, and sign-out.
+- Replace the mock account/session controller with reviewed email or phone authentication while preserving anonymous browsing, explicit expiry, and protected-state clearing.
 - Add persistence with PostgreSQL and PostGIS for radius, neighborhood, and map-style searches.
 - Add database migrations with Flyway.
 - Add Ktor Client networking in shared code and replace seeded data with API-backed repositories.
