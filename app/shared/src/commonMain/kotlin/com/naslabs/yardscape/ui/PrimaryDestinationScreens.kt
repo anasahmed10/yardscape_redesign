@@ -26,6 +26,7 @@ fun SavedDestinationScreen(
     onEventSelected: (String) -> Unit,
     onUnsave: (String) -> Unit,
     onBrowse: () -> Unit,
+    onMyRsvps: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -44,6 +45,9 @@ fun SavedDestinationScreen(
                     "Saved public previews stay available during this mock session.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Button(modifier = Modifier.fillMaxWidth(), onClick = onMyRsvps) {
+                    Text("My RSVPs")
+                }
             }
         }
         if (events.isEmpty()) {

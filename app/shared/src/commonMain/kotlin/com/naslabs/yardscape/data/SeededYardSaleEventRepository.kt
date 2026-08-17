@@ -51,6 +51,9 @@ class SeededYardSaleEventRepository(
     override fun rsvpsForEvent(eventId: String): List<Rsvp> =
         rsvps.filter { it.eventId == eventId }
 
+    override fun rsvpsForShopper(shopperId: String): List<Rsvp> =
+        rsvps.filter { it.shopperId == shopperId }
+
     override fun exactLocationFor(
         eventId: String,
         shopperId: String,
@@ -81,6 +84,24 @@ class SeededYardSaleEventRepository(
         rsvps += acceptedRsvp
         return acceptedRsvp
     }
+
+    override fun cancelRsvp(eventId: String, shopperId: String): Rsvp? =
+        updateRsvp(eventId, shopperId) { rsvp ->
+            rsvp.copy(
+                status = RsvpStatus.CANCELLED,
+                locationVisibility = LocationVisibility.PUBLIC_APPROXIMATION,
+            )
+        }
+
+    override fun revokeRsvpAccess(eventId: String, shopperId: String): Rsvp? =
+        updateRsvp(eventId, shopperId) { rsvp ->
+            rsvp.copy(locationVisibility = LocationVisibility.REVOKED)
+        }
+
+    override fun expireRsvpAccess(eventId: String, shopperId: String): Rsvp? =
+        updateRsvp(eventId, shopperId) { rsvp ->
+            rsvp.copy(locationVisibility = LocationVisibility.EXPIRED)
+        }
 
     override fun hostEvents(hostId: String): List<YardSaleEvent> =
         events
@@ -130,6 +151,18 @@ class SeededYardSaleEventRepository(
             }
         }
         return true
+    }
+
+    private fun updateRsvp(
+        eventId: String,
+        shopperId: String,
+        transform: (Rsvp) -> Rsvp,
+    ): Rsvp? {
+        val index = rsvps.indexOfFirst { it.eventId == eventId && it.shopperId == shopperId }
+        if (index == -1) return null
+        val updated = transform(rsvps[index])
+        rsvps[index] = updated
+        return updated
     }
 }
 

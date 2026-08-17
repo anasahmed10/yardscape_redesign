@@ -2,6 +2,7 @@ package com.naslabs.yardscape.data
 
 import com.naslabs.yardscape.domain.EventStatus
 import com.naslabs.yardscape.domain.LocationVisibility
+import com.naslabs.yardscape.domain.RsvpStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -96,6 +97,29 @@ class SeededYardSaleEventRepositoryTest {
 
         assertNotNull(submitted)
         assertEquals("123 Cedar Street", exactLocation?.streetAddress)
+    }
+
+    @Test
+    fun shopperRsvpLifecycleMutationsClearProtectedLocation() {
+        val shopperId = "shopper-lifecycle"
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        repository.submitRsvp(eventId, shopperId)
+        assertNotNull(repository.exactLocationFor(eventId, shopperId, now))
+
+        val revoked = repository.revokeRsvpAccess(eventId, shopperId)
+        assertEquals(LocationVisibility.REVOKED, revoked?.locationVisibility)
+        assertNull(repository.exactLocationFor(eventId, shopperId, now))
+
+        repository.submitRsvp(eventId, shopperId)
+        val expired = repository.expireRsvpAccess(eventId, shopperId)
+        assertEquals(LocationVisibility.EXPIRED, expired?.locationVisibility)
+        assertNull(repository.exactLocationFor(eventId, shopperId, now))
+
+        repository.submitRsvp(eventId, shopperId)
+        val cancelled = repository.cancelRsvp(eventId, shopperId)
+        assertEquals(RsvpStatus.CANCELLED, cancelled?.status)
+        assertEquals(LocationVisibility.PUBLIC_APPROXIMATION, cancelled?.locationVisibility)
+        assertNull(repository.exactLocationFor(eventId, shopperId, now))
     }
 
     @Test

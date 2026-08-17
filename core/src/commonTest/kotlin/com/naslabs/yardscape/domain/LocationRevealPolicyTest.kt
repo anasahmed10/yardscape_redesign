@@ -47,6 +47,21 @@ class LocationRevealPolicyTest {
     }
 
     @Test
+    fun nonAcceptedLifecycleStatusesCannotRevealExactLocation() {
+        listOf(
+            RsvpStatus.FULL,
+            RsvpStatus.WAITLISTED,
+            RsvpStatus.DECLINED,
+            RsvpStatus.CANCELLED,
+        ).forEach { status ->
+            val rsvp = rsvp(status = status, locationVisibility = LocationVisibility.RSVP_ACCEPTED)
+
+            assertFalse(LocationRevealPolicy.canRevealExactLocation(event(), rsvp, nowEpochMillis = NOW))
+            assertNull(LocationRevealPolicy.exactLocationFor(event(), rsvp, nowEpochMillis = NOW))
+        }
+    }
+
+    @Test
     fun revokedAccessCannotRevealExactLocation() {
         val rsvp = rsvp(
             status = RsvpStatus.ACCEPTED,

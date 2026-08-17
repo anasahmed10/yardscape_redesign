@@ -16,6 +16,7 @@ import com.naslabs.yardscape.domain.EventStatus
 import com.naslabs.yardscape.domain.ExactAddress
 import com.naslabs.yardscape.domain.LocationVisibility
 import com.naslabs.yardscape.domain.PublicEventPreview
+import com.naslabs.yardscape.domain.Rsvp
 import com.naslabs.yardscape.domain.RsvpStatus
 import com.naslabs.yardscape.domain.UserRole
 import com.naslabs.yardscape.domain.YardSaleEvent
@@ -44,6 +45,12 @@ sealed interface YardScapeRoute {
     data object Saved : YardScapeRoute {
         override val path: String = "/saved"
         override val destinationLabel: String = "Saved sales"
+        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Saved
+    }
+
+    data object MyRsvps : YardScapeRoute {
+        override val path: String = "/rsvps"
+        override val destinationLabel: String = "My RSVPs"
         override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Saved
     }
 
@@ -101,6 +108,7 @@ sealed interface YardScapeRoute {
             return when {
                 segments == listOf("browse") || segments.isEmpty() -> Browse
                 segments == listOf("saved") -> Saved
+                segments == listOf("rsvps") -> MyRsvps
                 segments == listOf("host") -> Host
                 segments == listOf("account") -> Account
                 segments.size == 2 && segments[0] == "events" -> EventDetail(segments[1])
@@ -124,6 +132,7 @@ object YardScapeTestTags {
     const val AppShell: String = "app-shell"
     const val DiscoveryNoResults: String = "discovery-no-results"
     const val SavedScreen: String = "saved-screen"
+    const val MyRsvpsScreen: String = "my-rsvps-screen"
 
     fun browseEventCard(eventId: String): String = "browse-event-card-$eventId"
     fun primaryDestination(destination: YardScapePrimaryDestination): String =
@@ -153,6 +162,18 @@ class YardScapeAppState(
     var savedEventIds: Set<String> by mutableStateOf(emptySet())
         private set
 
+    var pendingRsvpCancellationEventId: String? by mutableStateOf(null)
+        private set
+
+    var reminderEventIds: Set<String> by mutableStateOf(emptySet())
+        private set
+
+    var calendarExportEventIds: Set<String> by mutableStateOf(emptySet())
+        private set
+
+    var directionsEventId: String? by mutableStateOf(null)
+        private set
+
     val activePrimaryDestination: YardScapePrimaryDestination
         get() = route.primaryDestination
 
@@ -175,9 +196,10 @@ class YardScapeAppState(
         route = when (val current = route) {
             YardScapeRoute.Browse -> return false
             YardScapeRoute.Saved,
+            YardScapeRoute.MyRsvps,
             YardScapeRoute.Host,
             YardScapeRoute.Account,
-            -> YardScapeRoute.Browse
+            -> if (current == YardScapeRoute.MyRsvps) YardScapeRoute.Saved else YardScapeRoute.Browse
             is YardScapeRoute.EventDetail -> when (current.origin) {
                 YardScapePrimaryDestination.Saved -> YardScapeRoute.Saved
                 else -> YardScapeRoute.Browse
@@ -237,6 +259,85 @@ class YardScapeAppState(
 
     fun savedItems(): List<BrowseEventItem> =
         browseItems().filter { it.id in savedEventIds }
+
+    fun openMyRsvps() {
+        route = YardScapeRoute.MyRsvps
+    }
+
+    fun myRsvpItems(): List<ShopperRsvpItem> =
+        repository.rsvpsForShopper(shopperId).mapNotNull { rsvp ->
+            val detail = repository.publicEventDetail(rsvp.eventId) ?: return@mapNotNull null
+            val exactAddress = repository.exactLocationFor(rsvp.eventId, shopperId, nowEpochMillis)
+            val uiState = rsvp.toShopperUiState(detail.status, detail.saleWindow.hasEnded(nowEpochMillis))
+            ShopperRsvpItem(
+                eventId = detail.id,
+                title = detail.title,
+                dateLabel = detail.saleWindow.toBrowseDateLabel(nowEpochMillis),
+                approximateLocationLabel = listOfNotNull(
+                    detail.publicLocation.neighborhood,
+                    detail.publicLocation.distanceLabel ?: detail.publicLocation.areaDescription,
+                ).joinToString(" - "),
+                state = uiState,
+                group = uiState.toGroup(),
+                exactAddress = exactAddress.takeIf { uiState == ShopperRsvpUiState.Accepted },
+                reminderAdded = rsvp.eventId in reminderEventIds,
+                calendarExportPrepared = rsvp.eventId in calendarExportEventIds,
+            )
+        }.sortedWith(compareBy({ it.group.ordinal }, { it.dateLabel }))
+
+    fun requestRsvpCancellation(eventId: String): Boolean {
+        val item = myRsvpItems().firstOrNull { it.eventId == eventId } ?: return false
+        if (!item.canCancel) return false
+        pendingRsvpCancellationEventId = eventId
+        return true
+    }
+
+    fun dismissRsvpCancellation() {
+        pendingRsvpCancellationEventId = null
+    }
+
+    fun confirmRsvpCancellation(): Boolean {
+        val eventId = pendingRsvpCancellationEventId ?: return false
+        pendingRsvpCancellationEventId = null
+        val cancelled = repository.cancelRsvp(eventId, shopperId) ?: return false
+        directionsEventId = null
+        return cancelled.status == RsvpStatus.CANCELLED
+    }
+
+    fun addMockReminder(eventId: String): Boolean {
+        val item = myRsvpItems().firstOrNull { it.eventId == eventId } ?: return false
+        if (!item.canAddReminder) return false
+        reminderEventIds = reminderEventIds + eventId
+        return true
+    }
+
+    fun prepareMockCalendarExport(eventId: String): Boolean {
+        val item = myRsvpItems().firstOrNull { it.eventId == eventId } ?: return false
+        if (!item.canExportCalendar) return false
+        calendarExportEventIds = calendarExportEventIds + eventId
+        return true
+    }
+
+    fun requestDirections(eventId: String): ExactAddress? {
+        val item = myRsvpItems().firstOrNull { it.eventId == eventId } ?: return null
+        val exactAddress = item.exactAddress.takeIf { item.canOpenDirections } ?: return null
+        directionsEventId = eventId
+        return exactAddress
+    }
+
+    fun revokeRsvpAccess(eventId: String): Boolean {
+        val updated = repository.revokeRsvpAccess(eventId, shopperId) ?: return false
+        directionsEventId = null
+        return updated.locationVisibility == LocationVisibility.REVOKED
+    }
+
+    fun blockHostForEvent(eventId: String): Boolean = revokeRsvpAccess(eventId)
+
+    fun expireRsvpAccess(eventId: String): Boolean {
+        val updated = repository.expireRsvpAccess(eventId, shopperId) ?: return false
+        directionsEventId = null
+        return updated.locationVisibility == LocationVisibility.EXPIRED
+    }
 
     fun selectedEventDetailState(): EventDetailState? {
         val detailRoute = route as? YardScapeRoute.EventDetail ?: return null
@@ -596,6 +697,35 @@ private fun PublicEventDetail.toLocationRevealState(
             locationVisibility == LocationVisibility.RSVP_REQUESTED -> LocationRevealState.Pending
         else -> LocationRevealState.NotRequested
     }
+}
+
+private fun Rsvp.toShopperUiState(
+    eventStatus: EventStatus,
+    eventHasEnded: Boolean,
+): ShopperRsvpUiState = when {
+    eventStatus == EventStatus.CANCELLED || eventStatus == EventStatus.COMPLETED ->
+        ShopperRsvpUiState.Cancelled
+    locationVisibility == LocationVisibility.REVOKED -> ShopperRsvpUiState.Revoked
+    locationVisibility == LocationVisibility.EXPIRED || eventHasEnded -> ShopperRsvpUiState.Expired
+    status == RsvpStatus.REQUESTED -> ShopperRsvpUiState.Requested
+    status == RsvpStatus.ACCEPTED -> ShopperRsvpUiState.Accepted
+    status == RsvpStatus.FULL -> ShopperRsvpUiState.Full
+    status == RsvpStatus.WAITLISTED -> ShopperRsvpUiState.Waitlisted
+    status == RsvpStatus.DECLINED -> ShopperRsvpUiState.Declined
+    else -> ShopperRsvpUiState.Cancelled
+}
+
+private fun ShopperRsvpUiState.toGroup(): RsvpGroup = when (this) {
+    ShopperRsvpUiState.Requested,
+    ShopperRsvpUiState.Full,
+    ShopperRsvpUiState.Waitlisted,
+    -> RsvpGroup.ActionNeeded
+    ShopperRsvpUiState.Accepted -> RsvpGroup.Upcoming
+    ShopperRsvpUiState.Declined,
+    ShopperRsvpUiState.Cancelled,
+    ShopperRsvpUiState.Revoked,
+    ShopperRsvpUiState.Expired,
+    -> RsvpGroup.History
 }
 
 private fun ExactAddress.displayLabel(): String =

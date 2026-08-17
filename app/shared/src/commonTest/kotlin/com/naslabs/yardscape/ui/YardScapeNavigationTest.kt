@@ -55,6 +55,7 @@ class YardScapeNavigationTest {
         val routes = listOf(
             YardScapeRoute.Browse,
             YardScapeRoute.Saved,
+            YardScapeRoute.MyRsvps,
             YardScapeRoute.Host,
             YardScapeRoute.Account,
             YardScapeRoute.EventDetail("event-123"),
@@ -68,6 +69,18 @@ class YardScapeNavigationTest {
         }
         assertEquals(YardScapeRoute.EventDetail("event-123"), YardScapeRoute.fromPath("/events/event-123?tab=overview"))
         assertNull(YardScapeRoute.fromPath("/private/location/123-cedar-street"))
+    }
+
+    @Test
+    fun myRsvpsIsNestedUnderSavedAndBackReturnsThere() {
+        val state = YardScapeAppState()
+
+        state.openMyRsvps()
+
+        assertEquals(YardScapeRoute.MyRsvps, state.route)
+        assertEquals(YardScapePrimaryDestination.Saved, state.activePrimaryDestination)
+        assertTrue(state.navigateBack())
+        assertEquals(YardScapeRoute.Saved, state.route)
     }
 
     @Test

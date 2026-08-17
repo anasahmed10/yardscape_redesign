@@ -19,6 +19,9 @@ enum class MockScenarioId {
     NoNearbyEvents,
     PendingRsvp,
     AcceptedAccess,
+    WaitlistedRsvp,
+    DeclinedRsvp,
+    CancelledRsvp,
     RevokedAccess,
     ExpiredAccess,
     CancelledEvent,
@@ -90,13 +93,43 @@ object MockScenarioCatalog {
             repositoryFactory = { seeded() },
         ),
         scenario(
+            id = MockScenarioId.WaitlistedRsvp,
+            name = "Waitlisted RSVP",
+            assertions = listOf("My RSVPs reports waitlisted", "Exact location remains hidden"),
+            shopperId = WAITLISTED_SHOPPER_ID,
+            initialRoute = YardScapeRoute.MyRsvps,
+            repositoryFactory = {
+                seeded(rsvps = listOf(rsvp(WAITLISTED_SHOPPER_ID, RsvpStatus.WAITLISTED)))
+            },
+        ),
+        scenario(
+            id = MockScenarioId.DeclinedRsvp,
+            name = "Declined RSVP",
+            assertions = listOf("My RSVPs reports declined", "Exact location remains hidden"),
+            shopperId = DECLINED_SHOPPER_ID,
+            initialRoute = YardScapeRoute.MyRsvps,
+            repositoryFactory = {
+                seeded(rsvps = listOf(rsvp(DECLINED_SHOPPER_ID, RsvpStatus.DECLINED)))
+            },
+        ),
+        scenario(
+            id = MockScenarioId.CancelledRsvp,
+            name = "Cancelled RSVP",
+            assertions = listOf("My RSVPs reports shopper cancellation", "Exact location is cleared"),
+            shopperId = CANCELLED_SHOPPER_ID,
+            initialRoute = YardScapeRoute.MyRsvps,
+            repositoryFactory = {
+                seeded(rsvps = listOf(rsvp(CANCELLED_SHOPPER_ID, RsvpStatus.CANCELLED)))
+            },
+        ),
+        scenario(
             id = MockScenarioId.RevokedAccess,
             name = "Revoked location access",
             assertions = listOf("Detail reports revoked access", "Exact location remains hidden"),
             shopperId = REVOKED_SHOPPER_ID,
             initialRoute = YardScapeRoute.EventDetail(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID),
             repositoryFactory = {
-                seeded(rsvps = listOf(rsvp(REVOKED_SHOPPER_ID, LocationVisibility.REVOKED)))
+                seeded(rsvps = listOf(rsvp(REVOKED_SHOPPER_ID, visibility = LocationVisibility.REVOKED)))
             },
         ),
         scenario(
@@ -116,7 +149,7 @@ object MockScenarioCatalog {
                     )
                 seeded(
                     events = listOf(expiredEvent),
-                    rsvps = listOf(rsvp(EXPIRED_SHOPPER_ID, LocationVisibility.EXPIRED)),
+                    rsvps = listOf(rsvp(EXPIRED_SHOPPER_ID, visibility = LocationVisibility.EXPIRED)),
                 )
             },
         ),
@@ -132,9 +165,12 @@ object MockScenarioCatalog {
             id = MockScenarioId.EventAtCapacity,
             name = "Event at capacity",
             assertions = listOf("Detail reports capacity", "New RSVP action is unavailable"),
+            shopperId = FULL_SHOPPER_ID,
             initialRoute = YardScapeRoute.EventDetail(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID),
             atCapacityEventIds = setOf(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID),
-            repositoryFactory = { seeded(rsvps = emptyList()) },
+            repositoryFactory = {
+                seeded(rsvps = listOf(rsvp(FULL_SHOPPER_ID, RsvpStatus.FULL)))
+            },
         ),
         scenario(
             id = MockScenarioId.HostWithDrafts,
@@ -202,14 +238,26 @@ private fun seeded(
     rsvps: List<Rsvp> = SeededYardSaleData.rsvps,
 ): YardSaleEventRepository = SeededYardSaleEventRepository(events = events, rsvps = rsvps)
 
-private fun rsvp(shopperId: String, visibility: LocationVisibility): Rsvp = Rsvp(
+private fun rsvp(
+    shopperId: String,
+    status: RsvpStatus = RsvpStatus.ACCEPTED,
+    visibility: LocationVisibility = if (status == RsvpStatus.ACCEPTED) {
+        LocationVisibility.RSVP_ACCEPTED
+    } else {
+        LocationVisibility.PUBLIC_APPROXIMATION
+    },
+): Rsvp = Rsvp(
     id = "scenario-rsvp-$shopperId",
     eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID,
     shopperId = shopperId,
-    status = RsvpStatus.ACCEPTED,
+    status = status,
     locationVisibility = visibility,
 )
 
 private const val NEW_SHOPPER_ID = "scenario-new-shopper"
 private const val REVOKED_SHOPPER_ID = "scenario-revoked-shopper"
 private const val EXPIRED_SHOPPER_ID = "scenario-expired-shopper"
+private const val WAITLISTED_SHOPPER_ID = "scenario-waitlisted-shopper"
+private const val DECLINED_SHOPPER_ID = "scenario-declined-shopper"
+private const val CANCELLED_SHOPPER_ID = "scenario-cancelled-shopper"
+private const val FULL_SHOPPER_ID = "scenario-full-shopper"

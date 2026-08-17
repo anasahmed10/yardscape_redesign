@@ -106,6 +106,8 @@ enum class LocationVisibility {
 enum class RsvpStatus {
     REQUESTED,
     ACCEPTED,
+    FULL,
+    WAITLISTED,
     CANCELLED,
     DECLINED,
 }
