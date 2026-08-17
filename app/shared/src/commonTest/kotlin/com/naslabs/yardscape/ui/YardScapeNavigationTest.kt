@@ -60,6 +60,8 @@ class YardScapeNavigationTest {
             YardScapeRoute.Account,
             YardScapeRoute.EventDetail("event-123"),
             YardScapeRoute.Rsvp("event-123"),
+            YardScapeRoute.EventSafety("event-123", ShopperSafetyAction.Report),
+            YardScapeRoute.EventSafety("event-123", ShopperSafetyAction.Block),
             YardScapeRoute.HostCreateEdit(),
             YardScapeRoute.HostCreateEdit("event-123"),
             YardScapeRoute.HostAttendees("event-123"),

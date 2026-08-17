@@ -26,7 +26,11 @@ This distinction should remain explicit when issue #25 introduces real authentic
 
 General marketplace guidance appears in Account. A shorter reminder appears next to the high-risk exact-location area on Event Detail: visit only during listed hours, stay out of private areas, and leave if a situation feels unsafe. This is product guidance for the mock workflow, not final legal or store copy.
 
-Report and Block are represented by protected action types for issue #46. They share the account gate but do not yet submit reports, mutate blocks, or create a moderation record.
+Report and Block are mock-backed protected actions. Report requires a reason, accepts up to 500 optional characters, and distinguishes validation, offline, server-error, and successful receipt states. Its UI warns testers not to enter exact addresses, access instructions, private contact details, or payment information.
+
+Blocking requires confirmation. A successful block immediately removes every event from that host from discovery, closes active directions, revokes affected RSVP reveal grants, and suppresses exact locations even if repository mutation lags. Unblocking restores discovery only; it never restores the former RSVP or exact-location grant. Failed mutations leave the previous state intact and never display success copy.
+
+These controls use `ShopperSafetyRepository`, currently backed by deterministic seeded results. The interface keeps report and block mutations separate so authenticated API implementations can preserve moderation privacy and block-list semantics without moving those rules into platform UI.
 
 ## Backend follow-ups
 
@@ -38,3 +42,6 @@ The authenticated app and API should preserve these boundaries:
 - Keep public event retrieval independent from authentication availability.
 - Provide assurance facts separately from reputation or activity signals.
 - Let reporting and blocking reuse the same authenticated-action contract while keeping their moderation data separate.
+- Treat the authenticated user's block list as an overriding deny in browse, detail, RSVP, directions, and protected-location responses.
+- Make unblock idempotent and discovery-only; require a new RSVP before issuing any new location grant.
+- Return an opaque report receipt and field-level validation without echoing potentially sensitive report details.

@@ -6,6 +6,9 @@ import com.naslabs.yardscape.ui.AppDataAvailability
 import com.naslabs.yardscape.ui.EventAttendanceState
 import com.naslabs.yardscape.ui.LocationRevealState
 import com.naslabs.yardscape.ui.MockSessionStatus
+import com.naslabs.yardscape.ui.BlockMutationState
+import com.naslabs.yardscape.ui.ReportSubmissionState
+import com.naslabs.yardscape.ui.SafetyFailureKind
 import com.naslabs.yardscape.ui.YardScapeRoute
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -106,6 +109,39 @@ class MockScenarioCatalogTest {
         assertFalse(expired.accountState.isSignedIn)
         assertEquals(UserRole.SHOPPER, shopper.accountState.activeProfile?.role)
         assertEquals(UserRole.HOST, host.accountState.activeProfile?.role)
+    }
+
+    @Test
+    fun safetyScenariosExposeDeterministicFailureAndMutationStates() {
+        val validation = MockScenarioCatalog.createAppState(MockScenarioId.ReportValidation)
+        validation.submitSafetyReport()
+        assertEquals(
+            SafetyFailureKind.Validation,
+            assertIs<ReportSubmissionState.Failed>(validation.shopperSafetyState?.reportState).kind,
+        )
+
+        val offlineReport = MockScenarioCatalog.createAppState(MockScenarioId.ReportOffline)
+        offlineReport.updateSafetyReportReason(com.naslabs.yardscape.domain.ReportReason.Other)
+        offlineReport.submitSafetyReport()
+        assertEquals(
+            SafetyFailureKind.Offline,
+            assertIs<ReportSubmissionState.Failed>(offlineReport.shopperSafetyState?.reportState).kind,
+        )
+
+        val blocked = MockScenarioCatalog.createAppState(MockScenarioId.BlockHost)
+        blocked.requestBlockMutation()
+        blocked.confirmBlockMutation()
+        assertIs<BlockMutationState.Completed>(blocked.shopperSafetyState?.blockState)
+        assertTrue(SeededYardSaleData.ESTATE_TOOLS_EVENT_ID in blocked.blockedEventIds)
+
+        val failedBlock = MockScenarioCatalog.createAppState(MockScenarioId.BlockOffline)
+        failedBlock.requestBlockMutation()
+        failedBlock.confirmBlockMutation()
+        assertEquals(
+            SafetyFailureKind.Offline,
+            assertIs<BlockMutationState.Failed>(failedBlock.shopperSafetyState?.blockState).kind,
+        )
+        assertTrue(failedBlock.blockedEventIds.isEmpty())
     }
 
     private fun detailState(id: MockScenarioId) =

@@ -40,7 +40,7 @@ Shared Material 3 color, typography, spacing, shape, and component conventions l
 - Add Ktor Client networking in shared code and replace seeded data with API-backed repositories.
 - Add host RSVP approval mode, attendee caps, RSVP revocation, and exact-address expiry after event end.
 - Add event photo uploads with moderation-ready storage paths.
-- Add report, block, and basic moderation queues.
+- Replace the validated mock report and block repositories with authenticated APIs and add basic moderation queues.
 - Add reminders, saved searches, watchlist, calendar export, and "today near me" filters.
 - Add web browsing and RSVP parity after Android workflow stabilizes.
 - Add iOS build validation and shared UI polish.

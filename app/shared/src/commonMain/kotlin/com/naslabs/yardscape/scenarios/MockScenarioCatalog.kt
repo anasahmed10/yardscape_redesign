@@ -2,6 +2,9 @@ package com.naslabs.yardscape.scenarios
 
 import com.naslabs.yardscape.data.SeededYardSaleData
 import com.naslabs.yardscape.data.SeededYardSaleEventRepository
+import com.naslabs.yardscape.data.SeededShopperSafetyRepository
+import com.naslabs.yardscape.data.SeededSafetyBehavior
+import com.naslabs.yardscape.data.SeededSafetyOutcome
 import com.naslabs.yardscape.data.YardSaleEventRepository
 import com.naslabs.yardscape.domain.LocationVisibility
 import com.naslabs.yardscape.domain.Rsvp
@@ -13,6 +16,7 @@ import com.naslabs.yardscape.ui.EventCapacitySource
 import com.naslabs.yardscape.ui.MockSessionStatus
 import com.naslabs.yardscape.ui.YardScapeAppState
 import com.naslabs.yardscape.ui.YardScapeRoute
+import com.naslabs.yardscape.ui.ShopperSafetyAction
 
 enum class MockScenarioId {
     NewShopper,
@@ -33,6 +37,11 @@ enum class MockScenarioId {
     SessionExpiredAccount,
     ShopperProfile,
     HostProfile,
+    ReportValidation,
+    ReportOffline,
+    ReportServerError,
+    BlockHost,
+    BlockOffline,
     Offline,
     RecoverableError,
 }
@@ -48,6 +57,7 @@ class MockScenario internal constructor(
     private val dataAvailability: AppDataAvailability = AppDataAvailability.Available,
     private val atCapacityEventIds: Set<String> = emptySet(),
     private val initialAccountStatus: MockSessionStatus = MockSessionStatus.SignedIn,
+    private val safetyBehavior: SeededSafetyBehavior = SeededSafetyBehavior(),
     private val repositoryFactory: () -> YardSaleEventRepository,
 ) {
     fun createAppState(): YardScapeAppState = YardScapeAppState(
@@ -59,6 +69,7 @@ class MockScenario internal constructor(
         dataAvailability = dataAvailability,
         eventCapacitySource = EventCapacitySource { it in atCapacityEventIds },
         initialAccountStatus = initialAccountStatus,
+        shopperSafetyRepository = SeededShopperSafetyRepository(behavior = safetyBehavior),
         initialRoute = initialRoute,
     )
 }
@@ -227,6 +238,61 @@ object MockScenarioCatalog {
             repositoryFactory = { seeded() },
         ),
         scenario(
+            id = MockScenarioId.ReportValidation,
+            name = "Report validation",
+            assertions = listOf("Reason is required", "No report success is claimed"),
+            initialRoute = YardScapeRoute.EventSafety(
+                SeededYardSaleData.FAMILY_GARAGE_EVENT_ID,
+                ShopperSafetyAction.Report,
+            ),
+            repositoryFactory = { seeded() },
+        ),
+        scenario(
+            id = MockScenarioId.ReportOffline,
+            name = "Report offline",
+            assertions = listOf("Offline submission stays failed", "Event remains discoverable"),
+            initialRoute = YardScapeRoute.EventSafety(
+                SeededYardSaleData.FAMILY_GARAGE_EVENT_ID,
+                ShopperSafetyAction.Report,
+            ),
+            safetyBehavior = SeededSafetyBehavior(reportOutcome = SeededSafetyOutcome.Offline),
+            repositoryFactory = { seeded() },
+        ),
+        scenario(
+            id = MockScenarioId.ReportServerError,
+            name = "Report server error",
+            assertions = listOf("Server failure stays failed", "Retry remains available"),
+            initialRoute = YardScapeRoute.EventSafety(
+                SeededYardSaleData.FAMILY_GARAGE_EVENT_ID,
+                ShopperSafetyAction.Report,
+            ),
+            safetyBehavior = SeededSafetyBehavior(reportOutcome = SeededSafetyOutcome.ServerError),
+            repositoryFactory = { seeded() },
+        ),
+        scenario(
+            id = MockScenarioId.BlockHost,
+            name = "Block host",
+            assertions = listOf("Block confirmation explains reveal loss", "Success clears exact location"),
+            shopperId = SeededYardSaleData.SHOPPER_WITH_ACCEPTED_ACCESS_ID,
+            initialRoute = YardScapeRoute.EventSafety(
+                SeededYardSaleData.ESTATE_TOOLS_EVENT_ID,
+                ShopperSafetyAction.Block,
+            ),
+            repositoryFactory = { seeded() },
+        ),
+        scenario(
+            id = MockScenarioId.BlockOffline,
+            name = "Block offline",
+            assertions = listOf("Offline block does not mutate state", "Exact location is not falsely cleared"),
+            shopperId = SeededYardSaleData.SHOPPER_WITH_ACCEPTED_ACCESS_ID,
+            initialRoute = YardScapeRoute.EventSafety(
+                SeededYardSaleData.ESTATE_TOOLS_EVENT_ID,
+                ShopperSafetyAction.Block,
+            ),
+            safetyBehavior = SeededSafetyBehavior(blockOutcome = SeededSafetyOutcome.Offline),
+            repositoryFactory = { seeded() },
+        ),
+        scenario(
             id = MockScenarioId.Offline,
             name = "Offline",
             assertions = listOf("Browse reports offline state", "Seeded previews remain privacy-safe"),
@@ -259,6 +325,7 @@ private fun scenario(
     availability: AppDataAvailability = AppDataAvailability.Available,
     atCapacityEventIds: Set<String> = emptySet(),
     accountStatus: MockSessionStatus = MockSessionStatus.SignedIn,
+    safetyBehavior: SeededSafetyBehavior = SeededSafetyBehavior(),
     repositoryFactory: () -> YardSaleEventRepository,
 ): MockScenario = MockScenario(
     id = id,
@@ -270,6 +337,7 @@ private fun scenario(
     dataAvailability = availability,
     atCapacityEventIds = atCapacityEventIds,
     initialAccountStatus = accountStatus,
+    safetyBehavior = safetyBehavior,
     repositoryFactory = repositoryFactory,
 )
 
