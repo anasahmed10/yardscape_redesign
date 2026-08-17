@@ -27,11 +27,17 @@ Do not replace a production entry point with a scenario launch. A future debug m
 | Populated browse | Two upcoming public previews appear; previews contain approximate areas only. |
 | No nearby events | Browse is empty; host controls remain available. |
 | Pending RSVP | Detail reports a pending request; exact location stays hidden. |
+| Accepted location access | My RSVPs shows accepted access with the protected location and directions entry point. |
+| Waitlisted RSVP | My RSVPs reports waitlisted and keeps exact location hidden. |
+| Declined RSVP | My RSVPs reports declined and keeps exact location hidden. |
+| Cancelled RSVP | My RSVPs reports shopper cancellation and clears exact location. |
+| Revoked location access | My RSVPs reports revoked access and clears exact location. |
+| Expired location access | My RSVPs reports expired access after the sale and clears exact location. |
 | Accepted location access | The accepted shopper can see the protected exact location. |
 | Revoked location access | Detail reports revocation; exact location stays hidden. |
 | Expired location access | Detail reports expiry after the sale; exact location stays hidden. |
 | Cancelled event | Detail reports cancellation; cancellation suppresses exact location. |
-| Event at capacity | Detail reports capacity and disables the RSVP action. |
+| Event at capacity | Detail reports capacity, disables the RSVP action, and My RSVPs represents the full state. |
 | Host with drafts | Starts in the host editor with a draft available. |
 | Host with pending attendees | The host event has one pending attendee without a reveal grant. |
 | Offline | Browse reports offline state while privacy-safe seeded previews remain visible. |

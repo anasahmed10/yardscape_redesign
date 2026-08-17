@@ -20,6 +20,8 @@ interface YardSaleEventRepository {
 
     fun rsvpsForEvent(eventId: String): List<Rsvp> = emptyList()
 
+    fun rsvpsForShopper(shopperId: String): List<Rsvp> = emptyList()
+
     fun exactLocationFor(
         eventId: String,
         shopperId: String,
@@ -27,6 +29,12 @@ interface YardSaleEventRepository {
     ): ExactAddress?
 
     fun submitRsvp(eventId: String, shopperId: String): Rsvp?
+
+    fun cancelRsvp(eventId: String, shopperId: String): Rsvp? = null
+
+    fun revokeRsvpAccess(eventId: String, shopperId: String): Rsvp? = null
+
+    fun expireRsvpAccess(eventId: String, shopperId: String): Rsvp? = null
 
     fun hostEvents(hostId: String): List<YardSaleEvent>
 
