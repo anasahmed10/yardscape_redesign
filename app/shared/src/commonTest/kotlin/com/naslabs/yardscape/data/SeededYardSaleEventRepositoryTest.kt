@@ -1,6 +1,7 @@
 package com.naslabs.yardscape.data
 
 import com.naslabs.yardscape.domain.EventStatus
+import com.naslabs.yardscape.domain.LocationVisibility
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -207,7 +208,46 @@ class SeededYardSaleEventRepositoryTest {
 
         assertEquals("901 Hidden Lane", repository.exactLocationFor("event-local-edit", "shopper-edit", now)?.streetAddress)
         assertTrue(repository.cancelHostEvent("event-local-edit"))
+        assertEquals(
+            LocationVisibility.REVOKED,
+            repository.rsvpFor("event-local-edit", "shopper-edit")?.locationVisibility,
+        )
         assertNull(repository.exactLocationFor("event-local-edit", "shopper-edit", now))
+    }
+
+    @Test
+    fun hidingHostEventRevokesOnlyItsLocationAccess() {
+        repository.submitRsvp(
+            SeededYardSaleData.FAMILY_GARAGE_EVENT_ID,
+            "shopper-shared",
+        )
+        repository.submitRsvp(
+            SeededYardSaleData.ESTATE_TOOLS_EVENT_ID,
+            "shopper-shared",
+        )
+
+        assertTrue(repository.hideHostEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID))
+        assertEquals(
+            LocationVisibility.REVOKED,
+            repository.rsvpFor(
+                SeededYardSaleData.FAMILY_GARAGE_EVENT_ID,
+                "shopper-shared",
+            )?.locationVisibility,
+        )
+        assertEquals(
+            LocationVisibility.RSVP_ACCEPTED,
+            repository.rsvpFor(
+                SeededYardSaleData.ESTATE_TOOLS_EVENT_ID,
+                "shopper-shared",
+            )?.locationVisibility,
+        )
+        assertNull(
+            repository.exactLocationFor(
+                SeededYardSaleData.FAMILY_GARAGE_EVENT_ID,
+                "shopper-shared",
+                now,
+            ),
+        )
     }
 
     private fun validHostDraft(): HostEventDraft =

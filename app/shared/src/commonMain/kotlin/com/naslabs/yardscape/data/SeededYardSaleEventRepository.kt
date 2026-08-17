@@ -119,11 +119,10 @@ class SeededYardSaleEventRepository(
         if (index == -1) return false
         events[index] = events[index].copy(status = status)
         if (status == EventStatus.CANCELLED || status == EventStatus.HIDDEN) {
-            rsvps.replaceAll { rsvp ->
+            for (rsvpIndex in rsvps.indices) {
+                val rsvp = rsvps[rsvpIndex]
                 if (rsvp.eventId == eventId) {
-                    rsvp.copy(locationVisibility = LocationVisibility.REVOKED)
-                } else {
-                    rsvp
+                    rsvps[rsvpIndex] = rsvp.copy(locationVisibility = LocationVisibility.REVOKED)
                 }
             }
         }

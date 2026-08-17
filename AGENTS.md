@@ -219,3 +219,4 @@ Use the narrowest validation that proves the change.
 | 7 | Android workflow smoke test | Done |
 | 8 | GitHub Actions validation for agent PRs | Done |
 | 9 | Post-MVP backend design | Done |
+| 10 | JS and Wasm mock preview compatibility | Done |
