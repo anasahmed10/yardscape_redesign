@@ -39,6 +39,7 @@ import com.naslabs.yardscape.YardScapeConfig
 @Composable
 fun BrowseScreen(
     events: List<BrowseEventItem>,
+    dataAvailability: AppDataAvailability = AppDataAvailability.Available,
     onEventSelected: (String) -> Unit,
     onHostSelected: () -> Unit,
 ) {
@@ -67,6 +68,22 @@ fun BrowseScreen(
             )
         }
 
+        when (dataAvailability) {
+            AppDataAvailability.Available -> Unit
+            AppDataAvailability.Offline -> item {
+                BrowseAvailabilityCard(
+                    title = "You're offline",
+                    message = "Reconnect to refresh nearby sales. Previously loaded mock data stays visible.",
+                )
+            }
+            is AppDataAvailability.RecoverableError -> item {
+                BrowseAvailabilityCard(
+                    title = "Couldn't refresh sales",
+                    message = dataAvailability.message,
+                )
+            }
+        }
+
         item {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -91,6 +108,22 @@ fun BrowseScreen(
 
         item {
             Spacer(modifier = Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun BrowseAvailabilityCard(title: String, message: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SkyWash),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(message, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

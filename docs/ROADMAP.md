@@ -26,6 +26,7 @@ Exit criteria:
 Goal: turn the testable workflow into a useful alpha for a limited community.
 
 Backend planning details live in [Post-MVP Backend Design](./POST_MVP_BACKEND_DESIGN.md).
+Deterministic UX states and their privacy assertions live in [Mock Scenario Catalog](./MOCK_SCENARIOS.md).
 
 - Add account basics: email or phone sign-in, profile, session handling, and sign-out.
 - Add persistence with PostgreSQL and PostGIS for radius, neighborhood, and map-style searches.

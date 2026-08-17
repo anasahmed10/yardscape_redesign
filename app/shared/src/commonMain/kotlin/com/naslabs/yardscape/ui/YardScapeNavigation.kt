@@ -14,6 +14,7 @@ import com.naslabs.yardscape.domain.ExactAddress
 import com.naslabs.yardscape.domain.LocationVisibility
 import com.naslabs.yardscape.domain.PublicEventPreview
 import com.naslabs.yardscape.domain.RsvpStatus
+import com.naslabs.yardscape.domain.UserRole
 import com.naslabs.yardscape.domain.YardSaleEvent
 
 sealed interface YardScapeRoute {
@@ -39,8 +40,12 @@ class YardScapeAppState(
     private val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
     private val shopperId: String = SeededYardSaleData.SHOPPER_WITHOUT_ACCESS_ID,
     private val hostId: String = SeededYardSaleData.HOST_AVERY_ID,
+    val activeUserRole: UserRole = UserRole.SHOPPER,
+    val dataAvailability: AppDataAvailability = AppDataAvailability.Available,
+    private val eventCapacitySource: EventCapacitySource = EventCapacitySource.None,
+    initialRoute: YardScapeRoute = YardScapeRoute.Browse,
 ) {
-    var route: YardScapeRoute = YardScapeRoute.Browse
+    var route: YardScapeRoute = initialRoute
         private set
 
     fun browseItems(): List<BrowseEventItem> =
@@ -61,6 +66,11 @@ class YardScapeAppState(
         )
         return EventDetailState(
             detail = detail,
+            attendanceState = if (eventCapacitySource.isAtCapacity(eventId)) {
+                EventAttendanceState.AtCapacity
+            } else {
+                EventAttendanceState.Available
+            },
             revealState = detail.toLocationRevealState(
                 rsvpStatus = rsvp?.status,
                 locationVisibility = rsvp?.locationVisibility,
@@ -92,6 +102,13 @@ class YardScapeAppState(
 
     fun hostEventItems(): List<HostEventItem> =
         repository.hostEvents(hostId).map { it.toHostEventItem(nowEpochMillis) }
+
+    fun pendingAttendeeCount(eventId: String): Int {
+        val isOwningHost = activeUserRole == UserRole.HOST &&
+            repository.hostEvent(eventId)?.host?.id == hostId
+        if (!isOwningHost) return 0
+        return repository.rsvpsForEvent(eventId).count { it.status == RsvpStatus.REQUESTED }
+    }
 
     fun searchHostLocations(query: String): List<MapSelectedLocation> =
         mapLocationSearchRepository.searchHostLocations(query)
@@ -177,10 +194,31 @@ data class HostEditorState(
 data class EventDetailState(
     val detail: PublicEventDetail,
     val revealState: LocationRevealState,
+    val attendanceState: EventAttendanceState = EventAttendanceState.Available,
 ) {
     val shouldShowRsvpAction: Boolean =
         detail.status == EventStatus.PUBLISHED &&
+            attendanceState == EventAttendanceState.Available &&
             revealState !is LocationRevealState.Revealed
+}
+
+sealed interface AppDataAvailability {
+    data object Available : AppDataAvailability
+    data object Offline : AppDataAvailability
+    data class RecoverableError(val message: String) : AppDataAvailability
+}
+
+enum class EventAttendanceState {
+    Available,
+    AtCapacity,
+}
+
+fun interface EventCapacitySource {
+    fun isAtCapacity(eventId: String): Boolean
+
+    data object None : EventCapacitySource {
+        override fun isAtCapacity(eventId: String): Boolean = false
+    }
 }
 
 sealed interface LocationRevealState {

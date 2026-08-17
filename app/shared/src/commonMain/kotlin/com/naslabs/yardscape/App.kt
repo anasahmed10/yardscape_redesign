@@ -23,9 +23,13 @@ import com.naslabs.yardscape.ui.YardScapeTheme
 @Composable
 @Preview
 fun App() {
+    App(remember { YardScapeAppState() })
+}
+
+@Composable
+fun App(appState: YardScapeAppState) {
     YardScapeTheme {
-        val appState = remember { YardScapeAppState() }
-        var route by remember { mutableStateOf(appState.route) }
+        var route by remember(appState) { mutableStateOf(appState.route) }
 
         Surface(
             modifier = Modifier
@@ -37,6 +41,7 @@ fun App() {
             when (val currentRoute = route) {
                 YardScapeRoute.Browse -> BrowseScreen(
                     events = appState.browseItems(),
+                    dataAvailability = appState.dataAvailability,
                     onEventSelected = { eventId ->
                         appState.openEvent(eventId)
                         route = appState.route
@@ -71,7 +76,7 @@ fun App() {
                 )
 
                 is YardScapeRoute.HostCreateEdit -> {
-                    var editorState by remember(currentRoute.eventId) {
+                    var editorState by remember(appState, currentRoute.eventId) {
                         mutableStateOf(appState.hostEditorState(currentRoute.eventId))
                     }
                     HostCreateEditScreen(
