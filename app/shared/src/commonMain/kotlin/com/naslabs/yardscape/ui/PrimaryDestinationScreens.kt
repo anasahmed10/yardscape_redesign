@@ -15,16 +15,61 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.naslabs.yardscape.domain.UserRole
 
 @Composable
-fun RsvpsDestinationScreen() {
-    PrimaryPlaceholderScreen(
-        title = "My RSVPs",
-        message = "Track upcoming, pending, and past attendance here. Exact locations remain governed by each RSVP's access state.",
-    )
+fun SavedDestinationScreen(
+    events: List<BrowseEventItem>,
+    onEventSelected: (String) -> Unit,
+    onUnsave: (String) -> Unit,
+    onBrowse: () -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(YardScapeTestTags.SavedScreen)
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Column(
+                modifier = Modifier.padding(top = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("Saved sales", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "Saved public previews stay available during this mock session.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (events.isEmpty()) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text("Nothing saved yet", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("Browse nearby sales and save the ones you want to revisit.")
+                        Button(onClick = onBrowse) { Text("Browse sales") }
+                    }
+                }
+            }
+        } else {
+            items(events, key = { it.id }) { event ->
+                EventPreviewCard(
+                    event = event,
+                    isSaved = true,
+                    onClick = { onEventSelected(event.id) },
+                    onSavedToggle = { onUnsave(event.id) },
+                )
+            }
+        }
+    }
 }
 
 @Composable

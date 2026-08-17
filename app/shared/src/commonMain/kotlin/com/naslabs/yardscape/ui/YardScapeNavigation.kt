@@ -25,7 +25,7 @@ enum class YardScapePrimaryDestination(
     val contextLabel: String,
 ) {
     Browse(label = "Browse", contextLabel = "Shopper workspace"),
-    Rsvps(label = "RSVPs", contextLabel = "Shopper workspace"),
+    Saved(label = "Saved", contextLabel = "Shopper workspace"),
     Host(label = "Host", contextLabel = "Host workspace"),
     Account(label = "Account", contextLabel = "Account workspace"),
 }
@@ -41,10 +41,10 @@ sealed interface YardScapeRoute {
         override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse
     }
 
-    data object Rsvps : YardScapeRoute {
-        override val path: String = "/rsvps"
-        override val destinationLabel: String = "My RSVPs"
-        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Rsvps
+    data object Saved : YardScapeRoute {
+        override val path: String = "/saved"
+        override val destinationLabel: String = "Saved sales"
+        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Saved
     }
 
     data object Host : YardScapeRoute {
@@ -59,16 +59,30 @@ sealed interface YardScapeRoute {
         override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Account
     }
 
-    data class EventDetail(val eventId: String) : YardScapeRoute {
+    data class EventDetail(
+        val eventId: String,
+        val origin: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse,
+    ) : YardScapeRoute {
+        init {
+            require(origin == YardScapePrimaryDestination.Browse || origin == YardScapePrimaryDestination.Saved)
+        }
+
         override val path: String = "/events/$eventId"
         override val destinationLabel: String = "Event details"
-        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse
+        override val primaryDestination: YardScapePrimaryDestination = origin
     }
 
-    data class Rsvp(val eventId: String) : YardScapeRoute {
+    data class Rsvp(
+        val eventId: String,
+        val origin: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse,
+    ) : YardScapeRoute {
+        init {
+            require(origin == YardScapePrimaryDestination.Browse || origin == YardScapePrimaryDestination.Saved)
+        }
+
         override val path: String = "/events/$eventId/rsvp"
         override val destinationLabel: String = "RSVP"
-        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse
+        override val primaryDestination: YardScapePrimaryDestination = origin
     }
 
     data class HostCreateEdit(val eventId: String? = null) : YardScapeRoute {
@@ -86,7 +100,7 @@ sealed interface YardScapeRoute {
                 .filter { it.isNotBlank() }
             return when {
                 segments == listOf("browse") || segments.isEmpty() -> Browse
-                segments == listOf("rsvps") -> Rsvps
+                segments == listOf("saved") -> Saved
                 segments == listOf("host") -> Host
                 segments == listOf("account") -> Account
                 segments.size == 2 && segments[0] == "events" -> EventDetail(segments[1])
@@ -108,6 +122,8 @@ object YardScapeTestTags {
     const val RsvpAction: String = "event-detail-rsvp-action"
     const val RsvpConfirmAction: String = "rsvp-confirm-action"
     const val AppShell: String = "app-shell"
+    const val DiscoveryNoResults: String = "discovery-no-results"
+    const val SavedScreen: String = "saved-screen"
 
     fun browseEventCard(eventId: String): String = "browse-event-card-$eventId"
     fun primaryDestination(destination: YardScapePrimaryDestination): String =
@@ -128,13 +144,22 @@ class YardScapeAppState(
     var route: YardScapeRoute by mutableStateOf(initialRoute)
         private set
 
+    var discoveryFilters: DiscoveryFilters by mutableStateOf(DiscoveryFilters())
+        private set
+
+    var discoveryDisplayMode: DiscoveryDisplayMode by mutableStateOf(DiscoveryDisplayMode.List)
+        private set
+
+    var savedEventIds: Set<String> by mutableStateOf(emptySet())
+        private set
+
     val activePrimaryDestination: YardScapePrimaryDestination
         get() = route.primaryDestination
 
     fun navigateTo(destination: YardScapePrimaryDestination) {
         route = when (destination) {
             YardScapePrimaryDestination.Browse -> YardScapeRoute.Browse
-            YardScapePrimaryDestination.Rsvps -> YardScapeRoute.Rsvps
+            YardScapePrimaryDestination.Saved -> YardScapeRoute.Saved
             YardScapePrimaryDestination.Host -> YardScapeRoute.Host
             YardScapePrimaryDestination.Account -> YardScapeRoute.Account
         }
@@ -149,12 +174,15 @@ class YardScapeAppState(
     fun navigateBack(): Boolean {
         route = when (val current = route) {
             YardScapeRoute.Browse -> return false
-            YardScapeRoute.Rsvps,
+            YardScapeRoute.Saved,
             YardScapeRoute.Host,
             YardScapeRoute.Account,
             -> YardScapeRoute.Browse
-            is YardScapeRoute.EventDetail -> YardScapeRoute.Browse
-            is YardScapeRoute.Rsvp -> YardScapeRoute.EventDetail(current.eventId)
+            is YardScapeRoute.EventDetail -> when (current.origin) {
+                YardScapePrimaryDestination.Saved -> YardScapeRoute.Saved
+                else -> YardScapeRoute.Browse
+            }
+            is YardScapeRoute.Rsvp -> YardScapeRoute.EventDetail(current.eventId, current.origin)
             is YardScapeRoute.HostCreateEdit -> YardScapeRoute.Host
         }
         return true
@@ -162,6 +190,53 @@ class YardScapeAppState(
 
     fun browseItems(): List<BrowseEventItem> =
         repository.publicPreviews(nowEpochMillis).map { it.toBrowseEventItem(nowEpochMillis) }
+
+    fun discoveryState(): ShopperDiscoveryState {
+        val allItems = browseItems()
+        return ShopperDiscoveryState(
+            items = allItems.filter { it.matches(discoveryFilters, nowEpochMillis) },
+            totalEventCount = allItems.size,
+            availableCategories = allItems.flatMap { it.categoryLabels }.distinct().sorted(),
+            filters = discoveryFilters,
+            displayMode = discoveryDisplayMode,
+            savedEventIds = savedEventIds,
+        )
+    }
+
+    fun updateDiscoveryQuery(query: String) {
+        discoveryFilters = discoveryFilters.copy(query = query)
+    }
+
+    fun updateDiscoveryDate(date: DiscoveryDateFilter) {
+        discoveryFilters = discoveryFilters.copy(date = date)
+    }
+
+    fun updateDiscoveryDistance(distance: DiscoveryDistanceFilter) {
+        discoveryFilters = discoveryFilters.copy(distance = distance)
+    }
+
+    fun toggleDiscoveryCategory(category: String) {
+        val categories = discoveryFilters.categories.toMutableSet()
+        if (!categories.add(category)) categories.remove(category)
+        discoveryFilters = discoveryFilters.copy(categories = categories)
+    }
+
+    fun clearDiscoveryFilters() {
+        discoveryFilters = DiscoveryFilters()
+    }
+
+    fun updateDiscoveryDisplayMode(mode: DiscoveryDisplayMode) {
+        discoveryDisplayMode = mode
+    }
+
+    fun toggleSavedEvent(eventId: String): Boolean {
+        if (browseItems().none { it.id == eventId }) return false
+        savedEventIds = if (eventId in savedEventIds) savedEventIds - eventId else savedEventIds + eventId
+        return eventId in savedEventIds
+    }
+
+    fun savedItems(): List<BrowseEventItem> =
+        browseItems().filter { it.id in savedEventIds }
 
     fun selectedEventDetailState(): EventDetailState? {
         val detailRoute = route as? YardScapeRoute.EventDetail ?: return null
@@ -192,16 +267,27 @@ class YardScapeAppState(
     }
 
     fun openEvent(eventId: String) {
-        route = YardScapeRoute.EventDetail(eventId)
+        val origin = activePrimaryDestination.takeIf {
+            it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.Saved
+        } ?: YardScapePrimaryDestination.Browse
+        route = YardScapeRoute.EventDetail(eventId, origin)
     }
 
     fun openRsvp(eventId: String) {
-        route = YardScapeRoute.Rsvp(eventId)
+        val origin = (route as? YardScapeRoute.EventDetail)
+            ?.takeIf { it.eventId == eventId }
+            ?.origin
+            ?: YardScapePrimaryDestination.Browse
+        route = YardScapeRoute.Rsvp(eventId, origin)
     }
 
     fun confirmRsvp(eventId: String) {
         repository.submitRsvp(eventId, shopperId)
-        route = YardScapeRoute.EventDetail(eventId)
+        val origin = (route as? YardScapeRoute.Rsvp)
+            ?.takeIf { it.eventId == eventId }
+            ?.origin
+            ?: YardScapePrimaryDestination.Browse
+        route = YardScapeRoute.EventDetail(eventId, origin)
     }
 
     fun openHostCreateEdit(eventId: String? = null) {
@@ -282,8 +368,13 @@ class YardScapeAppState(
 data class BrowseEventItem(
     val id: String,
     val title: String,
+    val description: String,
     val dateLabel: String,
     val locationLabel: String,
+    val neighborhood: String,
+    val city: String,
+    val startsAtEpochMillis: Long,
+    val distanceMiles: Int?,
     val categoryLabels: List<String>,
     val statusLabel: String,
     val photoDescription: String?,
@@ -377,15 +468,50 @@ fun PublicEventPreview.toBrowseEventItem(nowEpochMillis: Long): BrowseEventItem 
     BrowseEventItem(
         id = id,
         title = title,
+        description = description,
         dateLabel = saleWindow.toBrowseDateLabel(nowEpochMillis),
         locationLabel = listOfNotNull(
             publicLocation.neighborhood,
             publicLocation.distanceLabel ?: publicLocation.areaDescription,
         ).joinToString(" - "),
+        neighborhood = publicLocation.neighborhood,
+        city = publicLocation.city,
+        startsAtEpochMillis = saleWindow.startsAtEpochMillis,
+        distanceMiles = publicLocation.distanceLabel?.substringBefore(' ')?.toIntOrNull(),
         categoryLabels = categories,
         statusLabel = status.name.lowercase().replaceFirstChar { it.uppercase() },
         photoDescription = photos.firstOrNull()?.description,
     )
+
+private fun BrowseEventItem.matches(filters: DiscoveryFilters, nowEpochMillis: Long): Boolean {
+    val normalizedQuery = filters.query.trim().lowercase()
+    val searchableText = listOf(
+        title,
+        description,
+        neighborhood,
+        city,
+        categoryLabels.joinToString(" "),
+    ).joinToString(" ").lowercase()
+    val dayOffset = (startsAtEpochMillis - nowEpochMillis).floorDiv(MILLIS_PER_DAY)
+    val matchesDate = when (filters.date) {
+        DiscoveryDateFilter.Any -> true
+        DiscoveryDateFilter.Today -> dayOffset == 0L
+        DiscoveryDateFilter.Tomorrow -> dayOffset == 1L
+        DiscoveryDateFilter.Weekend -> startsAtEpochMillis.isWeekendDay()
+    }
+    val matchesDistance = filters.distance.maximumMiles?.let { maximum ->
+        distanceMiles?.let { it <= maximum } ?: false
+    } ?: true
+    val matchesCategory = filters.categories.isEmpty() || categoryLabels.any { it in filters.categories }
+    return (normalizedQuery.isBlank() || normalizedQuery in searchableText) &&
+        matchesDate && matchesDistance && matchesCategory
+}
+
+private fun Long.isWeekendDay(): Boolean {
+    val daysSinceEpoch = floorDiv(MILLIS_PER_DAY)
+    val isoDayOfWeek = (daysSinceEpoch + 3L).floorMod(7L) + 1L
+    return isoDayOfWeek == 6L || isoDayOfWeek == 7L
+}
 
 fun YardSaleEvent.toHostEventItem(nowEpochMillis: Long): HostEventItem =
     HostEventItem(
