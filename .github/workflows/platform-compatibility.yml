@@ -1,0 +1,58 @@
+name: Platform compatibility
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "core/**"
+      - "app/shared/**"
+      - "app/webApp/**"
+      - "gradle/**"
+      - "*.gradle.kts"
+      - "gradle.properties"
+      - ".github/workflows/platform-compatibility.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "core/**"
+      - "app/shared/**"
+      - "app/webApp/**"
+      - "gradle/**"
+      - "*.gradle.kts"
+      - "gradle.properties"
+      - ".github/workflows/platform-compatibility.yml"
+  schedule:
+    - cron: "17 9 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-compatibility-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-compatibility:
+    name: JS and Wasm compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: corretto
+          java-version: "21"
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Build JS and Wasm distributions
+        run: ./gradlew --no-daemon :app:webApp:composeCompatibilityBrowserDistribution
