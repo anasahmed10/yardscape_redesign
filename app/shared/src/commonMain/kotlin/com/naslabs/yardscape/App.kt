@@ -12,11 +12,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.naslabs.yardscape.ui.AccountDestinationScreen
 import com.naslabs.yardscape.ui.BrowseScreen
+import com.naslabs.yardscape.ui.HostDashboardScreen
 import com.naslabs.yardscape.ui.HostCreateEditScreen
 import com.naslabs.yardscape.ui.PublicEventDetailScreen
 import com.naslabs.yardscape.ui.RsvpScreen
+import com.naslabs.yardscape.ui.RsvpsDestinationScreen
+import com.naslabs.yardscape.ui.YardScapeAppShell
 import com.naslabs.yardscape.ui.YardScapeAppState
+import com.naslabs.yardscape.ui.YardScapePrimaryDestination
 import com.naslabs.yardscape.ui.YardScapeRoute
 import com.naslabs.yardscape.ui.YardScapeTheme
 
@@ -29,8 +34,6 @@ fun App() {
 @Composable
 fun App(appState: YardScapeAppState) {
     YardScapeTheme {
-        var route by remember(appState) { mutableStateOf(appState.route) }
-
         Surface(
             modifier = Modifier
                 .background(MaterialTheme.colorScheme.background)
@@ -38,90 +41,78 @@ fun App(appState: YardScapeAppState) {
                 .fillMaxSize(),
             color = MaterialTheme.colorScheme.background,
         ) {
-            when (val currentRoute = route) {
-                YardScapeRoute.Browse -> BrowseScreen(
-                    events = appState.browseItems(),
-                    dataAvailability = appState.dataAvailability,
-                    onEventSelected = { eventId ->
-                        appState.openEvent(eventId)
-                        route = appState.route
-                    },
-                    onHostSelected = {
-                        appState.openHostCreateEdit()
-                        route = appState.route
-                    },
-                )
+            YardScapeAppShell(
+                route = appState.route,
+                activeUserRole = appState.activeUserRole,
+                onDestinationSelected = appState::navigateTo,
+            ) {
+                when (val currentRoute = appState.route) {
+                    YardScapeRoute.Browse -> BrowseScreen(
+                        events = appState.browseItems(),
+                        dataAvailability = appState.dataAvailability,
+                        onEventSelected = appState::openEvent,
+                        onHostSelected = {
+                            appState.navigateTo(YardScapePrimaryDestination.Host)
+                        },
+                    )
 
-                is YardScapeRoute.EventDetail -> PublicEventDetailScreen(
-                    state = appState.selectedEventDetailState(),
-                    onBack = {
-                        appState.returnToBrowse()
-                        route = appState.route
-                    },
-                    onRsvp = {
-                        appState.openRsvp(currentRoute.eventId)
-                        route = appState.route
-                    },
-                )
+                    YardScapeRoute.Rsvps -> RsvpsDestinationScreen()
+                    YardScapeRoute.Host -> HostDashboardScreen(
+                        events = appState.hostEventItems(),
+                        onCreateEvent = { appState.openHostCreateEdit() },
+                        onEditEvent = appState::openHostCreateEdit,
+                    )
+                    YardScapeRoute.Account -> AccountDestinationScreen(appState.activeUserRole)
 
-                is YardScapeRoute.Rsvp -> RsvpScreen(
-                    onConfirm = {
-                        appState.confirmRsvp(currentRoute.eventId)
-                        route = appState.route
-                    },
-                    onBack = {
-                        appState.openEvent(currentRoute.eventId)
-                        route = appState.route
-                    },
-                )
+                    is YardScapeRoute.EventDetail -> PublicEventDetailScreen(
+                        state = appState.selectedEventDetailState(),
+                        onBack = { appState.navigateBack() },
+                        onRsvp = { appState.openRsvp(currentRoute.eventId) },
+                    )
 
-                is YardScapeRoute.HostCreateEdit -> {
-                    var editorState by remember(appState, currentRoute.eventId) {
-                        mutableStateOf(appState.hostEditorState(currentRoute.eventId))
-                    }
-                    HostCreateEditScreen(
-                        hostEvents = appState.hostEventItems(),
-                        editorState = editorState,
-                        onAddressSearch = appState::searchHostLocations,
-                        onDraftChanged = { draft ->
-                            editorState = editorState.copy(
-                                draft = draft,
-                                validationErrors = emptyList(),
-                            )
-                        },
-                        onNew = {
-                            appState.openHostCreateEdit()
-                            route = appState.route
-                        },
-                        onEdit = { eventId ->
-                            appState.openHostCreateEdit(eventId)
-                            route = appState.route
-                        },
-                        onSaveDraft = {
-                            editorState = appState.saveHostDraft(editorState.draft)
-                        },
-                        onPublish = {
-                            editorState = appState.publishHostEvent(editorState.draft)
-                        },
-                        onCancelEvent = {
-                            editorState.savedEventId?.let { eventId ->
-                                appState.cancelHostEvent(eventId)
-                                editorState = appState.hostEditorState(eventId)
-                            }
-                        },
-                        onHideEvent = {
-                            editorState.savedEventId?.let { eventId ->
-                                appState.hideHostEvent(eventId)
-                                editorState = appState.hostEditorState(eventId)
-                            }
-                        },
-                        onBack = {
-                            appState.returnToBrowse()
-                            route = appState.route
-                        },
+                    is YardScapeRoute.Rsvp -> RsvpScreen(
+                        onConfirm = { appState.confirmRsvp(currentRoute.eventId) },
+                        onBack = { appState.navigateBack() },
+                    )
+
+                    is YardScapeRoute.HostCreateEdit -> HostEditorRoute(
+                        appState = appState,
+                        route = currentRoute,
                     )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun HostEditorRoute(appState: YardScapeAppState, route: YardScapeRoute.HostCreateEdit) {
+    var editorState by remember(appState, route.eventId) {
+        mutableStateOf(appState.hostEditorState(route.eventId))
+    }
+    HostCreateEditScreen(
+        hostEvents = appState.hostEventItems(),
+        editorState = editorState,
+        onAddressSearch = appState::searchHostLocations,
+        onDraftChanged = { draft ->
+            editorState = editorState.copy(draft = draft, validationErrors = emptyList())
+        },
+        onNew = { appState.openHostCreateEdit() },
+        onEdit = appState::openHostCreateEdit,
+        onSaveDraft = { editorState = appState.saveHostDraft(editorState.draft) },
+        onPublish = { editorState = appState.publishHostEvent(editorState.draft) },
+        onCancelEvent = {
+            editorState.savedEventId?.let { eventId ->
+                appState.cancelHostEvent(eventId)
+                editorState = appState.hostEditorState(eventId)
+            }
+        },
+        onHideEvent = {
+            editorState.savedEventId?.let { eventId ->
+                appState.hideHostEvent(eventId)
+                editorState = appState.hostEditorState(eventId)
+            }
+        },
+        onBack = { appState.navigateBack() },
+    )
 }

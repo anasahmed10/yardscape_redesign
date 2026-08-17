@@ -1,5 +1,8 @@
 package com.naslabs.yardscape.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.naslabs.yardscape.data.PublicEventDetail
 import com.naslabs.yardscape.data.SeededYardSaleData
 import com.naslabs.yardscape.data.SeededYardSaleEventRepository
@@ -17,11 +20,85 @@ import com.naslabs.yardscape.domain.RsvpStatus
 import com.naslabs.yardscape.domain.UserRole
 import com.naslabs.yardscape.domain.YardSaleEvent
 
+enum class YardScapePrimaryDestination(
+    val label: String,
+    val contextLabel: String,
+) {
+    Browse(label = "Browse", contextLabel = "Shopper workspace"),
+    Rsvps(label = "RSVPs", contextLabel = "Shopper workspace"),
+    Host(label = "Host", contextLabel = "Host workspace"),
+    Account(label = "Account", contextLabel = "Account workspace"),
+}
+
 sealed interface YardScapeRoute {
-    data object Browse : YardScapeRoute
-    data class EventDetail(val eventId: String) : YardScapeRoute
-    data class Rsvp(val eventId: String) : YardScapeRoute
-    data class HostCreateEdit(val eventId: String? = null) : YardScapeRoute
+    val path: String
+    val destinationLabel: String
+    val primaryDestination: YardScapePrimaryDestination
+
+    data object Browse : YardScapeRoute {
+        override val path: String = "/browse"
+        override val destinationLabel: String = "Browse sales"
+        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse
+    }
+
+    data object Rsvps : YardScapeRoute {
+        override val path: String = "/rsvps"
+        override val destinationLabel: String = "My RSVPs"
+        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Rsvps
+    }
+
+    data object Host : YardScapeRoute {
+        override val path: String = "/host"
+        override val destinationLabel: String = "Host tools"
+        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Host
+    }
+
+    data object Account : YardScapeRoute {
+        override val path: String = "/account"
+        override val destinationLabel: String = "Account"
+        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Account
+    }
+
+    data class EventDetail(val eventId: String) : YardScapeRoute {
+        override val path: String = "/events/$eventId"
+        override val destinationLabel: String = "Event details"
+        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse
+    }
+
+    data class Rsvp(val eventId: String) : YardScapeRoute {
+        override val path: String = "/events/$eventId/rsvp"
+        override val destinationLabel: String = "RSVP"
+        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse
+    }
+
+    data class HostCreateEdit(val eventId: String? = null) : YardScapeRoute {
+        override val path: String = eventId?.let { "/host/events/$it/edit" } ?: "/host/events/new"
+        override val destinationLabel: String = if (eventId == null) "Create sale" else "Edit sale"
+        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Host
+    }
+
+    companion object {
+        fun fromPath(path: String): YardScapeRoute? {
+            val segments = path.substringBefore('?').substringBefore('#')
+                .trim()
+                .trim('/')
+                .split('/')
+                .filter { it.isNotBlank() }
+            return when {
+                segments == listOf("browse") || segments.isEmpty() -> Browse
+                segments == listOf("rsvps") -> Rsvps
+                segments == listOf("host") -> Host
+                segments == listOf("account") -> Account
+                segments.size == 2 && segments[0] == "events" -> EventDetail(segments[1])
+                segments.size == 3 && segments[0] == "events" && segments[2] == "rsvp" -> Rsvp(segments[1])
+                segments == listOf("host", "events", "new") -> HostCreateEdit()
+                segments.size == 4 &&
+                    segments[0] == "host" && segments[1] == "events" && segments[3] == "edit" ->
+                    HostCreateEdit(segments[2])
+                else -> null
+            }
+        }
+    }
 }
 
 object YardScapeTestTags {
@@ -30,8 +107,11 @@ object YardScapeTestTags {
     const val ExactLocationContent: String = "event-detail-exact-location"
     const val RsvpAction: String = "event-detail-rsvp-action"
     const val RsvpConfirmAction: String = "rsvp-confirm-action"
+    const val AppShell: String = "app-shell"
 
     fun browseEventCard(eventId: String): String = "browse-event-card-$eventId"
+    fun primaryDestination(destination: YardScapePrimaryDestination): String =
+        "primary-destination-${destination.name.lowercase()}"
 }
 
 class YardScapeAppState(
@@ -45,8 +125,40 @@ class YardScapeAppState(
     private val eventCapacitySource: EventCapacitySource = EventCapacitySource.None,
     initialRoute: YardScapeRoute = YardScapeRoute.Browse,
 ) {
-    var route: YardScapeRoute = initialRoute
+    var route: YardScapeRoute by mutableStateOf(initialRoute)
         private set
+
+    val activePrimaryDestination: YardScapePrimaryDestination
+        get() = route.primaryDestination
+
+    fun navigateTo(destination: YardScapePrimaryDestination) {
+        route = when (destination) {
+            YardScapePrimaryDestination.Browse -> YardScapeRoute.Browse
+            YardScapePrimaryDestination.Rsvps -> YardScapeRoute.Rsvps
+            YardScapePrimaryDestination.Host -> YardScapeRoute.Host
+            YardScapePrimaryDestination.Account -> YardScapeRoute.Account
+        }
+    }
+
+    fun navigateToPath(path: String): Boolean {
+        val target = YardScapeRoute.fromPath(path) ?: return false
+        route = target
+        return true
+    }
+
+    fun navigateBack(): Boolean {
+        route = when (val current = route) {
+            YardScapeRoute.Browse -> return false
+            YardScapeRoute.Rsvps,
+            YardScapeRoute.Host,
+            YardScapeRoute.Account,
+            -> YardScapeRoute.Browse
+            is YardScapeRoute.EventDetail -> YardScapeRoute.Browse
+            is YardScapeRoute.Rsvp -> YardScapeRoute.EventDetail(current.eventId)
+            is YardScapeRoute.HostCreateEdit -> YardScapeRoute.Host
+        }
+        return true
+    }
 
     fun browseItems(): List<BrowseEventItem> =
         repository.publicPreviews(nowEpochMillis).map { it.toBrowseEventItem(nowEpochMillis) }
@@ -97,7 +209,7 @@ class YardScapeAppState(
     }
 
     fun returnToBrowse() {
-        route = YardScapeRoute.Browse
+        navigateTo(YardScapePrimaryDestination.Browse)
     }
 
     fun hostEventItems(): List<HostEventItem> =
