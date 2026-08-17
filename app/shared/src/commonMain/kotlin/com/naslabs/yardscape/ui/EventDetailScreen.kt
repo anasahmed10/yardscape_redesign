@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -33,17 +32,18 @@ fun PublicEventDetailScreen(
         return
     }
     val detail = state.detail
+    val spacing = YardScapeDesign.spacing
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = spacing.large),
+        verticalArrangement = Arrangement.spacedBy(spacing.medium),
     ) {
         item {
             Column(
                 modifier = Modifier.padding(top = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.medium),
             ) {
                 TextButton(onClick = onBack) {
                     Text("Back")
@@ -57,7 +57,7 @@ fun PublicEventDetailScreen(
                     text = detail.title,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = ForestInk,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = detail.description,
@@ -69,8 +69,8 @@ fun PublicEventDetailScreen(
 
         item {
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(spacing.small),
+                verticalArrangement = Arrangement.spacedBy(spacing.small),
             ) {
                 detail.categories.forEach { label -> CategoryChip(label = label) }
             }
@@ -121,7 +121,7 @@ internal fun LocationAccessPanel(revealState: LocationRevealState) {
         modifier = Modifier
             .fillMaxWidth()
             .testTag(YardScapeTestTags.LocationAccessPanel),
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
         colors = CardDefaults.cardColors(
             containerColor = when (revealState) {
                 is LocationRevealState.Revealed -> MintMist

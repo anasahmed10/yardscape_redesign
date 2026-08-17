@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -25,21 +24,22 @@ fun RsvpScreen(
     onConfirm: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val spacing = YardScapeDesign.spacing
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(spacing.large),
         contentAlignment = Alignment.Center,
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
+            shape = MaterialTheme.shapes.small,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         ) {
             Column(
                 modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.medium),
                 horizontalAlignment = Alignment.Start,
             ) {
                 StatusLabel(text = "RSVP")
@@ -47,7 +47,7 @@ fun RsvpScreen(
                     text = "Confirm attendance",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = ForestInk,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = "For this test workflow, RSVP is auto-accepted so you can verify the protected location reveal boundary.",
