@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -57,16 +56,17 @@ fun HostCreateEditScreen(
     onHideEvent: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val spacing = YardScapeDesign.spacing
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = spacing.large),
+        verticalArrangement = Arrangement.spacedBy(spacing.medium),
     ) {
         item {
             Column(
                 modifier = Modifier.padding(top = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.medium),
             ) {
                 TextButton(onClick = onBack) {
                     Text("Back")
@@ -84,7 +84,7 @@ fun HostCreateEditScreen(
                             text = "Host events",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
-                            color = ForestInk,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
                             text = "Draft, publish, and protect location access.",
@@ -119,7 +119,7 @@ fun HostCreateEditScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onEdit(event.id) },
-                shape = RoundedCornerShape(8.dp),
+                shape = MaterialTheme.shapes.small,
             ) {
                 Column(
                     modifier = Modifier.padding(14.dp),
@@ -208,7 +208,7 @@ private fun HostEventForm(
         if (state.validationErrors.isNotEmpty()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
+                shape = MaterialTheme.shapes.small,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                 ),
@@ -425,7 +425,7 @@ private fun MapLocationPicker(
         PrivacyNote("Search for the sale address with Maps autocomplete. Shoppers only see the approximate area until RSVP access is granted.")
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
+            shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.surface,
             shadowElevation = 1.dp,
         ) {
@@ -455,7 +455,7 @@ private fun MapLocationPicker(
                     onValueChange = { addressQuery = it },
                     label = { Text("Search address") },
                     placeholder = { Text("Start typing a street address") },
-                    shape = RoundedCornerShape(8.dp),
+                    shape = MaterialTheme.shapes.small,
                     singleLine = true,
                 )
 
@@ -529,7 +529,7 @@ private fun HostTimePickerField(
     OutlinedButton(
         modifier = Modifier.fillMaxWidth(),
         onClick = { showPicker = true },
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -613,7 +613,7 @@ private fun HostTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
     )
 }
 

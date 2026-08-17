@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -109,7 +108,7 @@ fun HostDashboardScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onEditEvent(event.id) },
-                shape = RoundedCornerShape(8.dp),
+                shape = MaterialTheme.shapes.small,
             ) {
                 Column(
                     modifier = Modifier.padding(14.dp),

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,7 +29,7 @@ import androidx.compose.ui.unit.dp
 internal fun DetailRow(label: String, value: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 1.dp,
     ) {
@@ -47,7 +46,7 @@ internal fun DetailRow(label: String, value: String) {
             Text(
                 text = value,
                 style = MaterialTheme.typography.bodyLarge,
-                color = ForestInk,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -85,13 +84,13 @@ internal fun CategoryChip(label: String) {
     Text(
         modifier = Modifier
             .background(
-                color = PeachWash,
-                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = MaterialTheme.shapes.extraSmall,
             )
             .padding(horizontal = 10.dp, vertical = 6.dp),
         text = label.replaceFirstChar { it.uppercase() },
         style = MaterialTheme.typography.labelMedium,
-        color = CocoaInk,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
@@ -103,7 +102,7 @@ internal fun StatusLabel(text: String) {
         modifier = Modifier
             .background(
                 color = SunTag,
-                shape = RoundedCornerShape(6.dp),
+                shape = MaterialTheme.shapes.extraSmall,
             )
             .widthIn(max = 180.dp)
             .padding(horizontal = 8.dp, vertical = 5.dp),
@@ -120,14 +119,14 @@ internal fun InfoChip(text: String) {
     Text(
         modifier = Modifier
             .background(
-                color = Stone,
-                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = MaterialTheme.shapes.extraSmall,
             )
             .widthIn(max = 220.dp)
             .padding(horizontal = 8.dp, vertical = 5.dp),
         text = text,
         style = MaterialTheme.typography.labelMedium,
-        color = OliveText,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
@@ -139,16 +138,16 @@ internal fun FilterChip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val background = if (selected) Evergreen else MaterialTheme.colorScheme.surface
-    val content = if (selected) Color.White else ForestInk
+    val background = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+    val content = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     Text(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(MaterialTheme.shapes.extraSmall)
             .background(background)
             .border(
                 width = 1.dp,
-                color = if (selected) Evergreen else SageLine,
-                shape = RoundedCornerShape(6.dp),
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                shape = MaterialTheme.shapes.extraSmall,
             )
             .clickable(onClick = onClick)
             .widthIn(max = 160.dp)
@@ -176,13 +175,13 @@ internal fun EventPhotoPreview(
         modifier = Modifier
             .fillMaxWidth()
             .height(136.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(MaterialTheme.shapes.small)
             .background(
                 brush = Brush.linearGradient(
                     colors = listOf(accent, accent.copy(alpha = 0.52f), Linen),
                 ),
             )
-            .border(1.dp, Color.White.copy(alpha = 0.72f), RoundedCornerShape(8.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.72f), MaterialTheme.shapes.small)
             .padding(14.dp),
         contentAlignment = Alignment.BottomStart,
     ) {
@@ -213,14 +212,14 @@ internal fun EventPhotoPreview(
 internal fun PrivacyNote(text: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = MintMist,
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.primaryContainer,
     ) {
         Text(
             modifier = Modifier.padding(12.dp),
             text = text,
             style = MaterialTheme.typography.bodyMedium,
-            color = ForestInk,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
     }
 }
