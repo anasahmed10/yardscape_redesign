@@ -19,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.naslabs.yardscape.domain.UserRole
 
 @Composable
 fun SavedDestinationScreen(
@@ -78,14 +77,6 @@ fun SavedDestinationScreen(
 }
 
 @Composable
-fun AccountDestinationScreen(activeUserRole: UserRole) {
-    PrimaryPlaceholderScreen(
-        title = "Account",
-        message = "Review the ${activeUserRole.name.lowercase()} mock profile, trust signals, and safety controls here.",
-    )
-}
-
-@Composable
 fun HostDashboardScreen(
     events: List<HostEventItem>,
     onCreateEvent: () -> Unit,
@@ -138,18 +129,5 @@ fun HostDashboardScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun PrimaryPlaceholderScreen(title: String, message: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text(message, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

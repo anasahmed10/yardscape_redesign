@@ -154,14 +154,19 @@ class YardScapeAppState(
     private val repository: YardSaleEventRepository = SeededYardSaleEventRepository(),
     private val mapLocationSearchRepository: MapLocationSearchRepository = SeededMapLocationSearchRepository(),
     private val hostPhotoPicker: HostPhotoPicker = SeededHostPhotoPicker(),
+    private val accountSessionController: AccountSessionController = SeededAccountSessionController(),
+    initialAccountStatus: MockSessionStatus = MockSessionStatus.SignedIn,
     private val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
     private val shopperId: String = SeededYardSaleData.SHOPPER_WITHOUT_ACCESS_ID,
     private val hostId: String = SeededYardSaleData.HOST_AVERY_ID,
-    val activeUserRole: UserRole = UserRole.SHOPPER,
+    activeUserRole: UserRole = UserRole.SHOPPER,
     val dataAvailability: AppDataAvailability = AppDataAvailability.Available,
     private val eventCapacitySource: EventCapacitySource = EventCapacitySource.None,
     initialRoute: YardScapeRoute = YardScapeRoute.Browse,
 ) {
+    var activeUserRole: UserRole by mutableStateOf(activeUserRole)
+        private set
+
     private val hostEditorSessions = mutableMapOf<String, HostEditorState>()
     private val hostAttendancePolicies = mutableMapOf(
         SeededYardSaleData.FAMILY_GARAGE_EVENT_ID to HostAttendancePolicy(
@@ -170,6 +175,14 @@ class YardScapeAppState(
         ),
     )
     var route: YardScapeRoute by mutableStateOf(initialRoute)
+        private set
+
+    var accountState: MockAccountState by mutableStateOf(
+        accountSessionController.stateFor(initialAccountStatus, activeUserRole),
+    )
+        private set
+
+    var pendingProtectedAction: PendingProtectedAction? by mutableStateOf(null)
         private set
 
     var discoveryFilters: DiscoveryFilters by mutableStateOf(DiscoveryFilters())
@@ -208,9 +221,57 @@ class YardScapeAppState(
         }
     }
 
+    fun protectedActionDecision(action: ProtectedAction): ProtectedActionDecision =
+        accountSessionController.gate(accountState, action)
+
+    fun signInMock(role: UserRole) {
+        val pending = pendingProtectedAction
+        activeUserRole = role
+        accountState = accountSessionController.signIn(role, accountState.notificationPreferences)
+        pendingProtectedAction = null
+        route = pending?.resumePath?.let(YardScapeRoute::fromPath) ?: YardScapeRoute.Account
+    }
+
+    fun signOutMock() {
+        accountState = accountSessionController.stateFor(MockSessionStatus.SignedOut, activeUserRole)
+        clearProtectedSessionState()
+        route = YardScapeRoute.Account
+    }
+
+    fun expireMockSession() {
+        accountState = accountSessionController.stateFor(MockSessionStatus.Expired, activeUserRole)
+        clearProtectedSessionState()
+        route = YardScapeRoute.Account
+    }
+
+    fun viewMockProfile(role: UserRole) {
+        accountState = accountState.copy(viewedProfile = accountSessionController.profileFor(role))
+    }
+
+    fun openAccountSettings(section: AccountSettingsSection) {
+        accountState = accountState.copy(selectedSettingsSection = section)
+    }
+
+    fun updateNotificationPreferences(preferences: NotificationPreferences) {
+        accountState = accountState.copy(notificationPreferences = preferences)
+    }
+
+    private fun clearProtectedSessionState() {
+        directionsEventId = null
+        pendingRsvpCancellationEventId = null
+        pendingHostAttendeeAction = null
+        pendingProtectedAction = null
+    }
+
     fun navigateToPath(path: String): Boolean {
         val target = YardScapeRoute.fromPath(path) ?: return false
-        route = target
+        when (target) {
+            YardScapeRoute.MyRsvps -> openMyRsvps()
+            is YardScapeRoute.Rsvp -> openRsvp(target.eventId)
+            is YardScapeRoute.HostCreateEdit -> openHostCreateEdit(target.eventId)
+            is YardScapeRoute.HostAttendees -> openHostAttendees(target.eventId)
+            else -> route = target
+        }
         return true
     }
 
@@ -284,29 +345,40 @@ class YardScapeAppState(
         browseItems().filter { it.id in savedEventIds }
 
     fun openMyRsvps() {
+        val gate = protectedActionDecision(ProtectedAction.RevealLocation)
+        if (gate is ProtectedActionDecision.SignInRequired) {
+            pendingProtectedAction = PendingProtectedAction(ProtectedAction.RevealLocation, YardScapeRoute.MyRsvps.path)
+            accountState = accountState.copy(signInReason = gate.message)
+            route = YardScapeRoute.Account
+            return
+        }
         route = YardScapeRoute.MyRsvps
     }
 
     fun myRsvpItems(): List<ShopperRsvpItem> =
-        repository.rsvpsForShopper(shopperId).mapNotNull { rsvp ->
-            val detail = repository.publicEventDetail(rsvp.eventId) ?: return@mapNotNull null
-            val exactAddress = repository.exactLocationFor(rsvp.eventId, shopperId, nowEpochMillis)
-            val uiState = rsvp.toShopperUiState(detail.status, detail.saleWindow.hasEnded(nowEpochMillis))
-            ShopperRsvpItem(
-                eventId = detail.id,
-                title = detail.title,
-                dateLabel = detail.saleWindow.toBrowseDateLabel(nowEpochMillis),
-                approximateLocationLabel = listOfNotNull(
-                    detail.publicLocation.neighborhood,
-                    detail.publicLocation.distanceLabel ?: detail.publicLocation.areaDescription,
-                ).joinToString(" - "),
-                state = uiState,
-                group = uiState.toGroup(),
-                exactAddress = exactAddress.takeIf { uiState == ShopperRsvpUiState.Accepted },
-                reminderAdded = rsvp.eventId in reminderEventIds,
-                calendarExportPrepared = rsvp.eventId in calendarExportEventIds,
-            )
-        }.sortedWith(compareBy({ it.group.ordinal }, { it.dateLabel }))
+        if (!accountState.isSignedIn) {
+            emptyList()
+        } else {
+            repository.rsvpsForShopper(shopperId).mapNotNull { rsvp ->
+                val detail = repository.publicEventDetail(rsvp.eventId) ?: return@mapNotNull null
+                val exactAddress = repository.exactLocationFor(rsvp.eventId, shopperId, nowEpochMillis)
+                val uiState = rsvp.toShopperUiState(detail.status, detail.saleWindow.hasEnded(nowEpochMillis))
+                ShopperRsvpItem(
+                    eventId = detail.id,
+                    title = detail.title,
+                    dateLabel = detail.saleWindow.toBrowseDateLabel(nowEpochMillis),
+                    approximateLocationLabel = listOfNotNull(
+                        detail.publicLocation.neighborhood,
+                        detail.publicLocation.distanceLabel ?: detail.publicLocation.areaDescription,
+                    ).joinToString(" - "),
+                    state = uiState,
+                    group = uiState.toGroup(),
+                    exactAddress = exactAddress.takeIf { uiState == ShopperRsvpUiState.Accepted },
+                    reminderAdded = rsvp.eventId in reminderEventIds,
+                    calendarExportPrepared = rsvp.eventId in calendarExportEventIds,
+                )
+            }.sortedWith(compareBy({ it.group.ordinal }, { it.dateLabel }))
+        }
 
     fun requestRsvpCancellation(eventId: String): Boolean {
         val item = myRsvpItems().firstOrNull { it.eventId == eventId } ?: return false
@@ -369,12 +441,12 @@ class YardScapeAppState(
 
     fun detailStateFor(eventId: String): EventDetailState? {
         val detail = repository.publicEventDetail(eventId) ?: return null
-        val rsvp = repository.rsvpFor(eventId, shopperId)
+        val rsvp = repository.rsvpFor(eventId, shopperId).takeIf { accountState.isSignedIn }
         val exactAddress = repository.exactLocationFor(
             eventId = eventId,
             shopperId = shopperId,
             nowEpochMillis = nowEpochMillis,
-        )
+        ).takeIf { accountState.isSignedIn }
         return EventDetailState(
             detail = detail,
             attendanceState = if (eventCapacitySource.isAtCapacity(eventId)) {
@@ -398,6 +470,16 @@ class YardScapeAppState(
     }
 
     fun openRsvp(eventId: String) {
+        val gate = protectedActionDecision(ProtectedAction.Rsvp)
+        if (gate is ProtectedActionDecision.SignInRequired) {
+            pendingProtectedAction = PendingProtectedAction(
+                ProtectedAction.Rsvp,
+                YardScapeRoute.EventDetail(eventId).path,
+            )
+            accountState = accountState.copy(signInReason = gate.message)
+            route = YardScapeRoute.Account
+            return
+        }
         val origin = (route as? YardScapeRoute.EventDetail)
             ?.takeIf { it.eventId == eventId }
             ?.origin
@@ -406,6 +488,10 @@ class YardScapeAppState(
     }
 
     fun confirmRsvp(eventId: String) {
+        if (!accountState.isSignedIn) {
+            openRsvp(eventId)
+            return
+        }
         repository.submitRsvp(eventId, shopperId)
         val origin = (route as? YardScapeRoute.Rsvp)
             ?.takeIf { it.eventId == eventId }
@@ -415,11 +501,29 @@ class YardScapeAppState(
     }
 
     fun openHostCreateEdit(eventId: String? = null) {
+        val target = YardScapeRoute.HostCreateEdit(eventId)
+        val gate = protectedActionDecision(ProtectedAction.HostManagement)
+        if (gate is ProtectedActionDecision.SignInRequired) {
+            pendingProtectedAction = PendingProtectedAction(ProtectedAction.HostManagement, target.path)
+            accountState = accountState.copy(signInReason = gate.message)
+            route = YardScapeRoute.Account
+            return
+        }
         if (eventId == null) hostEditorSessions.remove(NEW_HOST_SESSION_KEY)
-        route = YardScapeRoute.HostCreateEdit(eventId)
+        route = target
     }
 
     fun openHostAttendees(eventId: String): Boolean {
+        if (!accountState.isSignedIn) {
+            pendingProtectedAction = PendingProtectedAction(
+                ProtectedAction.HostManagement,
+                YardScapeRoute.HostAttendees(eventId).path,
+            )
+            val gate = protectedActionDecision(ProtectedAction.HostManagement)
+            accountState = accountState.copy(signInReason = (gate as? ProtectedActionDecision.SignInRequired)?.message)
+            route = YardScapeRoute.Account
+            return false
+        }
         val event = repository.hostEvent(eventId) ?: return false
         if (event.host.id != hostId) return false
         route = YardScapeRoute.HostAttendees(eventId)
@@ -435,6 +539,7 @@ class YardScapeAppState(
     }
 
     fun hostAttendanceState(eventId: String): HostAttendanceState? {
+        if (!accountState.isSignedIn) return null
         val event = repository.hostEvent(eventId) ?: return null
         if (event.host.id != hostId) return null
         val attendees = repository.rsvpsForEvent(eventId).map { rsvp ->
@@ -493,10 +598,15 @@ class YardScapeAppState(
     }
 
     fun hostEventItems(): List<HostEventItem> =
-        repository.hostEvents(hostId).map { it.toHostEventItem(nowEpochMillis) }
+        if (accountState.isSignedIn) {
+            repository.hostEvents(hostId).map { it.toHostEventItem(nowEpochMillis) }
+        } else {
+            emptyList()
+        }
 
     fun pendingAttendeeCount(eventId: String): Int {
-        val isOwningHost = activeUserRole == UserRole.HOST &&
+        val isOwningHost = accountState.isSignedIn &&
+            activeUserRole == UserRole.HOST &&
             repository.hostEvent(eventId)?.host?.id == hostId
         if (!isOwningHost) return 0
         return repository.rsvpsForEvent(eventId).count { it.status == RsvpStatus.REQUESTED }

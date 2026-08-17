@@ -40,7 +40,11 @@ Do not replace a production entry point with a scenario launch. A future debug m
 | Event at capacity | Detail reports capacity, disables the RSVP action, and My RSVPs represents the full state. |
 | Host with drafts | Starts in the host editor with a draft available. |
 | Host with pending attendees | The host event has one pending attendee without a reveal grant. |
+| Signed-out account | Public browsing remains available; protected actions explain why sign-in is required. |
+| Expired account session | Protected state is cleared while public browsing remains available. |
+| Shopper profile | Confirmed facts remain separate from community activity. |
+| Host profile | Host trust language avoids identity or safety guarantees. |
 | Offline | Browse reports offline state while privacy-safe seeded previews remain visible. |
 | Recoverable refresh error | Browse reports a recoverable error and retry guidance. |
 
-Scenario metadata contains no protected fixture values. Protected locations remain behind the repository interface, and app-visible detail state contains an exact address only for the accepted-access scenario (or the owning host editor). Pending-attendee counts are also gated to the event's owning host role.
+Scenario metadata contains no protected fixture values. Protected locations remain behind the repository interface, and app-visible detail state contains an exact address only for an accepted, active mock session (or the signed-in owning host editor). Pending-attendee counts are also gated to the signed-in event owner.

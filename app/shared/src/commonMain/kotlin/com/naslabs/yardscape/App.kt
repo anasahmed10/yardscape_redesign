@@ -12,7 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import com.naslabs.yardscape.ui.AccountDestinationScreen
+import com.naslabs.yardscape.ui.AccountScreen
 import com.naslabs.yardscape.ui.BrowseScreen
 import com.naslabs.yardscape.ui.HostDashboardScreen
 import com.naslabs.yardscape.ui.HostCreateEditScreen
@@ -90,7 +90,15 @@ fun App(appState: YardScapeAppState) {
                         onEditEvent = appState::openHostCreateEdit,
                         onManageAttendees = { appState.openHostAttendees(it) },
                     )
-                    YardScapeRoute.Account -> AccountDestinationScreen(appState.activeUserRole)
+                    YardScapeRoute.Account -> AccountScreen(
+                        state = appState.accountState,
+                        onSignIn = appState::signInMock,
+                        onSignOut = appState::signOutMock,
+                        onExpireSession = appState::expireMockSession,
+                        onViewProfile = appState::viewMockProfile,
+                        onOpenSettings = appState::openAccountSettings,
+                        onPreferencesChanged = appState::updateNotificationPreferences,
+                    )
 
                     is YardScapeRoute.EventDetail -> PublicEventDetailScreen(
                         state = appState.selectedEventDetailState(),

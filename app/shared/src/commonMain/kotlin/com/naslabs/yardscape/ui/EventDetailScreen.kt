@@ -84,6 +84,10 @@ fun PublicEventDetailScreen(
             LocationAccessPanel(revealState = state.revealState)
         }
 
+        item {
+            PrivacyNote(text = "Marketplace safety: visit only during listed hours, do not enter private areas, and leave if the situation feels unsafe.")
+        }
+
         if (state.attendanceState == EventAttendanceState.AtCapacity) {
             item {
                 PrivacyNote(text = "This sale is at capacity, so new RSVPs are paused.")
