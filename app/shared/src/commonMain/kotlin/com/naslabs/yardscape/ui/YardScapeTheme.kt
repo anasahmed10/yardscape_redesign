@@ -10,6 +10,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -37,12 +38,21 @@ object YardScapeDesign {
 private val BaseTypography = Typography()
 
 internal val YardScapeTypography = Typography(
-    headlineLarge = BaseTypography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-    headlineMedium = BaseTypography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-    headlineSmall = BaseTypography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-    titleLarge = BaseTypography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-    titleMedium = BaseTypography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-    labelLarge = BaseTypography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+    displayLarge = BaseTypography.displayLarge.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold),
+    displayMedium = BaseTypography.displayMedium.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold),
+    displaySmall = BaseTypography.displaySmall.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold),
+    headlineLarge = BaseTypography.headlineLarge.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold),
+    headlineMedium = BaseTypography.headlineMedium.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold),
+    headlineSmall = BaseTypography.headlineSmall.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold),
+    titleLarge = BaseTypography.titleLarge.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold),
+    titleMedium = BaseTypography.titleMedium.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold),
+    titleSmall = BaseTypography.titleSmall.copy(fontFamily = FontFamily.SansSerif),
+    bodyLarge = BaseTypography.bodyLarge.copy(fontFamily = FontFamily.SansSerif),
+    bodyMedium = BaseTypography.bodyMedium.copy(fontFamily = FontFamily.SansSerif),
+    bodySmall = BaseTypography.bodySmall.copy(fontFamily = FontFamily.SansSerif),
+    labelLarge = BaseTypography.labelLarge.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold),
+    labelMedium = BaseTypography.labelMedium.copy(fontFamily = FontFamily.SansSerif),
+    labelSmall = BaseTypography.labelSmall.copy(fontFamily = FontFamily.SansSerif),
 )
 
 internal val YardScapeShapes = Shapes(

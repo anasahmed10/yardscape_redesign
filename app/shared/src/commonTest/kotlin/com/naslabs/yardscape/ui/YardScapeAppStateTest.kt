@@ -11,6 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class YardScapeAppStateTest {
     @Test
@@ -69,6 +70,83 @@ class YardScapeAppStateTest {
 
         val revealed = assertIs<LocationRevealState.Revealed>(detailState?.revealState)
         assertEquals("123 Cedar Street", revealed.exactAddress.streetAddress)
+    }
+
+    @Test
+    fun reselectingMyFindsPreservesTheRequestedSectionAndProtectedSessionState() {
+        val eventId = SeededYardSaleData.ESTATE_TOOLS_EVENT_ID
+        val state = YardScapeAppState(
+            shopperId = SeededYardSaleData.SHOPPER_WITH_ACCEPTED_ACCESS_ID,
+        )
+
+        assertNotNull(state.requestDirections(eventId))
+        state.openMyFinds(MyFindsSection.Rsvps)
+        state.navigateTo(YardScapePrimaryDestination.MyFinds)
+
+        assertEquals(YardScapeRoute.MyFinds(MyFindsSection.Rsvps), state.route)
+        assertEquals(eventId, state.directionsEventId)
+    }
+
+    @Test
+    fun returningFromAnRsvpDetailRestoresTheRsvpsSection() {
+        val state = YardScapeAppState()
+
+        state.openMyFinds(MyFindsSection.Rsvps)
+        state.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+
+        assertTrue(state.navigateBack())
+        assertEquals(YardScapeRoute.MyFinds(MyFindsSection.Rsvps), state.route)
+    }
+
+    @Test
+    fun returningFromAnRsvpFlowRestoresTheRsvpsSection() {
+        val state = YardScapeAppState()
+
+        state.openMyFinds(MyFindsSection.Rsvps)
+        state.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+        state.openRsvp(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+
+        assertTrue(state.navigateBack())
+        assertTrue(state.navigateBack())
+        assertEquals(YardScapeRoute.MyFinds(MyFindsSection.Rsvps), state.route)
+    }
+
+    @Test
+    fun returningFromAnEventSafetyFlowRestoresTheRsvpsSection() {
+        val state = YardScapeAppState()
+
+        state.openMyFinds(MyFindsSection.Rsvps)
+        state.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+        state.openReport(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+
+        assertTrue(state.navigateBack())
+        assertTrue(state.navigateBack())
+        assertEquals(YardScapeRoute.MyFinds(MyFindsSection.Rsvps), state.route)
+    }
+
+    @Test
+    fun reselectingMyFindsFromChildRoutesRestoresTheirRequestedSection() {
+        val openChildRoutes = listOf<(YardScapeAppState) -> Unit>(
+            { state -> state.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID) },
+            { state ->
+                state.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+                state.openRsvp(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+            },
+            { state ->
+                state.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+                state.openReport(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+            },
+        )
+
+        openChildRoutes.forEach { openChildRoute ->
+            val state = YardScapeAppState()
+            state.openMyFinds(MyFindsSection.Rsvps)
+            openChildRoute(state)
+
+            state.navigateTo(YardScapePrimaryDestination.MyFinds)
+
+            assertEquals(YardScapeRoute.MyFinds(MyFindsSection.Rsvps), state.route)
+        }
     }
 
     @Test
