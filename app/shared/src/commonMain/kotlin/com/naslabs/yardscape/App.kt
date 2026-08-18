@@ -131,7 +131,26 @@ fun App(appState: YardScapeAppState) {
                     )
                     YardScapeRoute.Messages,
                     is YardScapeRoute.MessageThread,
-                    -> MessagesScreen()
+                    -> MessagesScreen(
+                        inboxState = appState.messagingInboxState,
+                        threadState = appState.messagingThreadState,
+                        isThreadRoute = currentRoute is YardScapeRoute.MessageThread,
+                        pendingAuthorizationSignal = appState.pendingMessageThreadAuthorizationSignal,
+                        hasPendingAuthorization = appState.hasPendingMessageThreadAuthorization,
+                        actor = appState.currentMessagingActor,
+                        onLoadInbox = appState::loadMessagingInbox,
+                        onResumePendingThread = appState::resumePendingMessageThread,
+                        onOpenThread = appState::openMessageThread,
+                        onMarkRead = appState::markCurrentMessageThreadRead,
+                        onDraftChanged = appState::updateMessageDraft,
+                        onSend = appState::sendMessageDraft,
+                        onRetry = appState::retryMessage,
+                        onOpenEvent = appState::openEvent,
+                        onReport = appState::openMessageThreadReport,
+                        onBlock = appState::openMessageThreadBlock,
+                        onBack = { appState.navigateBack() },
+                        onBrowse = { appState.navigateTo(YardScapePrimaryDestination.Browse) },
+                    )
                     YardScapeRoute.Account -> AccountScreen(
                         state = appState.accountState,
                         onSignIn = appState::signInMock,

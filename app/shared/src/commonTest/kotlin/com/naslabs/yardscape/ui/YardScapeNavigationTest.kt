@@ -108,6 +108,23 @@ class YardScapeNavigationTest {
     }
 
     @Test
+    fun sameRouteMessageDeepLinksAdvanceTheObservableAuthorizationSignal() {
+        val state = messagingState(shopperId = SeededAttendeeIds.Accepted)
+        val firstSignal = state.pendingMessageThreadAuthorizationSignal
+
+        assertTrue(state.navigateToPath("/messages/$CONVERSATION_ID"))
+        val queuedSignal = state.pendingMessageThreadAuthorizationSignal
+        assertTrue(state.hasPendingMessageThreadAuthorization)
+        assertTrue(queuedSignal > firstSignal)
+        assertEquals(YardScapeRoute.Messages, state.route)
+
+        assertTrue(state.navigateToPath("/messages/$CONVERSATION_ID"))
+        assertTrue(state.hasPendingMessageThreadAuthorization)
+        assertTrue(state.pendingMessageThreadAuthorizationSignal > queuedSignal)
+        assertEquals(YardScapeRoute.Messages, state.route)
+    }
+
+    @Test
     fun arbitraryConversationAndWrongRoleNeverCommitAThreadRoute() = runTest {
         val shopper = messagingState(shopperId = SeededAttendeeIds.Accepted)
         shopper.navigateTo(YardScapePrimaryDestination.Messages)

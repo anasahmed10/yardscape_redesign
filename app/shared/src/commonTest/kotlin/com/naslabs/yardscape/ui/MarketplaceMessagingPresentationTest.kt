@@ -1,0 +1,164 @@
+package com.naslabs.yardscape.ui
+
+import androidx.compose.ui.unit.dp
+import com.naslabs.yardscape.domain.EventPhoto
+import com.naslabs.yardscape.domain.MarketplaceConversationKey
+import com.naslabs.yardscape.domain.MarketplaceMessage
+import com.naslabs.yardscape.domain.MarketplaceMessageThread
+import com.naslabs.yardscape.domain.MessageDeliveryState
+import com.naslabs.yardscape.domain.MessageThreadSummary
+import com.naslabs.yardscape.domain.MessagingClosedReason
+import com.naslabs.yardscape.domain.MessagingComposerAccess
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class MarketplaceMessagingPresentationTest {
+    @Test
+    fun inboxRowsUsePublicArtworkUnreadSemanticsAndA48DpTarget() {
+        val row = marketplaceInboxRowPresentation(
+            MessageThreadSummary(
+                conversationId = "conversation-0000002a",
+                conversationKey = KEY,
+                eventTitle = "Maple Ridge Family Garage Sale",
+                eventPhoto = EventPhoto("seed://maple-ridge-driveway"),
+                lastMessagePreview = "New message",
+                lastMessageAtEpochMillis = 2_000L,
+                unreadCount = 2,
+                composerAccess = MessagingComposerAccess.Open,
+            ),
+        )
+
+        assertEquals(ShopperArtworkResource.GarageSale, row.artwork.artwork.resource)
+        assertEquals("2 unread messages", row.unreadLabel)
+        assertEquals(48.dp, row.minimumHeight)
+        assertTrue(row.isUnread)
+    }
+
+    @Test
+    fun inboxPresentationDistinguishesEmptyLoadingAndRecoverableFailures() {
+        assertIs<MarketplaceInboxPresentation.Loading>(
+            marketplaceInboxPresentation(MessagingInboxUiState.Loading),
+        )
+        val empty = assertIs<MarketplaceInboxPresentation.Empty>(
+            marketplaceInboxPresentation(MessagingInboxUiState.Loaded(emptyList())),
+        )
+        val offline = assertIs<MarketplaceInboxPresentation.Error>(
+            marketplaceInboxPresentation(
+                MessagingInboxUiState.Failed(MessagingFailureKind.Offline, "No connection"),
+            ),
+        )
+
+        assertEquals("You're offline", offline.title)
+        assertEquals("Try again", offline.actionLabel)
+        assertEquals("Browse sales", empty.actionLabel)
+    }
+
+    @Test
+    fun timelineOrdersMessagesAndExposesRetryOnlyForFailedOutboundMessages() {
+        val presentation = marketplaceThreadPresentation(
+            MessagingThreadPresentation(
+                thread = thread(
+                    messages = listOf(
+                        message("message-0000002b", HOST_ID, "Host reply", 3_000L),
+                        message("message-0000002a", SHOPPER_ID, "Try again", 2_000L, MessageDeliveryState.FAILED),
+                    ),
+                ),
+            ),
+            currentActorId = SHOPPER_ID,
+        )
+
+        assertEquals(listOf("message-0000002a", "message-0000002b"), presentation.messages.map { it.id })
+        assertTrue(presentation.messages.first().showsRetry)
+        assertEquals("Delivery failed. Retry", presentation.messages.first().deliveryLabel)
+        assertFalse(presentation.messages.last().showsRetry)
+        assertTrue(presentation.composer.isVisible)
+        assertEquals(48.dp, presentation.composer.minimumHeight)
+    }
+
+    @Test
+    fun closedThreadShowsItsReasonAndHidesComposerWhileSafetyActionsRemainAvailable() {
+        val presentation = marketplaceThreadPresentation(
+            MessagingThreadPresentation(
+                thread = thread(
+                    composerAccess = MessagingComposerAccess.Closed(MessagingClosedReason.EVENT_CANCELLED),
+                ),
+                draft = "private draft",
+            ),
+            currentActorId = SHOPPER_ID,
+        )
+
+        assertFalse(presentation.composer.isVisible)
+        assertEquals("This sale was cancelled", presentation.closedBanner?.title)
+        assertTrue(presentation.showReportAction)
+        assertTrue(presentation.showBlockAction)
+        assertEquals(48.dp, presentation.eventAction.minimumHeight)
+    }
+
+    @Test
+    fun threadPresentationDoesNotLeakProtectedFieldsThroughDiagnostics() {
+        val presentation = marketplaceThreadPresentation(
+            MessagingThreadPresentation(
+                thread = thread(
+                    messages = listOf(
+                        message(
+                            "message-0000002a",
+                            SHOPPER_ID,
+                            "Meet at 123 Cedar Street, unit 7. Gate code 1010.",
+                            2_000L,
+                        ),
+                    ),
+                ),
+            ),
+            currentActorId = SHOPPER_ID,
+        )
+
+        val diagnostic = presentation.toString()
+        assertFalse(diagnostic.contains("123 Cedar Street"))
+        assertFalse(diagnostic.contains("unit 7"))
+        assertFalse(diagnostic.contains("Gate code"))
+        assertNull(presentation.closedBanner)
+    }
+
+    @Test
+    fun messagingLayoutUsesTheSharedCompactAndExpandedBreakpoint() {
+        assertEquals(MarketplaceMessagingLayout.Compact, marketplaceMessagingLayoutFor(390.dp))
+        assertEquals(MarketplaceMessagingLayout.Expanded, marketplaceMessagingLayoutFor(1440.dp))
+    }
+
+    private fun thread(
+        messages: List<MarketplaceMessage> = emptyList(),
+        composerAccess: MessagingComposerAccess = MessagingComposerAccess.Open,
+    ) = MarketplaceMessageThread(
+        conversationId = "conversation-0000002a",
+        conversationKey = KEY,
+        eventTitle = "Maple Ridge Family Garage Sale",
+        eventPhoto = EventPhoto("seed://maple-ridge-driveway"),
+        messages = messages,
+        composerAccess = composerAccess,
+    )
+
+    private fun message(
+        id: String,
+        senderId: String,
+        body: String,
+        sentAt: Long,
+        deliveryState: MessageDeliveryState = MessageDeliveryState.SENT,
+    ) = MarketplaceMessage(
+        id = id,
+        conversationId = "conversation-0000002a",
+        senderId = senderId,
+        body = body,
+        sentAtEpochMillis = sentAt,
+        deliveryState = deliveryState,
+    )
+
+    private companion object {
+        const val SHOPPER_ID = "shopper-1"
+        const val HOST_ID = "host-1"
+        val KEY = MarketplaceConversationKey(eventId = "event-1", shopperId = SHOPPER_ID)
+    }
+}

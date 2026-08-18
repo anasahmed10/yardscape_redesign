@@ -290,8 +290,17 @@ class YardScapeAppState(
     var pendingProtectedAction: PendingProtectedAction? by mutableStateOf(null)
         private set
 
-    private var pendingMessageThreadAuthorization: MarketplaceConversationId? =
-        (initialRoute as? YardScapeRoute.MessageThread)?.conversationId
+    private var pendingMessageThreadAuthorization: MarketplaceConversationId? by mutableStateOf(
+        (initialRoute as? YardScapeRoute.MessageThread)?.conversationId,
+    )
+    var pendingMessageThreadAuthorizationSignal: Long by mutableStateOf(
+        if (initialRoute is YardScapeRoute.MessageThread) 1L else 0L,
+    )
+        private set
+    val hasPendingMessageThreadAuthorization: Boolean
+        get() = pendingMessageThreadAuthorization != null
+    val currentMessagingActor: MessagingActor
+        get() = messagingActor()
     private var messagingSessionVersion: Long = 0L
     private var messagingNavigationVersion: Long = 0L
 
@@ -411,7 +420,7 @@ class YardScapeAppState(
         pendingProtectedAction = null
         val pendingRoute = pending?.resumeRoute
         if (pendingRoute is YardScapeRoute.MessageThread) {
-            pendingMessageThreadAuthorization = pendingRoute.conversationId
+            queuePendingMessageThreadAuthorization(pendingRoute.conversationId)
             route = YardScapeRoute.Messages
         } else {
             route = pendingRoute ?: YardScapeRoute.Account
@@ -509,7 +518,7 @@ class YardScapeAppState(
     private fun openMessageThreadRoute(target: YardScapeRoute.MessageThread): Boolean {
         when (val gate = protectedActionDecision(ProtectedAction.Messaging)) {
             ProtectedActionDecision.Allowed -> {
-                pendingMessageThreadAuthorization = target.conversationId
+                queuePendingMessageThreadAuthorization(target.conversationId)
                 route = YardScapeRoute.Messages
                 return false
             }
@@ -521,6 +530,11 @@ class YardScapeAppState(
             }
         }
         return true
+    }
+
+    private fun queuePendingMessageThreadAuthorization(conversationId: MarketplaceConversationId) {
+        pendingMessageThreadAuthorization = conversationId
+        pendingMessageThreadAuthorizationSignal++
     }
 
     private fun openMessagesRoute(): Boolean {
@@ -590,8 +604,12 @@ class YardScapeAppState(
     suspend fun sendMessageDraft(sentAtEpochMillis: Long): Boolean =
         marketplaceMessagingState.sendDraft(sentAtEpochMillis)
 
+    suspend fun sendMessageDraft(): Boolean = sendMessageDraft(nowEpochMillis)
+
     suspend fun retryMessage(messageId: String, attemptedAtEpochMillis: Long): Boolean =
         marketplaceMessagingState.retryMessage(messageId, attemptedAtEpochMillis)
+
+    suspend fun retryMessage(messageId: String): Boolean = retryMessage(messageId, nowEpochMillis)
 
     fun browseItems(): List<BrowseEventItem> =
         repository.publicPreviews(nowEpochMillis)
