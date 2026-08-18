@@ -23,8 +23,12 @@ enum class MessagingFailureKind {
 
 sealed interface MessagingOperationState {
     data object Idle : MessagingOperationState
-    data class InProgress(val messageId: String? = null) : MessagingOperationState
-    data class Completed(val messageId: String? = null) : MessagingOperationState
+    data class InProgress(val messageId: String? = null) : MessagingOperationState {
+        override fun toString(): String = "MessagingOperationState.InProgress(hasMessageId=${messageId != null})"
+    }
+    data class Completed(val messageId: String? = null) : MessagingOperationState {
+        override fun toString(): String = "MessagingOperationState.Completed(hasMessageId=${messageId != null})"
+    }
     data class Failed(val kind: MessagingFailureKind, val message: String) : MessagingOperationState {
         override fun toString(): String =
             "MessagingOperationState.Failed(kind=$kind, messageLength=${message.length})"
@@ -51,7 +55,9 @@ sealed interface MessagingInboxUiState {
 sealed interface MessagingThreadUiState {
     data object Idle : MessagingThreadUiState
 
-    data class Loading(val conversationId: String) : MessagingThreadUiState
+    data class Loading(val conversationId: String) : MessagingThreadUiState {
+        override fun toString(): String = "MessagingThreadUiState.Loading"
+    }
 
     data class Loaded(val presentation: MessagingThreadPresentation) : MessagingThreadUiState {
         override fun toString(): String = "MessagingThreadUiState.Loaded($presentation)"
@@ -63,8 +69,7 @@ sealed interface MessagingThreadUiState {
         val message: String,
     ) : MessagingThreadUiState {
         override fun toString(): String =
-            "MessagingThreadUiState.Failed(conversationId=$conversationId, kind=$kind, " +
-                "messageLength=${message.length})"
+            "MessagingThreadUiState.Failed(kind=$kind, messageLength=${message.length})"
     }
 }
 
@@ -84,13 +89,13 @@ data class MessagingThreadPresentation(
     val composerAccess: MessagingComposerAccess
         get() = thread.composerAccess
     val canCompose: Boolean
-        get() = composerAccess is MessagingComposerAccess.Open
+        get() = composerAccess is MessagingComposerAccess.Open && operation !is MessagingOperationState.InProgress
     val closedReason: MessagingClosedReason?
         get() = (composerAccess as? MessagingComposerAccess.Closed)?.reason
 
     override fun toString(): String =
-        "MessagingThreadPresentation(conversationId=$conversationId, eventTitle=$eventTitle, " +
-            "messageCount=${messages.size}, draftLength=${draft.length}, composerAccess=$composerAccess, " +
+        "MessagingThreadPresentation(messageCount=${messages.size}, draftLength=${draft.length}, " +
+            "composerAccess=$composerAccess, " +
             "operation=${operation.diagnosticName})"
 }
 
@@ -98,6 +103,7 @@ class MarketplaceMessagingState(
     private val repository: MarketplaceMessagingRepository,
     private val actorSource: () -> MessagingActor,
     private val composerAccessFor: (MarketplaceConversationKey, MessagingActor) -> MessagingComposerAccess,
+    private val sessionVersionSource: () -> Long = { 0L },
 ) {
     var inboxState: MessagingInboxUiState by mutableStateOf<MessagingInboxUiState>(MessagingInboxUiState.Idle)
         private set
@@ -105,13 +111,20 @@ class MarketplaceMessagingState(
     var threadState: MessagingThreadUiState by mutableStateOf<MessagingThreadUiState>(MessagingThreadUiState.Idle)
         private set
 
+    private var invalidationGeneration: Long = 0L
+    private var nextRequestIdentifier: Long = 0L
+    private var latestInboxRequestIdentifier: Long = 0L
+    private var latestThreadRequestIdentifier: Long = 0L
+
     suspend fun loadInbox(): Boolean {
+        val request = beginRequest()
         inboxState = MessagingInboxUiState.Loading
-        val actor = actorSource()
-        return when (val result = repository.inboxFor(actor)) {
+        val result = repository.inboxFor(request.actor)
+        if (!isCurrent(request)) return false
+        return when (result) {
             is MessagingRepositoryResult.Success -> {
                 inboxState = MessagingInboxUiState.Loaded(
-                    result.value.map { it.withCurrentAccess(actor) },
+                    result.value.map { it.withCurrentAccess(request.actor) },
                 )
                 true
             }
@@ -123,9 +136,10 @@ class MarketplaceMessagingState(
     }
 
     suspend fun openThread(conversationId: String): Boolean {
+        val request = beginRequest(conversationId)
         threadState = MessagingThreadUiState.Loading(conversationId)
-        val actor = actorSource()
-        val summary = currentSummary(conversationId, actor)
+        val summary = currentSummary(conversationId, request)
+        if (!isCurrent(request)) return false
         if (summary == null) {
             threadState = MessagingThreadUiState.Failed(
                 conversationId,
@@ -134,12 +148,44 @@ class MarketplaceMessagingState(
             )
             return false
         }
-        return when (val result = repository.threadFor(summary.conversationKey, actor)) {
+        val result = repository.threadFor(summary.conversationKey, request.actor)
+        if (!isCurrent(request)) return false
+        return when (result) {
             is MessagingRepositoryResult.Success -> {
+                if (result.value.conversationKey != summary.conversationKey ||
+                    result.value.conversationId != conversationId
+                ) {
+                    narrowAccess(summary.conversationKey, MessagingClosedReason.CONVERSATION_UNAVAILABLE)
+                    threadState = MessagingThreadUiState.Failed(
+                        conversationId,
+                        MessagingFailureKind.Unauthorized,
+                        "This conversation is unavailable.",
+                    )
+                    return false
+                }
+                val thread = result.value.copy(
+                    composerAccess = result.value.composerAccess
+                        .narrowedBy(summary.composerAccess)
+                        .narrowedBy(composerAccessFor(result.value.conversationKey, request.actor)),
+                )
+                if (!thread.isVisibleToParticipant()) {
+                    narrowAccess(thread.conversationKey, thread.closedReasonOrUnavailable())
+                    threadState = MessagingThreadUiState.Failed(
+                        conversationId,
+                        MessagingFailureKind.Unauthorized,
+                        "This conversation is unavailable.",
+                    )
+                    return false
+                }
                 threadState = MessagingThreadUiState.Loaded(
-                    MessagingThreadPresentation(result.value.withCurrentAccess(actor)),
+                    MessagingThreadPresentation(thread),
                 )
                 true
+            }
+            is MessagingRepositoryResult.Unauthorized -> {
+                narrowAccess(summary.conversationKey, result.reason)
+                threadState = result.toThreadFailure(conversationId)
+                false
             }
             else -> {
                 threadState = result.toThreadFailure(conversationId)
@@ -158,19 +204,27 @@ class MarketplaceMessagingState(
 
     suspend fun markCurrentThreadRead(): Boolean {
         val loaded = threadState as? MessagingThreadUiState.Loaded ?: return false
-        val actor = actorSource()
-        return when (val result = repository.markRead(loaded.presentation.thread.conversationKey, actor)) {
+        if (loaded.presentation.operation is MessagingOperationState.InProgress) return false
+        val key = loaded.presentation.thread.conversationKey
+        val request = beginRequest(loaded.presentation.conversationId)
+        val result = repository.markRead(key, request.actor)
+        if (!isCurrent(request, key)) return false
+        return when (result) {
             is MessagingRepositoryResult.Success -> {
+                val current = (threadState as? MessagingThreadUiState.Loaded)?.presentation ?: return false
                 threadState = MessagingThreadUiState.Loaded(
-                    loaded.presentation.copy(operation = MessagingOperationState.Completed()),
+                    current.copy(operation = MessagingOperationState.Completed()),
                 )
-                loadInbox()
+                refreshInbox(request, key)
                 true
             }
+            is MessagingRepositoryResult.Unauthorized -> {
+                narrowAccess(key, result.reason, result.toOperationFailure())
+                false
+            }
             else -> {
-                threadState = MessagingThreadUiState.Loaded(
-                    loaded.presentation.copy(operation = result.toOperationFailure()),
-                )
+                val currentDraft = (threadState as? MessagingThreadUiState.Loaded)?.presentation?.draft.orEmpty()
+                restorePresentation(request, key, currentDraft, result.toOperationFailure())
                 false
             }
         }
@@ -179,37 +233,39 @@ class MarketplaceMessagingState(
     suspend fun sendDraft(sentAtEpochMillis: Long): Boolean {
         val loaded = threadState as? MessagingThreadUiState.Loaded ?: return false
         if (!loaded.presentation.canCompose) return false
-        val actor = actorSource()
         val key = loaded.presentation.thread.conversationKey
         val draft = loaded.presentation.draft
+        val request = beginRequest(loaded.presentation.conversationId)
         threadState = MessagingThreadUiState.Loaded(
             loaded.presentation.copy(operation = MessagingOperationState.InProgress()),
         )
-        val result = repository.sendMessage(key, actor, draft, sentAtEpochMillis)
+        val result = repository.sendMessage(key, request.actor, draft, sentAtEpochMillis)
+        if (!isCurrent(request, key)) return false
         return when (result) {
             is MessagingRepositoryResult.Success -> {
                 refreshThread(
+                    request = request,
                     key = key,
-                    actor = actor,
                     draft = "",
                     operation = MessagingOperationState.Completed(result.value.id),
                 )
-                loadInbox()
-                true
+                if (!isCurrent(request, key)) return false
+                refreshInbox(request, key)
+                isCurrent(request, key)
             }
             is MessagingRepositoryResult.ValidationFailure -> {
-                restorePresentation(draft, result.toOperationFailure())
+                restorePresentation(request, key, draft, result.toOperationFailure())
                 false
             }
             is MessagingRepositoryResult.Offline,
             is MessagingRepositoryResult.ServerError,
             -> {
-                refreshThread(key, actor, draft = "", operation = result.toOperationFailure())
-                loadInbox()
+                refreshThread(request, key, draft = "", operation = result.toOperationFailure())
+                if (isCurrent(request, key)) refreshInbox(request, key)
                 false
             }
             is MessagingRepositoryResult.Unauthorized -> {
-                closeComposer(result.reason, result.toOperationFailure())
+                narrowAccess(key, result.reason, result.toOperationFailure())
                 false
             }
         }
@@ -218,39 +274,37 @@ class MarketplaceMessagingState(
     suspend fun retryMessage(messageId: String, attemptedAtEpochMillis: Long): Boolean {
         val loaded = threadState as? MessagingThreadUiState.Loaded ?: return false
         if (!loaded.presentation.canCompose) return false
-        val actor = actorSource()
         val key = loaded.presentation.thread.conversationKey
+        val request = beginRequest(loaded.presentation.conversationId)
         threadState = MessagingThreadUiState.Loaded(
             loaded.presentation.copy(operation = MessagingOperationState.InProgress(messageId)),
         )
-        val result = repository.retryMessage(messageId, actor, attemptedAtEpochMillis)
+        val result = repository.retryMessage(messageId, request.actor, attemptedAtEpochMillis)
+        if (!isCurrent(request, key)) return false
         return when (result) {
             is MessagingRepositoryResult.Success -> {
                 refreshThread(
+                    request = request,
                     key = key,
-                    actor = actor,
                     draft = loaded.presentation.draft,
                     operation = MessagingOperationState.Completed(messageId),
                 )
-                loadInbox()
-                true
+                if (!isCurrent(request, key)) return false
+                refreshInbox(request, key)
+                isCurrent(request, key)
             }
             is MessagingRepositoryResult.Unauthorized -> {
-                synchronizeComposerAccess()
-                val current = threadState as? MessagingThreadUiState.Loaded
-                if (current?.presentation?.canCompose == true) {
-                    closeComposer(result.reason, result.toOperationFailure())
-                }
+                narrowAccess(key, result.reason, result.toOperationFailure())
                 false
             }
             else -> {
                 refreshThread(
+                    request = request,
                     key = key,
-                    actor = actor,
                     draft = loaded.presentation.draft,
                     operation = result.toOperationFailure(),
                 )
-                loadInbox()
+                if (isCurrent(request, key)) refreshInbox(request, key)
                 false
             }
         }
@@ -258,6 +312,11 @@ class MarketplaceMessagingState(
 
     fun synchronizeComposerAccess() {
         val actor = actorSource()
+        val loadedBefore = threadState as? MessagingThreadUiState.Loaded
+        val nextThreadAccess = loadedBefore?.presentation?.thread?.let { thread ->
+            thread.composerAccess.narrowedBy(composerAccessFor(thread.conversationKey, actor))
+        }
+        if (nextThreadAccess is MessagingComposerAccess.Closed) invalidatePendingWork()
         val inbox = inboxState as? MessagingInboxUiState.Loaded
         if (inbox != null) {
             inboxState = MessagingInboxUiState.Loaded(
@@ -265,7 +324,7 @@ class MarketplaceMessagingState(
             )
         }
         val loaded = threadState as? MessagingThreadUiState.Loaded ?: return
-        val access = composerAccessFor(loaded.presentation.thread.conversationKey, actor)
+        val access = requireNotNull(nextThreadAccess)
         val draft = if (access is MessagingComposerAccess.Open) loaded.presentation.draft else ""
         threadState = MessagingThreadUiState.Loaded(
             loaded.presentation.copy(
@@ -281,6 +340,7 @@ class MarketplaceMessagingState(
     }
 
     fun closeAndClear(reason: MessagingClosedReason) {
+        invalidatePendingWork()
         val inbox = inboxState as? MessagingInboxUiState.Loaded
         if (inbox != null) {
             inboxState = MessagingInboxUiState.Loaded(
@@ -289,21 +349,48 @@ class MarketplaceMessagingState(
                 },
             )
         }
-        closeComposer(reason, MessagingOperationState.Idle)
+        if (threadState is MessagingThreadUiState.Loaded) {
+            closeComposer(reason, MessagingOperationState.Idle)
+        } else {
+            threadState = MessagingThreadUiState.Idle
+        }
+    }
+
+    fun invalidatePendingWork() {
+        invalidationGeneration++
+        when (val current = threadState) {
+            is MessagingThreadUiState.Loading -> threadState = MessagingThreadUiState.Idle
+            is MessagingThreadUiState.Loaded -> {
+                if (current.presentation.operation is MessagingOperationState.InProgress) {
+                    threadState = MessagingThreadUiState.Loaded(
+                        current.presentation.copy(draft = "", operation = MessagingOperationState.Idle),
+                    )
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    fun resetForNewSession() {
+        invalidatePendingWork()
+        inboxState = MessagingInboxUiState.Idle
+        threadState = MessagingThreadUiState.Idle
     }
 
     private suspend fun currentSummary(
         conversationId: String,
-        actor: MessagingActor,
+        request: MessagingRequest,
     ): MessageThreadSummary? {
         (inboxState as? MessagingInboxUiState.Loaded)
             ?.threads
             ?.firstOrNull { it.conversationId == conversationId }
             ?.let { return it }
-        return when (val result = repository.inboxFor(actor)) {
+        val result = repository.inboxFor(request.actor)
+        if (!isCurrent(request)) return null
+        return when (result) {
             is MessagingRepositoryResult.Success -> {
-                val current = result.value.map { it.withCurrentAccess(actor) }
-                inboxState = MessagingInboxUiState.Loaded(current)
+                val current = result.value.map { it.withCurrentAccess(request.actor) }
+                if (canWriteInbox(request)) inboxState = MessagingInboxUiState.Loaded(current)
                 current.firstOrNull { it.conversationId == conversationId }
             }
             else -> {
@@ -314,21 +401,32 @@ class MarketplaceMessagingState(
     }
 
     private suspend fun refreshThread(
+        request: MessagingRequest,
         key: MarketplaceConversationKey,
-        actor: MessagingActor,
         draft: String,
         operation: MessagingOperationState,
     ) {
-        when (val refreshed = repository.threadFor(key, actor)) {
+        val refreshed = repository.threadFor(key, request.actor)
+        if (!isCurrent(request, key)) return
+        when (refreshed) {
             is MessagingRepositoryResult.Success -> {
+                if (refreshed.value.conversationKey != key ||
+                    refreshed.value.conversationId != request.conversationId
+                ) {
+                    narrowAccess(key, MessagingClosedReason.CONVERSATION_UNAVAILABLE, operation)
+                    return
+                }
+                val thread = refreshed.value.withCurrentAccess(request.actor)
                 threadState = MessagingThreadUiState.Loaded(
                     MessagingThreadPresentation(
-                        thread = refreshed.value.withCurrentAccess(actor),
-                        draft = draft,
+                        thread = thread,
+                        draft = if (thread.composerAccess is MessagingComposerAccess.Open) draft else "",
                         operation = operation,
                     ),
                 )
             }
+            is MessagingRepositoryResult.Unauthorized ->
+                narrowAccess(key, refreshed.reason, refreshed.toOperationFailure())
             else -> {
                 val conversationId = (threadState as? MessagingThreadUiState.Loaded)
                     ?.presentation
@@ -339,7 +437,26 @@ class MarketplaceMessagingState(
         }
     }
 
-    private fun restorePresentation(draft: String, operation: MessagingOperationState) {
+    private suspend fun refreshInbox(request: MessagingRequest, key: MarketplaceConversationKey) {
+        val result = repository.inboxFor(request.actor)
+        if (!isCurrent(request) || !canWriteInbox(request)) return
+        when (result) {
+            is MessagingRepositoryResult.Success -> inboxState = MessagingInboxUiState.Loaded(
+                result.value.map { it.withCurrentAccess(request.actor) },
+            )
+            is MessagingRepositoryResult.Unauthorized ->
+                narrowAccess(key, result.reason, result.toOperationFailure())
+            else -> inboxState = result.toInboxFailure()
+        }
+    }
+
+    private fun restorePresentation(
+        request: MessagingRequest,
+        key: MarketplaceConversationKey,
+        draft: String,
+        operation: MessagingOperationState,
+    ) {
+        if (!isCurrent(request, key)) return
         val current = threadState as? MessagingThreadUiState.Loaded ?: return
         threadState = MessagingThreadUiState.Loaded(current.presentation.copy(draft = draft, operation = operation))
     }
@@ -357,11 +474,89 @@ class MarketplaceMessagingState(
         )
     }
 
+    private fun narrowAccess(
+        key: MarketplaceConversationKey,
+        reason: MessagingClosedReason,
+        operation: MessagingOperationState = MessagingOperationState.Idle,
+    ) {
+        val access = MessagingComposerAccess.Closed(reason)
+        val inbox = inboxState as? MessagingInboxUiState.Loaded
+        if (inbox != null) {
+            inboxState = MessagingInboxUiState.Loaded(
+                inbox.threads.map { summary ->
+                    if (summary.conversationKey == key) summary.copy(composerAccess = access) else summary
+                },
+            )
+        }
+        val loaded = threadState as? MessagingThreadUiState.Loaded ?: return
+        if (loaded.presentation.thread.conversationKey != key) return
+        closeComposer(reason, operation)
+    }
+
     private fun MarketplaceMessageThread.withCurrentAccess(actor: MessagingActor): MarketplaceMessageThread =
-        copy(composerAccess = composerAccessFor(conversationKey, actor))
+        copy(composerAccess = composerAccess.narrowedBy(composerAccessFor(conversationKey, actor)))
 
     private fun MessageThreadSummary.withCurrentAccess(actor: MessagingActor): MessageThreadSummary =
-        copy(composerAccess = composerAccessFor(conversationKey, actor))
+        copy(composerAccess = composerAccess.narrowedBy(composerAccessFor(conversationKey, actor)))
+
+    private fun MessagingComposerAccess.narrowedBy(local: MessagingComposerAccess): MessagingComposerAccess =
+        when {
+            this is MessagingComposerAccess.Closed -> this
+            local is MessagingComposerAccess.Closed -> local
+            else -> MessagingComposerAccess.Open
+        }
+
+    private fun MarketplaceMessageThread.isVisibleToParticipant(): Boolean =
+        (composerAccess as? MessagingComposerAccess.Closed)?.reason !in setOf(
+            MessagingClosedReason.CONVERSATION_UNAVAILABLE,
+            MessagingClosedReason.NOT_PARTICIPANT,
+            MessagingClosedReason.NOT_EVENT_HOST,
+        )
+
+    private fun MarketplaceMessageThread.closedReasonOrUnavailable(): MessagingClosedReason =
+        (composerAccess as? MessagingComposerAccess.Closed)?.reason
+            ?: MessagingClosedReason.CONVERSATION_UNAVAILABLE
+
+    private fun beginRequest(conversationId: String? = null): MessagingRequest {
+        val requestIdentifier = ++nextRequestIdentifier
+        latestInboxRequestIdentifier = requestIdentifier
+        if (conversationId != null) {
+            latestThreadRequestIdentifier = requestIdentifier
+        }
+        return MessagingRequest(
+            invalidationGeneration = invalidationGeneration,
+            requestIdentifier = requestIdentifier,
+            actor = actorSource(),
+            sessionVersion = sessionVersionSource(),
+            conversationId = conversationId,
+        )
+    }
+
+    private fun isCurrent(request: MessagingRequest, key: MarketplaceConversationKey? = null): Boolean {
+        if (request.invalidationGeneration != invalidationGeneration) return false
+        val latestIdentifier = if (request.conversationId == null) {
+            latestInboxRequestIdentifier
+        } else {
+            latestThreadRequestIdentifier
+        }
+        if (request.requestIdentifier != latestIdentifier) return false
+        if (request.actor != actorSource() || request.sessionVersion != sessionVersionSource()) return false
+        if (key == null) return true
+        val loaded = threadState as? MessagingThreadUiState.Loaded ?: return false
+        return loaded.presentation.thread.conversationKey == key &&
+            loaded.presentation.conversationId == request.conversationId
+    }
+
+    private fun canWriteInbox(request: MessagingRequest): Boolean =
+        request.requestIdentifier == latestInboxRequestIdentifier
+
+    private data class MessagingRequest(
+        val invalidationGeneration: Long,
+        val requestIdentifier: Long,
+        val actor: MessagingActor,
+        val sessionVersion: Long,
+        val conversationId: String?,
+    )
 }
 
 private fun MessagingRepositoryResult<*>.toInboxFailure(): MessagingInboxUiState.Failed {

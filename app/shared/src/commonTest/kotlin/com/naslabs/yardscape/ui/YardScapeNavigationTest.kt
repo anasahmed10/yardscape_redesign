@@ -11,6 +11,10 @@ import com.naslabs.yardscape.domain.MessagingActor
 import com.naslabs.yardscape.domain.MessagingClosedReason
 import com.naslabs.yardscape.domain.MessagingComposerAccess
 import com.naslabs.yardscape.domain.UserRole
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,6 +23,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class YardScapeNavigationTest {
     @Test
     fun everyPrimaryDestinationIsReachableAndSelected() {
@@ -63,9 +68,12 @@ class YardScapeNavigationTest {
     }
 
     @Test
-    fun messageThreadIsNestedUnderMessagesAndBackReturnsToInbox() {
+    fun messageThreadIsNestedUnderMessagesAndBackReturnsToInbox() = runTest {
         val conversationId = "conversation-0000002a"
-        val state = YardScapeAppState(initialRoute = YardScapeRoute.MessageThread(conversationId))
+        val state = messagingState(shopperId = SeededAttendeeIds.Accepted)
+
+        state.loadMessagingInbox()
+        assertTrue(state.openMessageThread(conversationId))
 
         assertEquals(YardScapePrimaryDestination.Messages, state.activePrimaryDestination)
         assertTrue(state.navigateBack())
@@ -73,9 +81,14 @@ class YardScapeNavigationTest {
     }
 
     @Test
-    fun signedOutMessageThreadPathResumesAfterSignInWithoutParticipantIds() {
+    fun signedOutMessageThreadPathAuthorizesAfterSignInWithoutParticipantIds() = runTest {
         val conversationId = "conversation-0000002a"
-        val state = YardScapeAppState(initialAccountStatus = MockSessionStatus.SignedOut)
+        val key = MarketplaceConversationKey(MESSAGE_EVENT_ID, SeededAttendeeIds.Accepted)
+        val state = YardScapeAppState(
+            shopperId = SeededAttendeeIds.Accepted,
+            initialAccountStatus = MockSessionStatus.SignedOut,
+            messagingRepository = TransitionMessagingRepository(key),
+        )
 
         assertTrue(state.navigateToPath("/messages/$conversationId"))
         assertEquals(YardScapeRoute.Account, state.route)
@@ -87,9 +100,102 @@ class YardScapeNavigationTest {
 
         state.signInMock(UserRole.SHOPPER)
 
+        assertEquals(YardScapeRoute.Messages, state.route)
+        assertTrue(state.resumePendingMessageThread())
         assertEquals(YardScapeRoute.MessageThread(conversationId), state.route)
         assertFalse(state.route.path.contains(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID))
         assertFalse(state.route.path.contains(SeededYardSaleData.SHOPPER_WITH_ACCEPTED_ACCESS_ID))
+    }
+
+    @Test
+    fun arbitraryConversationAndWrongRoleNeverCommitAThreadRoute() = runTest {
+        val shopper = messagingState(shopperId = SeededAttendeeIds.Accepted)
+        shopper.navigateTo(YardScapePrimaryDestination.Messages)
+
+        assertFalse(shopper.openMessageThread("conversation-deadbeef"))
+        assertEquals(YardScapeRoute.Messages, shopper.route)
+
+        val wrongHost = messagingState(
+            shopperId = SeededAttendeeIds.Accepted,
+            activeUserRole = UserRole.HOST,
+            hostId = "host-someone-else",
+        )
+        wrongHost.navigateTo(YardScapePrimaryDestination.Messages)
+        assertFalse(wrongHost.openMessageThread(CONVERSATION_ID))
+        assertEquals(YardScapeRoute.Messages, wrongHost.route)
+    }
+
+    @Test
+    fun postSignInResumeWithNonParticipantRoleReturnsToMessages() = runTest {
+        val key = MarketplaceConversationKey(MESSAGE_EVENT_ID, SeededAttendeeIds.Accepted)
+        val state = YardScapeAppState(
+            shopperId = key.shopperId,
+            hostId = "host-someone-else",
+            initialAccountStatus = MockSessionStatus.SignedOut,
+            messagingRepository = TransitionMessagingRepository(key),
+        )
+        state.navigateToPath("/messages/$CONVERSATION_ID")
+
+        state.signInMock(UserRole.HOST)
+        assertEquals(YardScapeRoute.Messages, state.route)
+        assertFalse(state.resumePendingMessageThread())
+        assertEquals(YardScapeRoute.Messages, state.route)
+    }
+
+    @Test
+    fun hostCannotOpenShopperSafetyFromOwnMessageThread() = runTest {
+        val state = messagingState(
+            shopperId = SeededAttendeeIds.Accepted,
+            activeUserRole = UserRole.HOST,
+        )
+        state.loadMessagingInbox()
+        assertTrue(state.openMessageThread(CONVERSATION_ID))
+
+        state.openMessageThreadReport()
+        assertEquals(YardScapeRoute.MessageThread(CONVERSATION_ID), state.route)
+        state.openMessageThreadBlock()
+        assertEquals(YardScapeRoute.MessageThread(CONVERSATION_ID), state.route)
+    }
+
+    @Test
+    fun routeChangeWhileAuthorizationIsPendingCannotCommitTheThread() = runTest {
+        val result = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessageThread>>()
+        val key = MarketplaceConversationKey(MESSAGE_EVENT_ID, SeededAttendeeIds.Accepted)
+        val state = YardScapeAppState(
+            shopperId = key.shopperId,
+            messagingRepository = TransitionMessagingRepository(key, result),
+        )
+        state.loadMessagingInbox()
+
+        val open = async { state.openMessageThread(CONVERSATION_ID) }
+        runCurrent()
+        state.navigateTo(YardScapePrimaryDestination.Browse)
+        result.complete(MessagingRepositoryResult.Success(messageThread(key)))
+
+        assertFalse(open.await())
+        assertEquals(YardScapeRoute.Browse, state.route)
+    }
+
+    @Test
+    fun signOutAndDifferentRoleReauthCannotProjectAnOldActorThread() = runTest {
+        val result = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessageThread>>()
+        val key = MarketplaceConversationKey(MESSAGE_EVENT_ID, SeededAttendeeIds.Accepted)
+        val state = YardScapeAppState(
+            shopperId = key.shopperId,
+            messagingRepository = TransitionMessagingRepository(key, result),
+        )
+        state.loadMessagingInbox()
+
+        val open = async { state.openMessageThread(CONVERSATION_ID) }
+        runCurrent()
+        state.signOutMock()
+        state.signInMock(UserRole.HOST)
+        result.complete(MessagingRepositoryResult.Success(messageThread(key)))
+
+        assertFalse(open.await())
+        assertEquals(YardScapeRoute.Account, state.route)
+        assertFalse(state.messagingThreadState is MessagingThreadUiState.Loaded &&
+            (state.messagingThreadState as MessagingThreadUiState.Loaded).presentation.canCompose)
     }
 
     @Test
@@ -258,11 +364,10 @@ class YardScapeNavigationTest {
         blocked.requestBlockMutation()
         blocked.confirmBlockMutation()
         assertComposerClosedAndDraftCleared(blocked)
-        assertEquals(
-            MessagingClosedReason.LOCATION_ACCESS_REVOKED,
+        assertIs<MessagingComposerAccess.Closed>(
             assertIs<MessagingThreadUiState.Loaded>(blocked.messagingThreadState)
                 .presentation
-                .closedReason,
+                .composerAccess,
         )
 
         val signedOut = messagingState(shopperId = SeededAttendeeIds.Accepted)
@@ -291,10 +396,12 @@ class YardScapeNavigationTest {
     private fun messagingState(
         shopperId: String,
         activeUserRole: UserRole = UserRole.SHOPPER,
+        hostId: String = SeededYardSaleData.HOST_AVERY_ID,
     ): YardScapeAppState {
         val key = MarketplaceConversationKey(MESSAGE_EVENT_ID, shopperId)
         return YardScapeAppState(
             shopperId = shopperId,
+            hostId = hostId,
             activeUserRole = activeUserRole,
             messagingRepository = TransitionMessagingRepository(key),
         )
@@ -319,15 +426,9 @@ class YardScapeNavigationTest {
 
     private class TransitionMessagingRepository(
         private val key: MarketplaceConversationKey,
+        private val threadResult: CompletableDeferred<MessagingRepositoryResult<MarketplaceMessageThread>>? = null,
     ) : MarketplaceMessagingRepository {
-        private val thread = MarketplaceMessageThread(
-            conversationId = CONVERSATION_ID,
-            conversationKey = key,
-            eventTitle = "Maple Ridge Family Garage Sale",
-            eventPhoto = null,
-            messages = emptyList(),
-            composerAccess = MessagingComposerAccess.Open,
-        )
+        private val thread = messageThread(key)
 
         override suspend fun inboxFor(actor: MessagingActor): MessagingRepositoryResult<List<MessageThreadSummary>> =
             MessagingRepositoryResult.Success(
@@ -348,7 +449,8 @@ class YardScapeNavigationTest {
         override suspend fun threadFor(
             conversationKey: MarketplaceConversationKey,
             actor: MessagingActor,
-        ): MessagingRepositoryResult<MarketplaceMessageThread> = MessagingRepositoryResult.Success(thread)
+        ): MessagingRepositoryResult<MarketplaceMessageThread> =
+            threadResult?.await() ?: MessagingRepositoryResult.Success(thread)
 
         override suspend fun sendMessage(
             conversationKey: MarketplaceConversationKey,
@@ -372,5 +474,14 @@ class YardScapeNavigationTest {
     private companion object {
         const val CONVERSATION_ID = "conversation-0000002a"
         const val MESSAGE_EVENT_ID = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+
+        fun messageThread(key: MarketplaceConversationKey) = MarketplaceMessageThread(
+            conversationId = CONVERSATION_ID,
+            conversationKey = key,
+            eventTitle = "Maple Ridge Family Garage Sale",
+            eventPhoto = null,
+            messages = emptyList(),
+            composerAccess = MessagingComposerAccess.Open,
+        )
     }
 }

@@ -22,12 +22,17 @@ import com.naslabs.yardscape.domain.MessagingComposerAccess
 import com.naslabs.yardscape.domain.RsvpStatus
 import com.naslabs.yardscape.domain.UserRole
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class MarketplaceMessagingStateTest {
     @Test
     fun loadInboxExposesLoadingAndTypedFailureState() = runTest {
@@ -178,6 +183,206 @@ class MarketplaceMessagingStateTest {
 
         assertFalse(diagnosticText.contains("123 Cedar Street"))
         assertFalse(diagnosticText.contains("side gate"))
+        assertFalse(diagnosticText.contains("conversation-0000002a"))
+    }
+
+    @Test
+    fun repositoryClosedAccessIsNeverWidenedByAnOpenLocalProjection() = runTest {
+        val repository = ControllableRepository(
+            thread = thread(composerAccess = MessagingComposerAccess.Open),
+            summaries = listOf(
+                summary(
+                    KEY,
+                    CONVERSATION_ID,
+                    MessagingComposerAccess.Closed(MessagingClosedReason.EVENT_CANCELLED),
+                ),
+            ),
+        )
+        val state = MarketplaceMessagingState(repository, { SHOPPER }, { _, _ -> MessagingComposerAccess.Open })
+
+        assertTrue(state.loadInbox())
+        assertTrue(state.openThread(CONVERSATION_ID))
+
+        val presentation = assertIs<MessagingThreadUiState.Loaded>(state.threadState).presentation
+        assertEquals(MessagingClosedReason.EVENT_CANCELLED, presentation.closedReason)
+        assertFalse(presentation.canCompose)
+    }
+
+    @Test
+    fun closeInvalidatesDelayedValidationAndNeverRestoresTheDraft() = runTest {
+        val sendResult = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessage>>()
+        val repository = ControllableRepository(thread(), sendResult = sendResult)
+        val state = MarketplaceMessagingState(repository, { SHOPPER }, ::composerAccess)
+        state.loadInbox()
+        state.openThread(CONVERSATION_ID)
+        state.updateDraft("private draft")
+
+        val send = async { state.sendDraft(NOW) }
+        runCurrent()
+        state.closeAndClear(MessagingClosedReason.LOCATION_ACCESS_REVOKED)
+        sendResult.complete(MessagingRepositoryResult.ValidationFailure(listOf("Try again")))
+
+        assertFalse(send.await())
+        val presentation = assertIs<MessagingThreadUiState.Loaded>(state.threadState).presentation
+        assertEquals("", presentation.draft)
+        assertEquals(MessagingClosedReason.LOCATION_ACCESS_REVOKED, presentation.closedReason)
+    }
+
+    @Test
+    fun laterOpenWinsWhenThreadLoadsCompleteOutOfOrder() = runTest {
+        val first = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessageThread>>()
+        val second = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessageThread>>()
+        val secondKey = MarketplaceConversationKey("event-second", KEY.shopperId)
+        val repository = ControllableRepository(
+            thread(),
+            summaries = listOf(summary(KEY, CONVERSATION_ID), summary(secondKey, SECOND_CONVERSATION_ID)),
+            threadResults = ArrayDeque(listOf(first, second)),
+        )
+        val state = MarketplaceMessagingState(repository, { SHOPPER }, ::composerAccess)
+        state.loadInbox()
+
+        val olderOpen = async { state.openThread(CONVERSATION_ID) }
+        runCurrent()
+        val newerOpen = async { state.openThread(SECOND_CONVERSATION_ID) }
+        runCurrent()
+        second.complete(MessagingRepositoryResult.Success(thread(secondKey, SECOND_CONVERSATION_ID)))
+        assertTrue(newerOpen.await())
+        first.complete(MessagingRepositoryResult.Success(thread()))
+
+        assertFalse(olderOpen.await())
+        assertEquals(
+            SECOND_CONVERSATION_ID,
+            assertIs<MessagingThreadUiState.Loaded>(state.threadState).presentation.conversationId,
+        )
+    }
+
+    @Test
+    fun actorAndSessionChangeInvalidatesDelayedOldActorOpen() = runTest {
+        var actor = SHOPPER
+        var sessionVersion = 1L
+        val delayed = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessageThread>>()
+        val repository = ControllableRepository(thread(), threadResults = ArrayDeque(listOf(delayed)))
+        val state = MarketplaceMessagingState(repository, { actor }, ::composerAccess, { sessionVersion })
+        state.loadInbox()
+
+        val open = async { state.openThread(CONVERSATION_ID) }
+        runCurrent()
+        actor = HOST
+        sessionVersion++
+        state.closeAndClear(MessagingClosedReason.CONVERSATION_UNAVAILABLE)
+        delayed.complete(MessagingRepositoryResult.Success(thread()))
+
+        assertFalse(open.await())
+        assertFalse(state.threadState is MessagingThreadUiState.Loaded &&
+            (state.threadState as MessagingThreadUiState.Loaded).presentation.composerAccess is MessagingComposerAccess.Open)
+    }
+
+    @Test
+    fun sendIsSerializedAndBusyPresentationCannotCompose() = runTest {
+        val sendResult = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessage>>()
+        val repository = ControllableRepository(thread(), sendResult = sendResult)
+        val state = MarketplaceMessagingState(repository, { SHOPPER }, ::composerAccess)
+        state.loadInbox()
+        state.openThread(CONVERSATION_ID)
+        state.updateDraft("Can I bring a trailer?")
+
+        val first = async { state.sendDraft(NOW) }
+        runCurrent()
+        assertFalse(assertIs<MessagingThreadUiState.Loaded>(state.threadState).presentation.canCompose)
+        val second = async { state.sendDraft(NOW + 1) }
+        runCurrent()
+
+        assertFalse(second.await())
+        assertEquals(1, repository.sendCount)
+        sendResult.complete(MessagingRepositoryResult.ValidationFailure(listOf("Try again")))
+        assertFalse(first.await())
+    }
+
+    @Test
+    fun retryIsSerializedAndDelayedCompletionCannotWriteAfterClose() = runTest {
+        val retryResult = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessage>>()
+        val repository = ControllableRepository(thread(), retryResult = retryResult)
+        val state = MarketplaceMessagingState(repository, { SHOPPER }, ::composerAccess)
+        state.loadInbox()
+        state.openThread(CONVERSATION_ID)
+
+        val first = async { state.retryMessage("message-0000002a", NOW) }
+        runCurrent()
+        val second = async { state.retryMessage("message-0000002a", NOW + 1) }
+        runCurrent()
+        assertFalse(second.await())
+        assertEquals(1, repository.retryCount)
+
+        state.closeAndClear(MessagingClosedReason.EVENT_CANCELLED)
+        retryResult.complete(
+            MessagingRepositoryResult.Success(
+                MarketplaceMessage(
+                    id = "message-0000002a",
+                    conversationId = CONVERSATION_ID,
+                    senderId = SHOPPER.userId,
+                    body = "private body",
+                    sentAtEpochMillis = NOW,
+                    deliveryState = MessageDeliveryState.SENT,
+                ),
+            ),
+        )
+        assertFalse(first.await())
+        assertEquals(
+            MessagingClosedReason.EVENT_CANCELLED,
+            assertIs<MessagingThreadUiState.Loaded>(state.threadState).presentation.closedReason,
+        )
+    }
+
+    @Test
+    fun delayedMarkReadCannotProjectAfterSessionClose() = runTest {
+        val readResult = CompletableDeferred<MessagingRepositoryResult<Unit>>()
+        val repository = ControllableRepository(thread(), readResult = readResult)
+        val state = MarketplaceMessagingState(repository, { SHOPPER }, ::composerAccess)
+        state.loadInbox()
+        state.openThread(CONVERSATION_ID)
+
+        val read = async { state.markCurrentThreadRead() }
+        runCurrent()
+        state.closeAndClear(MessagingClosedReason.CONVERSATION_UNAVAILABLE)
+        readResult.complete(MessagingRepositoryResult.Success(Unit))
+
+        assertFalse(read.await())
+        assertEquals(
+            MessagingClosedReason.CONVERSATION_UNAVAILABLE,
+            assertIs<MessagingThreadUiState.Loaded>(state.threadState).presentation.closedReason,
+        )
+    }
+
+    @Test
+    fun unauthorizedMutationNarrowsOnlyTheMatchingThreadAndInboxSummary() = runTest {
+        val sendResult = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessage>>()
+        val secondKey = MarketplaceConversationKey("event-second", KEY.shopperId)
+        val repository = ControllableRepository(
+            thread(),
+            summaries = listOf(summary(KEY, CONVERSATION_ID), summary(secondKey, SECOND_CONVERSATION_ID)),
+            sendResult = sendResult,
+        )
+        val state = MarketplaceMessagingState(repository, { SHOPPER }, ::composerAccess)
+        state.loadInbox()
+        state.openThread(CONVERSATION_ID)
+        state.updateDraft("private draft")
+
+        val send = async { state.sendDraft(NOW) }
+        runCurrent()
+        sendResult.complete(
+            MessagingRepositoryResult.Unauthorized(MessagingClosedReason.LOCATION_ACCESS_REVOKED),
+        )
+
+        assertFalse(send.await())
+        val presentation = assertIs<MessagingThreadUiState.Loaded>(state.threadState).presentation
+        assertEquals("", presentation.draft)
+        assertEquals(MessagingClosedReason.LOCATION_ACCESS_REVOKED, presentation.closedReason)
+        val summaries = assertIs<MessagingInboxUiState.Loaded>(state.inboxState).threads
+        assertEquals(
+            MessagingClosedReason.LOCATION_ACCESS_REVOKED,
+            assertIs<MessagingComposerAccess.Closed>(summaries.first().composerAccess).reason,
+        )
+        assertIs<MessagingComposerAccess.Open>(summaries.last().composerAccess)
     }
 
     private class InboxFailureRepository(
@@ -212,6 +417,51 @@ class MarketplaceMessagingStateTest {
         ): MessagingRepositoryResult<Unit> = error("Not used")
     }
 
+    private class ControllableRepository(
+        private val thread: MarketplaceMessageThread,
+        private val summaries: List<MessageThreadSummary> = listOf(summary(thread.conversationKey, thread.conversationId)),
+        private val sendResult: CompletableDeferred<MessagingRepositoryResult<MarketplaceMessage>>? = null,
+        private val retryResult: CompletableDeferred<MessagingRepositoryResult<MarketplaceMessage>>? = null,
+        private val readResult: CompletableDeferred<MessagingRepositoryResult<Unit>>? = null,
+        private val threadResults: ArrayDeque<CompletableDeferred<MessagingRepositoryResult<MarketplaceMessageThread>>> = ArrayDeque(),
+    ) : MarketplaceMessagingRepository {
+        var sendCount: Int = 0
+        var retryCount: Int = 0
+
+        override suspend fun inboxFor(actor: MessagingActor) = MessagingRepositoryResult.Success(summaries)
+
+        override suspend fun threadFor(
+            conversationKey: MarketplaceConversationKey,
+            actor: MessagingActor,
+        ): MessagingRepositoryResult<MarketplaceMessageThread> =
+            if (threadResults.isEmpty()) MessagingRepositoryResult.Success(thread)
+            else threadResults.removeFirst().await()
+
+        override suspend fun sendMessage(
+            conversationKey: MarketplaceConversationKey,
+            actor: MessagingActor,
+            body: String,
+            sentAtEpochMillis: Long,
+        ): MessagingRepositoryResult<MarketplaceMessage> {
+            sendCount++
+            return sendResult?.await() ?: error("Unexpected send")
+        }
+
+        override suspend fun retryMessage(
+            messageId: String,
+            actor: MessagingActor,
+            attemptedAtEpochMillis: Long,
+        ): MessagingRepositoryResult<MarketplaceMessage> {
+            retryCount++
+            return retryResult?.await() ?: error("Unexpected retry")
+        }
+
+        override suspend fun markRead(
+            conversationKey: MarketplaceConversationKey,
+            actor: MessagingActor,
+        ): MessagingRepositoryResult<Unit> = readResult?.await() ?: error("Unexpected mark read")
+    }
+
     private class MutableAccessSource : MarketplaceMessagingAccessSource {
         var context: MessagingAccessContext = openContext()
 
@@ -227,6 +477,36 @@ class MarketplaceMessagingStateTest {
         val SHOPPER = MessagingActor(KEY.shopperId, UserRole.SHOPPER)
         val HOST = MessagingActor(SeededYardSaleData.HOST_AVERY_ID, UserRole.HOST)
         const val NOW = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS
+        const val CONVERSATION_ID = "conversation-0000002a"
+        const val SECOND_CONVERSATION_ID = "conversation-0000002b"
+
+        fun thread(
+            key: MarketplaceConversationKey = KEY,
+            conversationId: String = CONVERSATION_ID,
+            composerAccess: MessagingComposerAccess = MessagingComposerAccess.Open,
+        ) = MarketplaceMessageThread(
+            conversationId = conversationId,
+            conversationKey = key,
+            eventTitle = "Sale",
+            eventPhoto = null,
+            messages = emptyList(),
+            composerAccess = composerAccess,
+        )
+
+        fun summary(
+            key: MarketplaceConversationKey,
+            conversationId: String,
+            composerAccess: MessagingComposerAccess = MessagingComposerAccess.Open,
+        ) = MessageThreadSummary(
+            conversationId = conversationId,
+            conversationKey = key,
+            eventTitle = "Sale",
+            eventPhoto = null,
+            lastMessagePreview = null,
+            lastMessageAtEpochMillis = null,
+            unreadCount = 0,
+            composerAccess = composerAccess,
+        )
 
         fun openContext(): MessagingAccessContext = MessagingAccessContext(
             conversationKey = KEY,
