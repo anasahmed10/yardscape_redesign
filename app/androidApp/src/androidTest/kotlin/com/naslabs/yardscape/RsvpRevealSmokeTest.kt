@@ -114,9 +114,17 @@ class RsvpRevealSmokeTest {
             composeRule.onAllNodes(hasContentDescription("Message composer")).fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("Retry").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("Retry").fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onAllNodesWithText("Sent").assertCountEquals(1)
         composeRule.onNodeWithContentDescription("Message composer")
             .performTextInput("Can I bring a trailer?")
         composeRule.onNodeWithContentDescription("Send message").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("Sent").fetchSemanticsNodes().size == 2
+        }
+        composeRule.onAllNodesWithText("Can I bring a trailer?").assertCountEquals(1)
 
         composeRule.runOnIdle { appState.revokeRsvpAccess(conversationKey.eventId) }
         composeRule.onAllNodes(hasContentDescription("Message composer")).assertCountEquals(0)

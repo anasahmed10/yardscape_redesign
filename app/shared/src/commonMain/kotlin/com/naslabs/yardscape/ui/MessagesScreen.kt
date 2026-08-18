@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -25,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,13 +63,15 @@ fun MessagesScreen(
 ) {
     val scope = rememberCoroutineScope()
     val launchAction: (suspend () -> Boolean) -> Unit = { action -> scope.launch { action() } }
-    LaunchedEffect(pendingAuthorizationSignal) {
-        if (hasPendingAuthorization) onResumePendingThread()
+    val lifecycle = remember(onLoadInbox, onResumePendingThread) {
+        MarketplaceMessagingLifecycle(onLoadInbox, onResumePendingThread)
     }
-    LaunchedEffect(inboxState, threadState, hasPendingAuthorization) {
-        if (!hasPendingAuthorization && inboxState is MessagingInboxUiState.Idle &&
-            threadState !is MessagingThreadUiState.Loading
-        ) onLoadInbox()
+    LaunchedEffect(pendingAuthorizationSignal) {
+        lifecycle.handleAuthorizationSignal(
+            signal = pendingAuthorizationSignal,
+            hasPendingAuthorization = hasPendingAuthorization,
+            inboxState = inboxState,
+        )
     }
     val loadedConversationId = (threadState as? MessagingThreadUiState.Loaded)?.presentation?.conversationId
     LaunchedEffect(isThreadRoute, loadedConversationId) {
@@ -79,11 +83,19 @@ fun MessagesScreen(
         contentAlignment = Alignment.TopCenter,
     ) {
         val layout = marketplaceMessagingLayoutFor(maxWidth)
+        val contentWidth = marketplaceMessagingContentWidthFor(
+            availableWidth = maxWidth,
+            maximumWidth = when {
+                layout == MarketplaceMessagingLayout.Compact -> maxWidth
+                isThreadRoute -> 960.dp
+                else -> 1_080.dp
+            },
+        )
         if (isThreadRoute) {
             MessageThreadContent(
                 state = threadState,
                 actor = actor,
-                layout = layout,
+                contentWidth = contentWidth,
                 onDraftChanged = onDraftChanged,
                 onSend = onSend,
                 onRetry = onRetry,
@@ -96,7 +108,7 @@ fun MessagesScreen(
         } else {
             MessagingInboxContent(
                 state = inboxState,
-                layout = layout,
+                contentWidth = contentWidth,
                 onOpenThread = onOpenThread,
                 onRetry = onLoadInbox,
                 launchAction = launchAction,
@@ -109,7 +121,7 @@ fun MessagesScreen(
 @Composable
 private fun MessagingInboxContent(
     state: MessagingInboxUiState,
-    layout: MarketplaceMessagingLayout,
+    contentWidth: Dp,
     onOpenThread: suspend (String) -> Boolean,
     onRetry: suspend () -> Boolean,
     launchAction: (suspend () -> Boolean) -> Unit,
@@ -118,8 +130,8 @@ private fun MessagingInboxContent(
     val spacing = YardScapeDesign.spacing
     val presentation = marketplaceInboxPresentation(state)
     LazyColumn(
-        modifier = Modifier.fillMaxSize()
-            .widthIn(max = if (layout == MarketplaceMessagingLayout.Expanded) 1_080.dp else Dp.Infinity)
+        modifier = Modifier.width(contentWidth)
+            .fillMaxHeight()
             .padding(horizontal = spacing.large),
         verticalArrangement = Arrangement.spacedBy(spacing.small),
     ) {
@@ -162,7 +174,7 @@ private fun InboxRow(row: MarketplaceInboxRowPresentation, onOpen: () -> Unit) {
     val spacing = YardScapeDesign.spacing
     Surface(
         modifier = Modifier.fillMaxWidth().heightIn(min = row.minimumHeight).clickable(onClick = onOpen)
-            .semantics { contentDescription = "Open messages for ${row.title}" },
+            .semantics { contentDescription = row.contentDescription },
         color = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.medium,
     ) {
@@ -187,7 +199,7 @@ private fun InboxRow(row: MarketplaceInboxRowPresentation, onOpen: () -> Unit) {
 private fun MessageThreadContent(
     state: MessagingThreadUiState,
     actor: MessagingActor,
-    layout: MarketplaceMessagingLayout,
+    contentWidth: Dp,
     onDraftChanged: (String) -> Unit,
     onSend: suspend () -> Boolean,
     onRetry: suspend (String) -> Boolean,
@@ -204,7 +216,7 @@ private fun MessageThreadContent(
     is MessagingThreadUiState.Loaded -> MessageThreadLoadedContent(
         state.presentation,
         marketplaceThreadPresentation(state.presentation, actor.userId, actor.role == UserRole.SHOPPER),
-        layout, onDraftChanged, onSend, onRetry, onOpenEvent, onReport, onBlock, onBack, launchAction,
+        contentWidth, onDraftChanged, onSend, onRetry, onOpenEvent, onReport, onBlock, onBack, launchAction,
     )
 }
 
@@ -212,7 +224,7 @@ private fun MessageThreadContent(
 private fun MessageThreadLoadedContent(
     state: MessagingThreadPresentation,
     presentation: MarketplaceThreadPresentation,
-    layout: MarketplaceMessagingLayout,
+    contentWidth: Dp,
     onDraftChanged: (String) -> Unit,
     onSend: suspend () -> Boolean,
     onRetry: suspend (String) -> Boolean,
@@ -224,8 +236,8 @@ private fun MessageThreadLoadedContent(
 ) {
     val spacing = YardScapeDesign.spacing
     LazyColumn(
-        modifier = Modifier.fillMaxSize()
-            .widthIn(max = if (layout == MarketplaceMessagingLayout.Expanded) 960.dp else Dp.Infinity)
+        modifier = Modifier.width(contentWidth)
+            .fillMaxHeight()
             .padding(horizontal = spacing.large),
         verticalArrangement = Arrangement.spacedBy(spacing.medium),
     ) {

@@ -34,6 +34,10 @@ class MarketplaceMessagingPresentationTest {
 
         assertEquals(ShopperArtworkResource.GarageSale, row.artwork.artwork.resource)
         assertEquals("2 unread messages", row.unreadLabel)
+        assertEquals(
+            "Open messages for Maple Ridge Family Garage Sale, 2 unread messages",
+            row.contentDescription,
+        )
         assertEquals(48.dp, row.minimumHeight)
         assertTrue(row.isUnread)
     }
@@ -73,6 +77,7 @@ class MarketplaceMessagingPresentationTest {
 
         assertEquals(listOf("message-0000002a", "message-0000002b"), presentation.messages.map { it.id })
         assertTrue(presentation.messages.first().showsRetry)
+        assertTrue(presentation.messages.first().isRetryEnabled)
         assertEquals("Delivery failed. Retry", presentation.messages.first().deliveryLabel)
         assertFalse(presentation.messages.last().showsRetry)
         assertTrue(presentation.composer.isVisible)
@@ -127,6 +132,32 @@ class MarketplaceMessagingPresentationTest {
     fun messagingLayoutUsesTheSharedCompactAndExpandedBreakpoint() {
         assertEquals(MarketplaceMessagingLayout.Compact, marketplaceMessagingLayoutFor(390.dp))
         assertEquals(MarketplaceMessagingLayout.Expanded, marketplaceMessagingLayoutFor(1440.dp))
+        assertEquals(390.dp, marketplaceMessagingContentWidthFor(390.dp, 1_080.dp))
+        assertEquals(1_080.dp, marketplaceMessagingContentWidthFor(1_440.dp, 1_080.dp))
+        assertEquals(960.dp, marketplaceMessagingContentWidthFor(1_440.dp, 960.dp))
+    }
+
+    @Test
+    fun retryIsHiddenWhileAMessageOperationIsBusyOrConversationIsClosed() {
+        val failedMessage = message("message-0000002a", SHOPPER_ID, "Try again", 2_000L, MessageDeliveryState.FAILED)
+        val busy = marketplaceThreadPresentation(
+            MessagingThreadPresentation(thread = thread(messages = listOf(failedMessage)), operation = MessagingOperationState.InProgress()),
+            currentActorId = SHOPPER_ID,
+        )
+        val closed = marketplaceThreadPresentation(
+            MessagingThreadPresentation(
+                thread = thread(
+                    messages = listOf(failedMessage),
+                    composerAccess = MessagingComposerAccess.Closed(MessagingClosedReason.EVENT_CANCELLED),
+                ),
+            ),
+            currentActorId = SHOPPER_ID,
+        )
+
+        assertFalse(busy.messages.single().showsRetry)
+        assertFalse(busy.messages.single().isRetryEnabled)
+        assertFalse(closed.messages.single().showsRetry)
+        assertFalse(closed.messages.single().isRetryEnabled)
     }
 
     private fun thread(

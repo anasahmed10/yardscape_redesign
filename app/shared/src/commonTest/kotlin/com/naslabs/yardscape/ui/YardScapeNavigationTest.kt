@@ -194,6 +194,31 @@ class YardScapeNavigationTest {
     }
 
     @Test
+    fun viewSaleInvalidatesDelayedMessageSendBeforeLeavingTheThread() = runTest {
+        val result = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessage>>()
+        val key = MarketplaceConversationKey(MESSAGE_EVENT_ID, SeededAttendeeIds.Accepted)
+        val state = YardScapeAppState(
+            shopperId = key.shopperId,
+            messagingRepository = TransitionMessagingRepository(key, sendResult = result),
+        )
+        state.loadMessagingInbox()
+        assertTrue(state.openMessageThread(CONVERSATION_ID))
+        state.updateMessageDraft("Can I bring a trailer?")
+
+        val send = async { state.sendMessageDraft(3_000L) }
+        runCurrent()
+        state.openEvent(key.eventId)
+        result.complete(MessagingRepositoryResult.Success(message(key)))
+
+        assertFalse(send.await())
+        assertIs<YardScapeRoute.EventDetail>(state.route)
+        val thread = assertIs<MessagingThreadUiState.Loaded>(state.messagingThreadState).presentation
+        assertEquals("", thread.draft)
+        assertFalse(thread.operation is MessagingOperationState.InProgress)
+        assertTrue(thread.messages.isEmpty())
+    }
+
+    @Test
     fun signOutAndDifferentRoleReauthCannotProjectAnOldActorThread() = runTest {
         val result = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessageThread>>()
         val key = MarketplaceConversationKey(MESSAGE_EVENT_ID, SeededAttendeeIds.Accepted)
@@ -444,6 +469,7 @@ class YardScapeNavigationTest {
     private class TransitionMessagingRepository(
         private val key: MarketplaceConversationKey,
         private val threadResult: CompletableDeferred<MessagingRepositoryResult<MarketplaceMessageThread>>? = null,
+        private val sendResult: CompletableDeferred<MessagingRepositoryResult<MarketplaceMessage>>? = null,
     ) : MarketplaceMessagingRepository {
         private val thread = messageThread(key)
 
@@ -474,7 +500,7 @@ class YardScapeNavigationTest {
             actor: MessagingActor,
             body: String,
             sentAtEpochMillis: Long,
-        ): MessagingRepositoryResult<MarketplaceMessage> = error("Not used")
+        ): MessagingRepositoryResult<MarketplaceMessage> = sendResult?.await() ?: error("Not used")
 
         override suspend fun retryMessage(
             messageId: String,
@@ -499,6 +525,15 @@ class YardScapeNavigationTest {
             eventPhoto = null,
             messages = emptyList(),
             composerAccess = MessagingComposerAccess.Open,
+        )
+
+        fun message(key: MarketplaceConversationKey) = MarketplaceMessage(
+            id = "message-0000002a",
+            conversationId = CONVERSATION_ID,
+            senderId = key.shopperId,
+            body = "Can I bring a trailer?",
+            sentAtEpochMillis = 3_000L,
+            deliveryState = com.naslabs.yardscape.domain.MessageDeliveryState.SENT,
         )
     }
 }

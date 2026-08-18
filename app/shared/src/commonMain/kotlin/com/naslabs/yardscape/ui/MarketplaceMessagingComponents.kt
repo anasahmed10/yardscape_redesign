@@ -18,6 +18,30 @@ internal enum class MarketplaceMessagingLayout {
 internal fun marketplaceMessagingLayoutFor(width: Dp): MarketplaceMessagingLayout =
     if (width >= 760.dp) MarketplaceMessagingLayout.Expanded else MarketplaceMessagingLayout.Compact
 
+internal fun marketplaceMessagingContentWidthFor(availableWidth: Dp, maximumWidth: Dp): Dp =
+    minOf(availableWidth, maximumWidth)
+
+internal class MarketplaceMessagingLifecycle(
+    private val onLoadInbox: suspend () -> Boolean,
+    private val onResumePendingThread: suspend () -> Boolean,
+) {
+    private var handledAuthorizationSignal: Long? = null
+
+    suspend fun handleAuthorizationSignal(
+        signal: Long,
+        hasPendingAuthorization: Boolean,
+        inboxState: MessagingInboxUiState,
+    ): Boolean {
+        if (handledAuthorizationSignal == signal) return false
+        handledAuthorizationSignal = signal
+        return when {
+            hasPendingAuthorization -> onResumePendingThread()
+            inboxState is MessagingInboxUiState.Idle -> onLoadInbox()
+            else -> false
+        }
+    }
+}
+
 internal sealed interface MarketplaceInboxPresentation {
     data object Loading : MarketplaceInboxPresentation
     data class Empty(val actionLabel: String = "Browse sales") : MarketplaceInboxPresentation
@@ -36,6 +60,8 @@ internal data class MarketplaceInboxRowPresentation(
 ) {
     val isUnread: Boolean
         get() = unreadLabel != null
+    val contentDescription: String
+        get() = listOfNotNull("Open messages for $title", unreadLabel).joinToString(", ")
 
     override fun toString(): String =
         "MarketplaceInboxRowPresentation(conversationId=$conversationId, title=$title, " +
@@ -49,6 +75,7 @@ internal data class MarketplaceMessageBubblePresentation(
     val timeLabel: String,
     val deliveryLabel: String?,
     val showsRetry: Boolean,
+    val isRetryEnabled: Boolean,
 ) {
     override fun toString(): String =
         "MarketplaceMessageBubblePresentation(id=$id, bodyLength=${body.length}, " +
@@ -135,6 +162,7 @@ internal fun marketplaceThreadPresentation(
 ): MarketplaceThreadPresentation {
     val access = presentation.composerAccess
     val isClosed = access as? MessagingComposerAccess.Closed
+    val canRetry = presentation.canCompose
     return MarketplaceThreadPresentation(
         eventTitle = presentation.eventTitle,
         artwork = ShopperEventArtworkPresentation(
@@ -143,7 +171,7 @@ internal fun marketplaceThreadPresentation(
         ),
         messages = presentation.messages
             .sortedWith(compareBy<MarketplaceMessage> { it.sentAtEpochMillis }.thenBy { it.id })
-            .map { message -> message.toBubblePresentation(currentActorId) },
+            .map { message -> message.toBubblePresentation(currentActorId, canRetry) },
         composer = MarketplaceComposerPresentation(
             isVisible = isClosed == null,
             isEnabled = presentation.canCompose,
@@ -154,7 +182,10 @@ internal fun marketplaceThreadPresentation(
     )
 }
 
-private fun MarketplaceMessage.toBubblePresentation(currentActorId: String): MarketplaceMessageBubblePresentation {
+private fun MarketplaceMessage.toBubblePresentation(
+    currentActorId: String,
+    canRetry: Boolean,
+): MarketplaceMessageBubblePresentation {
     val outgoing = senderId == currentActorId
     val failed = outgoing && deliveryState == MessageDeliveryState.FAILED
     return MarketplaceMessageBubblePresentation(
@@ -162,8 +193,13 @@ private fun MarketplaceMessage.toBubblePresentation(currentActorId: String): Mar
         body = body,
         isOutgoing = outgoing,
         timeLabel = marketplaceMessageTimeLabel(sentAtEpochMillis),
-        deliveryLabel = if (failed) "Delivery failed. Retry" else null,
-        showsRetry = failed,
+        deliveryLabel = when {
+            failed -> "Delivery failed. Retry"
+            outgoing -> "Sent"
+            else -> null
+        },
+        showsRetry = failed && canRetry,
+        isRetryEnabled = failed && canRetry,
     )
 }
 

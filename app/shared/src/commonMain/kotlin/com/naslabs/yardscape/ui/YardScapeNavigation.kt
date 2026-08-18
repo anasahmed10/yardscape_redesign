@@ -906,6 +906,7 @@ class YardScapeAppState(
     }
 
     fun openEvent(eventId: String) {
+        invalidateMessagingNavigation()
         val origin = activePrimaryDestination.takeIf {
             it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.MyFinds
         } ?: YardScapePrimaryDestination.Browse
