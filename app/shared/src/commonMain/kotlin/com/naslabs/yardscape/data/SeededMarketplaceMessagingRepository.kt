@@ -132,13 +132,13 @@ class SeededMarketplaceMessagingRepository(
         val context = accessSource.accessContextFor(record.key) ?: return unavailable()
         val access = MarketplaceMessagingPolicy.composerAccess(context, actor)
         if (access is MessagingComposerAccess.Closed) {
-            return MessagingRepositoryResult.Unauthorized(access.reason)
+            return unavailable()
         }
 
         val messageIndex = record.messages.indexOfFirst { it.id == messageId }
         val current = record.messages[messageIndex]
-        if (current.senderId != actor.userId) {
-            return MessagingRepositoryResult.Unauthorized(MessagingClosedReason.NOT_PARTICIPANT)
+        if (actor !in record.authorizedActors || current.senderId != actor.userId) {
+            return unavailable()
         }
         if (current.deliveryState != MessageDeliveryState.FAILED) {
             return MessagingRepositoryResult.ValidationFailure(
@@ -221,7 +221,7 @@ class SeededMarketplaceMessagingRepository(
             conversationKey = key,
             eventTitle = eventTitle,
             eventPhoto = eventPhoto,
-            lastMessagePreview = lastMessage?.body,
+            lastMessagePreview = lastMessage?.summaryPreviewFor(actor),
             lastMessageAtEpochMillis = lastMessage?.sentAtEpochMillis,
             unreadCount = visibleMessages.count { message ->
                 message.deliveryState == MessageDeliveryState.SENT &&
@@ -247,6 +247,12 @@ class SeededMarketplaceMessagingRepository(
         messages.filter { message ->
             message.deliveryState == MessageDeliveryState.SENT || message.senderId == actor.userId
         }
+
+    private fun MarketplaceMessage.summaryPreviewFor(actor: MessagingActor): String = when {
+        deliveryState == MessageDeliveryState.FAILED -> "Message failed to send"
+        senderId == actor.userId -> "You sent a message"
+        else -> "New message"
+    }
 
     private fun isParticipant(
         context: MessagingAccessContext,
