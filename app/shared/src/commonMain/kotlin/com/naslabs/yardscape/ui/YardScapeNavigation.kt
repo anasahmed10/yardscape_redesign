@@ -179,6 +179,8 @@ object YardScapeTestTags {
     const val DiscoveryNoResults: String = "discovery-no-results"
     const val SavedScreen: String = "saved-screen"
     const val MyRsvpsScreen: String = "my-rsvps-screen"
+    const val MyFindsScreen: String = "my-finds-screen"
+    const val MessagesScreen: String = "messages-screen"
 
     fun browseEventCard(eventId: String): String = "browse-event-card-$eventId"
     fun primaryDestination(destination: YardScapePrimaryDestination): String =
@@ -263,7 +265,8 @@ class YardScapeAppState(
     fun navigateTo(destination: YardScapePrimaryDestination) {
         route = when (destination) {
             YardScapePrimaryDestination.Browse -> YardScapeRoute.Browse
-            YardScapePrimaryDestination.MyFinds -> YardScapeRoute.MyFinds()
+            YardScapePrimaryDestination.MyFinds -> (route as? YardScapeRoute.MyFinds)
+                ?: YardScapeRoute.MyFinds()
             YardScapePrimaryDestination.Host -> YardScapeRoute.Host
             YardScapePrimaryDestination.Messages -> YardScapeRoute.Messages
             YardScapePrimaryDestination.Account -> YardScapeRoute.Account

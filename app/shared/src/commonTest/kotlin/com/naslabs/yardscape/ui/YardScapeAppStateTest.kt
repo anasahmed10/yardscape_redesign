@@ -72,6 +72,21 @@ class YardScapeAppStateTest {
     }
 
     @Test
+    fun reselectingMyFindsPreservesTheRequestedSectionAndProtectedSessionState() {
+        val eventId = SeededYardSaleData.ESTATE_TOOLS_EVENT_ID
+        val state = YardScapeAppState(
+            shopperId = SeededYardSaleData.SHOPPER_WITH_ACCEPTED_ACCESS_ID,
+        )
+
+        assertNotNull(state.requestDirections(eventId))
+        state.openMyFinds(MyFindsSection.Rsvps)
+        state.navigateTo(YardScapePrimaryDestination.MyFinds)
+
+        assertEquals(YardScapeRoute.MyFinds(MyFindsSection.Rsvps), state.route)
+        assertEquals(eventId, state.directionsEventId)
+    }
+
+    @Test
     fun revokedAndExpiredAccessHideExactAddress() {
         val revokedState = YardScapeAppState(
             repository = SeededYardSaleEventRepository(
