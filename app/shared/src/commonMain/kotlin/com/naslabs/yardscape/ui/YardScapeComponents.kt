@@ -19,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -166,46 +165,11 @@ internal fun EventPhotoPreview(
     description: String?,
     seed: String,
 ) {
-    val accent = when (seed.length % 3) {
-        0 -> PhotoLeaf
-        1 -> PhotoMarket
-        else -> PhotoClay
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(136.dp)
-            .clip(MaterialTheme.shapes.small)
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(accent, accent.copy(alpha = 0.52f), Linen),
-                ),
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.72f), MaterialTheme.shapes.small)
-            .padding(14.dp),
-        contentAlignment = Alignment.BottomStart,
-    ) {
-        Column(
-            modifier = Modifier.widthIn(max = 280.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = description ?: "Preview photo coming soon",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = ForestInk,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodySmall,
-                color = ForestInk.copy(alpha = 0.72f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+    ShopperEventArtwork(
+        eventId = seed,
+        photoReference = seed,
+        height = 184.dp,
+    )
 }
 
 @Composable
