@@ -13,22 +13,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 
 @Composable
 fun MessagesScreen() {
+    val spacing = YardScapeDesign.spacing
     Column(
         modifier = Modifier
             .fillMaxSize()
             .testTag(YardScapeTestTags.MessagesScreen)
-            .padding(16.dp),
+            .padding(spacing.large),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(spacing.extraLarge),
+                verticalArrangement = Arrangement.spacedBy(spacing.small),
             ) {
                 Text("Messages", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Text("Your inbox is empty.")

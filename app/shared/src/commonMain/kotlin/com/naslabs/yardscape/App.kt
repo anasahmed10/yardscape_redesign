@@ -47,7 +47,6 @@ fun App(appState: YardScapeAppState) {
         ) {
             YardScapeAppShell(
                 route = appState.route,
-                activeUserRole = appState.activeUserRole,
                 onDestinationSelected = appState::navigateTo,
             ) {
                 when (val currentRoute = appState.route) {

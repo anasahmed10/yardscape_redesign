@@ -1,6 +1,7 @@
 package com.naslabs.yardscape.ui
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlin.test.Test
@@ -36,7 +37,15 @@ class YardScapeThemeTest {
     }
 
     @Test
-    fun typographyEncodesHierarchyWithoutPlatformFonts() {
+    fun typographyUsesPlatformSerifForDisplayAndSansSerifForUiCopy() {
+        assertEquals(FontFamily.Serif, YardScapeTypography.displayLarge.fontFamily)
+        assertEquals(FontFamily.Serif, YardScapeTypography.headlineMedium.fontFamily)
+        assertEquals(FontFamily.SansSerif, YardScapeTypography.bodyLarge.fontFamily)
+        assertEquals(FontFamily.SansSerif, YardScapeTypography.labelLarge.fontFamily)
+    }
+
+    @Test
+    fun typographyEncodesWeightHierarchyWithoutFontBinaries() {
         assertEquals(FontWeight.Bold, YardScapeTypography.headlineMedium.fontWeight)
         assertEquals(FontWeight.SemiBold, YardScapeTypography.titleLarge.fontWeight)
         assertEquals(FontWeight.SemiBold, YardScapeTypography.labelLarge.fontWeight)

@@ -20,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.naslabs.yardscape.domain.ExactAddress
 
 @Composable
@@ -38,24 +37,25 @@ fun MyFindsScreen(
     onExportCalendar: (String) -> Boolean,
     onDirections: (String) -> ExactAddress?,
 ) {
+    val spacing = YardScapeDesign.spacing
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .testTag(YardScapeTestTags.MyFindsScreen)
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = spacing.large),
+        verticalArrangement = Arrangement.spacedBy(spacing.medium),
     ) {
         item {
             Column(
-                modifier = Modifier.padding(top = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = spacing.large),
+                verticalArrangement = Arrangement.spacedBy(spacing.small),
             ) {
                 Text("My Finds", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text(
                     "Keep saved public previews and your RSVP plans together.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(spacing.small)) {
                     MyFindsSection.entries.forEach { section ->
                         val selected = state.section == section
                         if (selected) {
@@ -75,9 +75,16 @@ fun MyFindsScreen(
         }
 
         when (state.section) {
-            MyFindsSection.Saved -> savedItems(state.savedItems, onEventSelected, onUnsave, onBrowse)
+            MyFindsSection.Saved -> savedItems(
+                events = state.savedItems,
+                spacing = spacing,
+                onEventSelected = onEventSelected,
+                onUnsave = onUnsave,
+                onBrowse = onBrowse,
+            )
             MyFindsSection.Rsvps -> rsvpItems(
                 items = state.rsvpItems,
+                spacing = spacing,
                 onEventSelected = onEventSelected,
                 onRequestCancellation = onRequestCancellation,
                 onAddReminder = onAddReminder,
@@ -110,6 +117,7 @@ private val MyFindsSection.label: String
 
 private fun androidx.compose.foundation.lazy.LazyListScope.savedItems(
     events: List<BrowseEventItem>,
+    spacing: YardScapeSpacing,
     onEventSelected: (String) -> Unit,
     onUnsave: (String) -> Unit,
     onBrowse: () -> Unit,
@@ -119,8 +127,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.savedItems(
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(spacing.extraLarge),
+                    verticalArrangement = Arrangement.spacedBy(spacing.small),
                 ) {
                     Text("Nothing saved yet", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text("Browse nearby sales and save the ones you want to revisit.")
@@ -142,6 +150,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.savedItems(
 
 private fun androidx.compose.foundation.lazy.LazyListScope.rsvpItems(
     items: List<ShopperRsvpItem>,
+    spacing: YardScapeSpacing,
     onEventSelected: (String) -> Unit,
     onRequestCancellation: (String) -> Boolean,
     onAddReminder: (String) -> Boolean,
@@ -152,7 +161,10 @@ private fun androidx.compose.foundation.lazy.LazyListScope.rsvpItems(
     if (items.isEmpty()) {
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
-                Text("No RSVPs yet. Open a sale to request attendance.", modifier = Modifier.padding(18.dp))
+                Text(
+                    "No RSVPs yet. Open a sale to request attendance.",
+                    modifier = Modifier.padding(spacing.extraLarge),
+                )
             }
         }
     } else {
@@ -163,6 +175,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.rsvpItems(
                 items(groupItems, key = { it.eventId }) { item ->
                     MyFindsRsvpCard(
                         item = item,
+                        spacing = spacing,
                         onEventSelected = onEventSelected,
                         onRequestCancellation = onRequestCancellation,
                         onAddReminder = onAddReminder,
@@ -178,6 +191,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.rsvpItems(
 @Composable
 private fun MyFindsRsvpCard(
     item: ShopperRsvpItem,
+    spacing: YardScapeSpacing,
     onEventSelected: (String) -> Unit,
     onRequestCancellation: (String) -> Boolean,
     onAddReminder: (String) -> Boolean,
@@ -185,7 +199,10 @@ private fun MyFindsRsvpCard(
     onDirections: (String) -> ExactAddress?,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            modifier = Modifier.padding(spacing.large),
+            verticalArrangement = Arrangement.spacedBy(spacing.small),
+        ) {
             Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(item.dateLabel)
             Text(item.approximateLocationLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -194,7 +211,7 @@ private fun MyFindsRsvpCard(
             if (item.canOpenDirections) {
                 PrivacyNote("Protected location is available for this accepted RSVP.")
             }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.small)) {
                 OutlinedButton(onClick = { onEventSelected(item.eventId) }) { Text("Open event") }
                 if (item.canOpenDirections) {
                     Button(onClick = { onDirections(item.eventId) }) { Text("Directions") }

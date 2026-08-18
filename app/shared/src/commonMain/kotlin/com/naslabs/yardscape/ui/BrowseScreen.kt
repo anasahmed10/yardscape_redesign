@@ -1,6 +1,5 @@
 package com.naslabs.yardscape.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -22,15 +21,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.naslabs.yardscape.YardScapeConfig
 
 @Composable
 fun BrowseScreen(
@@ -297,9 +293,10 @@ private fun BrowseHero(
     eventCount: Int,
     onHostSelected: () -> Unit,
 ) {
+    val spacing = YardScapeDesign.spacing
     Column(
-        modifier = Modifier.padding(top = 18.dp, bottom = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.padding(top = spacing.large),
+        verticalArrangement = Arrangement.spacedBy(spacing.small),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -308,54 +305,28 @@ private fun BrowseHero(
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.extraSmall),
             ) {
                 Text(
-                    text = YardScapeConfig.appName,
+                    text = "Nearby sales",
                     style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
                     color = ForestInk,
                 )
                 Text(
-                    text = "$eventCount nearby sales",
+                    text = "$eventCount public previews",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             OutlinedButton(onClick = onHostSelected) {
-                Text("Host")
+                Text("Host a sale")
             }
         }
-
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.small,
-            color = Evergreen,
-            contentColor = Color.White,
-            shadowElevation = 2.dp,
-        ) {
-            Column(
-                modifier = Modifier
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(Evergreen, MarketBlue),
-                        ),
-                    )
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    text = "Find the good stuff before the signs go up.",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = "Browse public previews by area, date, and category. Exact addresses stay private until RSVP access is granted.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.86f),
-                )
-            }
-        }
+        Text(
+            text = "Browse public previews by area, date, and category. Exact addresses stay private until RSVP access is granted.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -392,8 +363,7 @@ internal fun EventPreviewCard(
             ) {
                 Text(
                     text = event.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.headlineSmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
