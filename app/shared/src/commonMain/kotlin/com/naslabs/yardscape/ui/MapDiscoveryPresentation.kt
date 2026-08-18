@@ -123,11 +123,15 @@ private fun spatialMarkerGroups(
 
 private data class PublicMarkerGrid(
     val latitudeCellDegrees: Double,
-    val longitudeCellDegrees: Double,
+    val longitudeCellCount: Int,
 ) {
+    private val longitudeCellDegrees = FULL_LONGITUDE_DEGREES / longitudeCellCount
+
     fun cellFor(marker: PublicEventMarker): PublicMarkerGridCell = PublicMarkerGridCell(
         latitude = floor(marker.area.center.latitude / latitudeCellDegrees).toInt(),
-        longitude = floor(marker.area.center.longitude / longitudeCellDegrees).toInt(),
+        longitude = floor(normalizedPublicLongitude(marker.area.center.longitude) / longitudeCellDegrees)
+            .toInt()
+            .coerceAtMost(longitudeCellCount - 1),
     )
 
     fun neighboringCells(marker: PublicEventMarker): List<PublicMarkerGridCell> {
@@ -135,10 +139,15 @@ private data class PublicMarkerGrid(
         return buildList {
             for (latitudeOffset in -1..1) {
                 for (longitudeOffset in -1..1) {
-                    add(PublicMarkerGridCell(cell.latitude + latitudeOffset, cell.longitude + longitudeOffset))
+                    add(
+                        PublicMarkerGridCell(
+                            latitude = cell.latitude + latitudeOffset,
+                            longitude = (cell.longitude + longitudeOffset + longitudeCellCount) % longitudeCellCount,
+                        ),
+                    )
                 }
             }
-        }
+        }.distinct()
     }
 }
 
@@ -153,18 +162,25 @@ private fun publicMarkerGridFor(
 ): PublicMarkerGrid {
     val smallestLongitudeScale = markers
         .minOf { marker -> abs(cos(marker.area.center.latitude * PI / 180.0)) }
+    val maximumLongitudeCellDegrees = if (smallestLongitudeScale < MINIMUM_LONGITUDE_SCALE) {
+        360.0
+    } else {
+        clusterDistanceMeters / (METERS_PER_LATITUDE_DEGREE * smallestLongitudeScale)
+    }
     return PublicMarkerGrid(
         latitudeCellDegrees = clusterDistanceMeters / METERS_PER_LATITUDE_DEGREE,
-        longitudeCellDegrees = if (smallestLongitudeScale < MINIMUM_LONGITUDE_SCALE) {
-            360.0
-        } else {
-            clusterDistanceMeters / (METERS_PER_LATITUDE_DEGREE * smallestLongitudeScale)
-        },
+        longitudeCellCount = floor(FULL_LONGITUDE_DEGREES / maximumLongitudeCellDegrees)
+            .toInt()
+            .coerceAtLeast(1),
     )
 }
 
 private const val METERS_PER_LATITUDE_DEGREE = 111_320.0
 private const val MINIMUM_LONGITUDE_SCALE = 0.000001
+private const val FULL_LONGITUDE_DEGREES = 360.0
+
+private fun normalizedPublicLongitude(longitude: Double): Double =
+    ((longitude + 180.0) % FULL_LONGITUDE_DEGREES + FULL_LONGITUDE_DEGREES) % FULL_LONGITUDE_DEGREES
 
 private fun publicDistanceMeters(first: PublicEventMarker, second: PublicEventMarker): Double {
     val lat1 = first.area.center.latitude * PI / 180.0
