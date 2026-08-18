@@ -26,6 +26,7 @@ import com.naslabs.yardscape.domain.PublicEventPreview
 import com.naslabs.yardscape.domain.PublicEventMarker
 import com.naslabs.yardscape.domain.Rsvp
 import com.naslabs.yardscape.domain.RsvpEligibilityPolicy
+import com.naslabs.yardscape.domain.RsvpEligibilityStatus
 import com.naslabs.yardscape.domain.RsvpStatus
 import com.naslabs.yardscape.domain.ReportReason
 import com.naslabs.yardscape.domain.SafetyReportDraft
@@ -717,9 +718,16 @@ class YardScapeAppState(
         route = context.detailRoute(eventId)
     }
 
+    fun rsvpScreenStateFor(eventId: String): RsvpScreenState =
+        rsvpEligibilityStatusFor(eventId).toRsvpScreenState()
+
     private fun canSubmitRsvp(eventId: String): Boolean {
-        val detail = repository.publicEventDetail(eventId) ?: return false
-        return RsvpEligibilityPolicy.canSubmit(
+        return rsvpEligibilityStatusFor(eventId) == RsvpEligibilityStatus.ELIGIBLE
+    }
+
+    private fun rsvpEligibilityStatusFor(eventId: String): RsvpEligibilityStatus {
+        val detail = repository.publicEventDetail(eventId) ?: return RsvpEligibilityStatus.EVENT_UNAVAILABLE
+        return RsvpEligibilityPolicy.statusFor(
             eventStatus = detail.status,
             saleWindow = detail.saleWindow,
             currentLocationVisibility = repository.rsvpFor(eventId, shopperId)?.locationVisibility,

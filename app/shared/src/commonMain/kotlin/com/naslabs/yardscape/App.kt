@@ -149,6 +149,7 @@ fun App(appState: YardScapeAppState) {
                     )
 
                     is YardScapeRoute.Rsvp -> RsvpScreen(
+                        state = appState.rsvpScreenStateFor(currentRoute.eventId),
                         onConfirm = { appState.confirmRsvp(currentRoute.eventId) },
                         onBack = { appState.navigateBack() },
                     )

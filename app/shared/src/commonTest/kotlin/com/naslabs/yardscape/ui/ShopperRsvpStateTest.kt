@@ -5,6 +5,7 @@ import com.naslabs.yardscape.data.SeededYardSaleEventRepository
 import com.naslabs.yardscape.domain.EventStatus
 import com.naslabs.yardscape.domain.LocationVisibility
 import com.naslabs.yardscape.domain.Rsvp
+import com.naslabs.yardscape.domain.RsvpEligibilityStatus
 import com.naslabs.yardscape.domain.RsvpStatus
 import com.naslabs.yardscape.domain.SaleWindow
 import com.naslabs.yardscape.scenarios.MockScenarioCatalog
@@ -18,6 +19,188 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ShopperRsvpStateTest {
+    @Test
+    fun acceptedActiveAccessCannotReopenRsvpAndKeepsMyFindsOrigin() {
+        val eventId = SeededYardSaleData.ESTATE_TOOLS_EVENT_ID
+        val expectedDetailRoute = YardScapeRoute.EventDetail(
+            eventId = eventId,
+            origin = YardScapePrimaryDestination.MyFinds,
+            myFindsSection = MyFindsSection.Rsvps,
+        )
+        val state = YardScapeAppState(
+            shopperId = SeededYardSaleData.SHOPPER_WITH_ACCEPTED_ACCESS_ID,
+            initialRoute = expectedDetailRoute,
+        )
+
+        state.openRsvp(eventId)
+
+        assertEquals(expectedDetailRoute, state.route)
+        assertIs<LocationRevealState.Revealed>(state.detailStateFor(eventId)?.revealState)
+
+        val directRouteState = YardScapeAppState(
+            shopperId = SeededYardSaleData.SHOPPER_WITH_ACCEPTED_ACCESS_ID,
+            initialRoute = YardScapeRoute.Rsvp(
+                eventId = eventId,
+                origin = YardScapePrimaryDestination.MyFinds,
+                myFindsSection = MyFindsSection.Rsvps,
+            ),
+        )
+        directRouteState.confirmRsvp(eventId)
+
+        assertEquals(expectedDetailRoute, directRouteState.route)
+    }
+
+    @Test
+    fun rsvpPresentationRecomputesAndHidesConfirmForEveryUnavailableState() {
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        val baseEvent = SeededYardSaleData.events.first { it.id == eventId }
+        val shopperId = "stale-rsvp-shopper"
+        val denialStates = buildList {
+            add(
+                RsvpEligibilityStatus.ACCESS_REVOKED to rsvpState(
+                    event = baseEvent,
+                    shopperId = shopperId,
+                    rsvp = restrictedRsvp(eventId, shopperId, LocationVisibility.REVOKED),
+                ),
+            )
+            add(
+                RsvpEligibilityStatus.ACCESS_EXPIRED to rsvpState(
+                    event = baseEvent,
+                    shopperId = shopperId,
+                    rsvp = restrictedRsvp(eventId, shopperId, LocationVisibility.EXPIRED),
+                ),
+            )
+            add(
+                RsvpEligibilityStatus.EVENT_CANCELLED to rsvpState(
+                    event = baseEvent.copy(status = EventStatus.CANCELLED),
+                    shopperId = shopperId,
+                ),
+            )
+            add(
+                RsvpEligibilityStatus.EVENT_COMPLETED to rsvpState(
+                    event = baseEvent.copy(status = EventStatus.COMPLETED),
+                    shopperId = shopperId,
+                ),
+            )
+            add(
+                RsvpEligibilityStatus.EVENT_UNAVAILABLE to rsvpState(
+                    event = baseEvent.copy(status = EventStatus.HIDDEN),
+                    shopperId = shopperId,
+                ),
+            )
+            add(
+                RsvpEligibilityStatus.EVENT_UNAVAILABLE to rsvpState(
+                    event = baseEvent.copy(status = EventStatus.DRAFT),
+                    shopperId = shopperId,
+                ),
+            )
+            add(
+                RsvpEligibilityStatus.EVENT_ENDED to rsvpState(
+                    event = baseEvent.copy(
+                        saleWindow = SaleWindow(
+                            startsAtEpochMillis = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS - 2_000L,
+                            endsAtEpochMillis = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS - 1_000L,
+                        ),
+                    ),
+                    shopperId = shopperId,
+                ),
+            )
+            add(
+                RsvpEligibilityStatus.AT_CAPACITY to rsvpState(
+                    event = baseEvent,
+                    shopperId = shopperId,
+                    isAtCapacity = true,
+                ),
+            )
+            add(
+                RsvpEligibilityStatus.ALREADY_ACCEPTED to rsvpState(
+                    event = baseEvent,
+                    shopperId = shopperId,
+                    rsvp = restrictedRsvp(eventId, shopperId, LocationVisibility.RSVP_ACCEPTED),
+                ),
+            )
+        }
+        val blockedState = rsvpState(event = baseEvent, shopperId = shopperId)
+        assertTrue(blockedState.blockHostForEvent(eventId))
+        val missingState = YardScapeAppState(
+            repository = SeededYardSaleEventRepository(events = emptyList(), rsvps = emptyList()),
+            shopperId = shopperId,
+            initialRoute = YardScapeRoute.Rsvp(eventId),
+        )
+        val allDenialStates = denialStates + listOf(
+            RsvpEligibilityStatus.BLOCKED to blockedState,
+            RsvpEligibilityStatus.EVENT_UNAVAILABLE to missingState,
+        )
+
+        allDenialStates.forEach { (expectedStatus, appState) ->
+            val presentation = appState.rsvpScreenStateFor(eventId)
+
+            assertEquals(expectedStatus, presentation.status)
+            assertFalse(presentation.canConfirm)
+            assertTrue(presentation.title.isNotBlank())
+            assertTrue(presentation.message.isNotBlank())
+            assertFalse(presentation.toString().contains("123 Cedar Street"))
+            assertFalse(presentation.toString().contains("41.8781"))
+        }
+    }
+
+    @Test
+    fun availableAndShopperCancelledRsvpsKeepConfirmationAvailable() {
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        val baseEvent = SeededYardSaleData.events.first { it.id == eventId }
+        val cancelledShopperId = "cancelled-shopper"
+        val availableState = rsvpState(event = baseEvent, shopperId = "new-shopper")
+        val cancelledState = rsvpState(
+            event = baseEvent,
+            shopperId = cancelledShopperId,
+            rsvp = Rsvp(
+                id = "cancelled-rsvp",
+                eventId = eventId,
+                shopperId = cancelledShopperId,
+                status = RsvpStatus.CANCELLED,
+                locationVisibility = LocationVisibility.PUBLIC_APPROXIMATION,
+            ),
+        )
+
+        listOf(availableState, cancelledState).forEach { appState ->
+            val presentation = appState.rsvpScreenStateFor(eventId)
+
+            assertEquals(RsvpEligibilityStatus.ELIGIBLE, presentation.status)
+            assertTrue(presentation.canConfirm)
+        }
+    }
+
+    @Test
+    fun openRsvpPresentationReflectsRevocationAndExpiryTransitions() {
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        val event = SeededYardSaleData.events.first { it.id == eventId }
+        listOf(
+            RsvpEligibilityStatus.ACCESS_REVOKED to YardScapeAppState::revokeRsvpAccess,
+            RsvpEligibilityStatus.ACCESS_EXPIRED to YardScapeAppState::expireRsvpAccess,
+        ).forEachIndexed { index, (expectedStatus, transition) ->
+            val shopperId = "transition-shopper-$index"
+            val appState = rsvpState(
+                event = event,
+                shopperId = shopperId,
+                rsvp = Rsvp(
+                    id = "transition-rsvp-$index",
+                    eventId = eventId,
+                    shopperId = shopperId,
+                    status = RsvpStatus.REQUESTED,
+                    locationVisibility = LocationVisibility.RSVP_REQUESTED,
+                ),
+            )
+            assertTrue(appState.rsvpScreenStateFor(eventId).canConfirm)
+
+            assertTrue(transition(appState, eventId))
+
+            val presentation = appState.rsvpScreenStateFor(eventId)
+            assertIs<YardScapeRoute.Rsvp>(appState.route)
+            assertEquals(expectedStatus, presentation.status)
+            assertFalse(presentation.canConfirm)
+        }
+    }
+
     @Test
     fun directRsvpRoutesCannotRestoreRevokedOrExpiredAccess() {
         listOf(LocationVisibility.REVOKED, LocationVisibility.EXPIRED).forEach { visibility ->
@@ -344,5 +527,24 @@ class ShopperRsvpStateTest {
         shopperId = shopperId,
         status = RsvpStatus.ACCEPTED,
         locationVisibility = visibility,
+    )
+
+    private fun rsvpState(
+        event: com.naslabs.yardscape.domain.YardSaleEvent,
+        shopperId: String,
+        rsvp: Rsvp? = null,
+        isAtCapacity: Boolean = false,
+    ): YardScapeAppState = YardScapeAppState(
+        repository = SeededYardSaleEventRepository(
+            events = listOf(event),
+            rsvps = listOfNotNull(rsvp),
+        ),
+        shopperId = shopperId,
+        eventCapacitySource = EventCapacitySource { isAtCapacity },
+        initialRoute = YardScapeRoute.Rsvp(
+            eventId = event.id,
+            origin = YardScapePrimaryDestination.MyFinds,
+            myFindsSection = MyFindsSection.Rsvps,
+        ),
     )
 }

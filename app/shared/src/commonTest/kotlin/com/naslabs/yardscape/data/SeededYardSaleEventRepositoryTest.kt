@@ -100,6 +100,19 @@ class SeededYardSaleEventRepositoryTest {
     }
 
     @Test
+    fun submitRsvpDoesNotReplaceActiveAcceptedAccess() {
+        val eventId = SeededYardSaleData.ESTATE_TOOLS_EVENT_ID
+        val shopperId = SeededYardSaleData.SHOPPER_WITH_ACCEPTED_ACCESS_ID
+        val acceptedBefore = assertNotNull(repository.rsvpFor(eventId, shopperId))
+
+        val submitted = repository.submitRsvp(eventId, shopperId)
+
+        assertEquals(acceptedBefore, submitted)
+        assertEquals(acceptedBefore, repository.rsvpFor(eventId, shopperId))
+        assertNotNull(repository.exactLocationFor(eventId, shopperId, now))
+    }
+
+    @Test
     fun submitRsvpCannotRestoreRevokedOrExpiredAccess() {
         listOf(LocationVisibility.REVOKED, LocationVisibility.EXPIRED).forEach { visibility ->
             val shopperId = "shopper-${visibility.name.lowercase()}"

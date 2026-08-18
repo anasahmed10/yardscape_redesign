@@ -22,9 +22,46 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.naslabs.yardscape.domain.RsvpEligibilityStatus
+
+data class RsvpScreenState(
+    val status: RsvpEligibilityStatus,
+    val title: String,
+    val message: String,
+) {
+    val canConfirm: Boolean
+        get() = status == RsvpEligibilityStatus.ELIGIBLE
+}
+
+internal fun RsvpEligibilityStatus.toRsvpScreenState(): RsvpScreenState {
+    val copy = when (this) {
+        RsvpEligibilityStatus.ELIGIBLE -> "Join this yard sale" to
+            "Confirm that you plan to attend. This test workflow accepts the RSVP immediately and returns you to the event."
+        RsvpEligibilityStatus.BLOCKED -> "RSVP unavailable" to
+            "You blocked this host, so this sale cannot accept your RSVP."
+        RsvpEligibilityStatus.ACCESS_REVOKED -> "Access revoked" to
+            "The host revoked your access. This RSVP cannot be submitted again."
+        RsvpEligibilityStatus.ACCESS_EXPIRED -> "Access expired" to
+            "Your access to this sale has expired. This RSVP cannot be submitted again."
+        RsvpEligibilityStatus.EVENT_CANCELLED -> "Sale cancelled" to
+            "This sale was cancelled and is no longer accepting RSVPs."
+        RsvpEligibilityStatus.EVENT_COMPLETED -> "Sale completed" to
+            "This sale is complete and is no longer accepting RSVPs."
+        RsvpEligibilityStatus.EVENT_UNAVAILABLE -> "Sale unavailable" to
+            "This sale is not currently available for RSVP."
+        RsvpEligibilityStatus.EVENT_ENDED -> "Sale ended" to
+            "The sale window has ended and RSVPs are closed."
+        RsvpEligibilityStatus.AT_CAPACITY -> "Sale at capacity" to
+            "This sale has reached its attendee limit and cannot accept another RSVP."
+        RsvpEligibilityStatus.ALREADY_ACCEPTED -> "RSVP already accepted" to
+            "Your RSVP is already accepted. Return to the event for your current access details."
+    }
+    return RsvpScreenState(status = this, title = copy.first, message = copy.second)
+}
 
 @Composable
 fun RsvpScreen(
+    state: RsvpScreenState,
     onConfirm: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -56,28 +93,30 @@ fun RsvpScreen(
                 ) {
                     StatusLabel(text = "RSVP")
                     Text(
-                        text = "Join this yard sale",
+                        text = state.title,
                         style = MaterialTheme.typography.headlineLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "Confirm that you plan to attend. This test workflow accepts the RSVP immediately and returns you to the event.",
+                        text = state.message,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    ShopperStatePanel(
-                        title = "Protected location",
-                        message = "The exact address and directions appear only while your accepted RSVP has active access.",
-                    )
-                    Button(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .testTag(YardScapeTestTags.RsvpConfirmAction)
-                            .semantics { contentDescription = "Confirm RSVP" },
-                        onClick = onConfirm,
-                    ) {
-                        Text("Confirm RSVP")
+                    if (state.canConfirm) {
+                        ShopperStatePanel(
+                            title = "Protected location",
+                            message = "The exact address and directions appear only while your accepted RSVP has active access.",
+                        )
+                        Button(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .testTag(YardScapeTestTags.RsvpConfirmAction)
+                                .semantics { contentDescription = "Confirm RSVP" },
+                            onClick = onConfirm,
+                        ) {
+                            Text("Confirm RSVP")
+                        }
                     }
                     OutlinedButton(
                         modifier = Modifier
