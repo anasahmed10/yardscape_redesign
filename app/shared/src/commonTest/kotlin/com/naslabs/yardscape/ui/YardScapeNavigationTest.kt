@@ -469,6 +469,19 @@ class YardScapeNavigationTest {
     }
 
     @Test
+    fun eventCancellationPreservesDirectionsForAnotherActiveEvent() {
+        val directionsEventId = SeededYardSaleData.ESTATE_TOOLS_EVENT_ID
+        val state = YardScapeAppState(
+            shopperId = SeededYardSaleData.SHOPPER_WITH_ACCEPTED_ACCESS_ID,
+        )
+        assertTrue(state.requestDirections(directionsEventId) != null)
+
+        state.cancelHostEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+
+        assertEquals(directionsEventId, state.directionsEventId)
+    }
+
+    @Test
     fun hostWideBlockSignOutAndSessionExpirySynchronouslyClearComposer() = runTest {
         val blocked = messagingState(shopperId = SeededAttendeeIds.Accepted)
         openDraftedThread(blocked)

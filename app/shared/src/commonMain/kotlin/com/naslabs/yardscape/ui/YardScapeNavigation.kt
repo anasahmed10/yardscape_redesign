@@ -1428,7 +1428,7 @@ class YardScapeAppState(
 
     fun cancelHostEvent(eventId: String) {
         if (repository.cancelHostEvent(eventId)) {
-            directionsEventId = null
+            if (directionsEventId == eventId) directionsEventId = null
             synchronizeMessagingComposer()
         }
         synchronizeDiscoveryMapMarkers()

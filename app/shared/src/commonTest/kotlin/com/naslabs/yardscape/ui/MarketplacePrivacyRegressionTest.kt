@@ -25,7 +25,8 @@ class MarketplacePrivacyRegressionTest {
             transition.mutate(fixture.state)
 
             assertProtectedProjectionsCleared(fixture, transition.name)
-            assertPublicDiscoveryRemainsApproximate(fixture.state, transition.name)
+            assertPublicDiscoveryRemainsUsableAndApproximate(fixture.state, transition)
+            assertSelectionMatchesDiscoveryPolicy(fixture.state, transition)
         }
     }
 
@@ -100,20 +101,63 @@ class MarketplacePrivacyRegressionTest {
         assertIs<MessagingComposerAccess.Closed>(closed.composerAccess, transitionName)
     }
 
-    private fun assertPublicDiscoveryRemainsApproximate(state: YardScapeAppState, transitionName: String) {
-        val publicProjection = buildString {
-            append(state.browseItems())
-            append(state.mapDiscoveryState.markers)
+    private fun assertPublicDiscoveryRemainsUsableAndApproximate(
+        state: YardScapeAppState,
+        transition: PrivacyTransition,
+    ) {
+        val publicItems = state.browseItems()
+        val publicMarkers = state.mapDiscoveryState.markers
+        assertTrue(publicItems.isNotEmpty(), "${transition.name} removed every usable Browse result")
+        assertTrue(publicMarkers.isNotEmpty(), "${transition.name} removed every usable map result")
+        publicItems.forEach { publicItem ->
+            assertTrue(publicItem.title.isNotBlank(), transition.name)
+            assertTrue(publicItem.locationLabel.isNotBlank(), transition.name)
+            assertTrue(publicItem.neighborhood.isNotBlank(), transition.name)
+            assertContainsNoExactLocation(publicItem.toString(), transition.name)
         }
+        publicMarkers.forEach { publicMarker ->
+            assertTrue(publicMarker.title.isNotBlank(), transition.name)
+            assertTrue(publicMarker.area.displayLabel.isNotBlank(), transition.name)
+            assertTrue(publicMarker.area.approximationRadiusMeters >= 500, transition.name)
+            assertContainsNoExactLocation(publicMarker.toString(), transition.name)
+        }
+
+        if (transition.keepsAffectedEventDiscoverable) {
+            val retainedItem = publicItems.single { it.id == EVENT_ID }
+            val retainedMarker = publicMarkers.single { it.eventId == EVENT_ID }
+            assertTrue(retainedItem.locationLabel.contains("Maple Ridge"), transition.name)
+            assertTrue(retainedMarker.area.displayLabel.contains("Maple Ridge"), transition.name)
+        } else {
+            assertFalse(publicItems.any { it.id == EVENT_ID }, transition.name)
+            assertFalse(publicMarkers.any { it.eventId == EVENT_ID }, transition.name)
+            assertTrue(publicItems.any { it.id == OTHER_PUBLIC_EVENT_ID }, transition.name)
+            assertTrue(publicMarkers.any { it.eventId == OTHER_PUBLIC_EVENT_ID }, transition.name)
+        }
+    }
+
+    private fun assertSelectionMatchesDiscoveryPolicy(
+        state: YardScapeAppState,
+        transition: PrivacyTransition,
+    ) {
+        if (transition.keepsAffectedEventDiscoverable) {
+            assertEquals(EVENT_ID, state.mapDiscoveryState.selectedEventId, transition.name)
+            val selectedMarker = assertNotNull(state.mapDiscoveryState.selectedMarker, transition.name)
+            assertEquals(EVENT_ID, selectedMarker.eventId, transition.name)
+            assertTrue(selectedMarker.area.displayLabel.contains("Maple Ridge"), transition.name)
+            assertTrue(selectedMarker.area.approximationRadiusMeters >= 500, transition.name)
+            assertContainsNoExactLocation(selectedMarker.toString(), transition.name)
+        } else {
+            assertNull(state.mapDiscoveryState.selectedEventId, transition.name)
+            assertNull(state.mapDiscoveryState.selectedMarker, transition.name)
+        }
+    }
+
+    private fun assertContainsNoExactLocation(publicProjection: String, transitionName: String) {
         EXACT_LOCATION_TOKENS.forEach { protectedToken ->
             assertFalse(
                 publicProjection.contains(protectedToken),
                 "$transitionName leaked $protectedToken through public discovery",
             )
-        }
-        state.browseItems().firstOrNull { it.id == EVENT_ID }?.let { publicItem ->
-            assertTrue(publicItem.locationLabel.contains("Maple Ridge"), transitionName)
-            assertFalse(publicItem.locationLabel.contains("Street"), transitionName)
         }
     }
 
@@ -121,11 +165,13 @@ class MarketplacePrivacyRegressionTest {
 
     private data class PrivacyTransition(
         val name: String,
+        val keepsAffectedEventDiscoverable: Boolean = true,
         val mutate: (YardScapeAppState) -> Unit,
     )
 
     private companion object {
         const val EVENT_ID = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        const val OTHER_PUBLIC_EVENT_ID = SeededYardSaleData.ESTATE_TOOLS_EVENT_ID
         const val SHOPPER_ID = SeededAttendeeIds.Accepted
         const val PRIVATE_MESSAGE = "Private pickup question before access changes"
         const val PRIVATE_DRAFT = "Private draft before access changes"
@@ -136,6 +182,10 @@ class MarketplacePrivacyRegressionTest {
             "side gate",
             "47.6101",
             "-122.2015",
+            "418 Juniper Avenue",
+            "driveway tent",
+            "47.6208",
+            "-122.2142",
         )
         val privacyTransitions = listOf(
             PrivacyTransition("host revoke") { state ->
@@ -148,10 +198,10 @@ class MarketplacePrivacyRegressionTest {
             PrivacyTransition("access expiry") { state ->
                 assertTrue(state.expireRsvpAccess(EVENT_ID))
             },
-            PrivacyTransition("event cancellation") { state ->
+            PrivacyTransition("event cancellation", keepsAffectedEventDiscoverable = false) { state ->
                 state.cancelHostEvent(EVENT_ID)
             },
-            PrivacyTransition("host block") { state ->
+            PrivacyTransition("host block", keepsAffectedEventDiscoverable = false) { state ->
                 assertTrue(state.blockHostForEvent(EVENT_ID))
             },
             PrivacyTransition("sign-out") { state ->
