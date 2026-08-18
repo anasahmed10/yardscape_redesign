@@ -39,7 +39,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -106,6 +110,11 @@ fun BrowseScreen(
                     message = presentation.message,
                     actionLabel = presentation.actionLabel,
                     onAction = presentation.actionLabel?.let { onRetryData },
+                    statusMessageKind = when (presentation.availability) {
+                        ShopperBrowseAvailability.OfflineCached -> YardScapeStatusMessageKind.Offline
+                        ShopperBrowseAvailability.RecoverableError -> YardScapeStatusMessageKind.Failure
+                        else -> null
+                    },
                 )
             }
         }
@@ -197,7 +206,7 @@ private fun DiscoveryControls(
                 singleLine = true,
             )
             OutlinedButton(
-                modifier = Modifier.heightIn(min = 48.dp),
+                modifier = Modifier.yardScapeInteractiveTarget(),
                 onClick = { showMoreFilters = !showMoreFilters },
             ) {
                 Text(if (showMoreFilters) "Less" else "Filters")
@@ -244,7 +253,7 @@ private fun DiscoveryControls(
             }
         }
         if (state.filters.isActive) {
-            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onResetFilters) {
+            OutlinedButton(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = onResetFilters) {
                 Text("Reset search and filters")
             }
         }
@@ -287,9 +296,11 @@ private fun MapDiscoveryExperience(
     onUseMyLocation: () -> Unit,
     onSheetPositionChanged: (MapResultsSheetPosition) -> Unit,
 ) {
-    val defaultPresentation = mapPresentationFor(mapState.markers)
-    val viewport = mapState.cameraViewportDraft ?: defaultPresentation.defaultViewport
-    val presentation = mapPresentationFor(mapState.markers, viewport.zoomLevel)
+    val defaultViewport = remember(mapState.markers) { defaultViewportFor(mapState.markers) }
+    val viewport = mapState.cameraViewportDraft ?: defaultViewport
+    val presentation = remember(mapState.markers, viewport.zoomLevel) {
+        mapPresentationFor(mapState.markers, viewport.zoomLevel)
+    }
     LaunchedEffect(mapState.cameraViewportDraft, mapState.viewportSearchReadiness) {
         if (mapState.viewportSearchReadiness == ViewportSearchReadiness.WaitingForDebounce) {
             delay(350)
@@ -329,9 +340,12 @@ private fun MapDiscoveryExperience(
                 )
             }
         } else if (platformMapSupportsComposeOverlay()) {
+            val sheetLayout = mapSheetLayoutFor(mapState.sheetPosition)
             Box(modifier = Modifier.fillMaxWidth().height(620.dp)) {
                 DiscoveryMapPanel(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = sheetLayout.mapBottomClearance),
                     mapState = mapState,
                     platformState = PlatformMapState(
                         viewport = viewport,
@@ -417,7 +431,7 @@ private fun DiscoveryMapPanel(
             verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
         ) {
             OutlinedButton(
-                modifier = Modifier.heightIn(min = 48.dp),
+                modifier = Modifier.yardScapeInteractiveTarget(),
                 enabled = mapState.locationPermission != ApproximateLocationPermission.Requesting,
                 onClick = onUseMyLocation,
             ) {
@@ -425,7 +439,7 @@ private fun DiscoveryMapPanel(
             }
             if (mapState.canSearchThisArea) {
                 Button(
-                    modifier = Modifier.heightIn(min = 48.dp),
+                    modifier = Modifier.yardScapeInteractiveTarget(),
                     onClick = onSearchThisArea,
                 ) {
                     Text("Search this area")
@@ -433,7 +447,7 @@ private fun DiscoveryMapPanel(
             }
             if (isFallback && platformMapCapability() == PlatformMapCapability.Interactive) {
                 OutlinedButton(
-                    modifier = Modifier.heightIn(min = 48.dp),
+                    modifier = Modifier.yardScapeInteractiveTarget(),
                     onClick = { onMapAvailabilityChanged(MapAvailability.Loading) },
                 ) {
                     Text("Retry map")
@@ -545,15 +559,12 @@ private fun MobileNearbySheet(
 ) {
     var dragDistance by remember { mutableFloatStateOf(0f) }
     val dragState = rememberDraggableState { delta -> dragDistance += delta }
-    val height = when (position) {
-        MapResultsSheetPosition.Collapsed -> 190.dp
-        MapResultsSheetPosition.HalfExpanded -> 300.dp
-        MapResultsSheetPosition.Expanded -> 470.dp
-    }
+    val accessibility = mapSheetAccessibilityFor(position)
+    val layout = mapSheetLayoutFor(position)
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(height)
+            .height(layout.height)
             .draggable(
                 orientation = Orientation.Vertical,
                 state = dragState,
@@ -567,25 +578,31 @@ private fun MobileNearbySheet(
                     onPositionChanged(next)
                 },
             )
+            .semantics {
+                contentDescription = accessibility.label
+                stateDescription = accessibility.stateDescription
+                customActions = accessibility.actionLabels.map { label ->
+                    CustomAccessibilityAction(label) {
+                        onPositionChanged(
+                            when (label) {
+                                "Expand nearby sales" -> position.expandOneStep()
+                                else -> position.collapseOneStep()
+                            },
+                        )
+                        true
+                    }
+                }
+            }
             .testTag(YardScapeTestTags.DiscoveryResultsSheet),
         shape = MaterialTheme.shapes.large,
         shadowElevation = 8.dp,
     ) {
         Column(modifier = Modifier.padding(YardScapeDesign.spacing.medium)) {
-            OutlinedButton(
-                modifier = Modifier.align(Alignment.CenterHorizontally).heightIn(min = 48.dp),
-                onClick = {
-                    onPositionChanged(
-                        if (position == MapResultsSheetPosition.Expanded) {
-                            MapResultsSheetPosition.Collapsed
-                        } else {
-                            position.expandOneStep()
-                        },
-                    )
-                },
-            ) {
-                Text("${events.size} nearby sales")
-            }
+            Text(
+                text = "${events.size} nearby sales",
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                style = MaterialTheme.typography.labelLarge,
+            )
             NearbyResultList(
                 modifier = Modifier.fillMaxSize(),
                 events = events,
@@ -622,7 +639,13 @@ private fun CompactMapResultCard(
 ) {
     val actions = compactMapResultActionsFor(saved)
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(YardScapeTestTags.mapResult(event.id))
+            .semantics {
+                this.selected = selected
+                stateDescription = if (selected) "Selected" else "Not selected"
+            },
         colors = CardDefaults.cardColors(
             containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
         ),
@@ -636,10 +659,10 @@ private fun CompactMapResultCard(
             Text(event.dateLabel, color = MaterialTheme.colorScheme.primary)
             Text(event.locationLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
-                Button(modifier = Modifier.heightIn(min = 48.dp), onClick = onOpen) { Text("View sale") }
+                Button(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onOpen) { Text("View sale") }
                 OutlinedButton(
                     modifier = Modifier
-                        .heightIn(min = 48.dp)
+                        .yardScapeInteractiveTarget()
                         .semantics { contentDescription = actions.saveLabel },
                     onClick = onSave,
                 ) {
@@ -796,7 +819,7 @@ private fun BrowseEventActions(
         Button(
             modifier = Modifier
                 .weight(1f)
-                .heightIn(min = 48.dp)
+                .yardScapeInteractiveTarget()
                 .testTag(YardScapeTestTags.browseEventCard(eventId))
                 .semantics { contentDescription = actions.openLabel },
             onClick = onOpen,
@@ -806,7 +829,7 @@ private fun BrowseEventActions(
         TextButton(
             modifier = Modifier
                 .weight(1f)
-                .heightIn(min = 48.dp)
+                .yardScapeInteractiveTarget()
                 .semantics { contentDescription = actions.saveLabel },
             onClick = onSave,
         ) {
@@ -879,12 +902,13 @@ internal fun EventPreviewCard(
             OutlinedButton(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .yardScapeInteractiveTarget()
                     .testTag(YardScapeTestTags.browseEventCard(event.id)),
                 onClick = onClick,
             ) {
                 Text("View sale")
             }
-            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onSavedToggle) {
+            OutlinedButton(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = onSavedToggle) {
                 Text(if (isSaved) "Unsave" else "Save sale")
             }
         }

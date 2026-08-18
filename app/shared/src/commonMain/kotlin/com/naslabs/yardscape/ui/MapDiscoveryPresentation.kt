@@ -5,8 +5,10 @@ import com.naslabs.yardscape.domain.PublicEventMarker
 import com.naslabs.yardscape.domain.PublicMapCluster
 import com.naslabs.yardscape.domain.ViewportCenter
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.asin
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.sin
@@ -22,18 +24,9 @@ fun mapPresentationFor(
     markers: List<PublicEventMarker>,
     zoomLevel: Double = 11.5,
 ): MapDiscoveryPresentation {
-    val clusterDistanceMeters = clusterDistanceMeters(markers, zoomLevel)
-    val unassigned = markers.toMutableList()
-    val markerGroups = buildList {
-        while (unassigned.isNotEmpty()) {
-            val anchor = unassigned.removeAt(0)
-            val nearby = unassigned.filter { marker ->
-                publicDistanceMeters(anchor, marker) <= clusterDistanceMeters
-            }
-            unassigned.removeAll(nearby)
-            add(listOf(anchor) + nearby)
-        }
-    }
+    val orderedMarkers = markers.sortedBy(PublicEventMarker::eventId)
+    val clusterDistanceMeters = clusterDistanceMeters(orderedMarkers, zoomLevel)
+    val markerGroups = spatialMarkerGroups(orderedMarkers, clusterDistanceMeters)
     val clusteredGroups = markerGroups.filter { it.size > 1 }
     val clusters = clusteredGroups.map { group ->
         val eventIds = group.map(PublicEventMarker::eventId).sorted()
@@ -44,7 +37,15 @@ fun mapPresentationFor(
         )
     }
     val clusteredIds = clusters.flatMap(PublicMapCluster::eventIds).toSet()
-    val visibleMarkers = markers.filterNot { it.eventId in clusteredIds }
+    val visibleMarkers = orderedMarkers.filterNot { it.eventId in clusteredIds }
+    return MapDiscoveryPresentation(
+        clusters = clusters,
+        unclusteredMarkers = visibleMarkers,
+        defaultViewport = defaultViewportFor(orderedMarkers),
+    )
+}
+
+fun defaultViewportFor(markers: List<PublicEventMarker>): MapViewport {
     val centers = markers.map { it.area.center }
     val center = if (centers.isEmpty()) {
         ViewportCenter(latitude = 47.618, longitude = -122.215)
@@ -54,11 +55,7 @@ fun mapPresentationFor(
             longitude = centers.map { it.longitude }.average(),
         )
     }
-    return MapDiscoveryPresentation(
-        clusters = clusters,
-        unclusteredMarkers = visibleMarkers,
-        defaultViewport = MapViewport(center = center, zoomLevel = 11.5),
-    )
+    return MapViewport(center = center, zoomLevel = 11.5)
 }
 
 fun markersInViewport(
@@ -86,6 +83,104 @@ private fun clusterDistanceMeters(markers: List<PublicEventMarker>, zoomLevel: D
     val metersPerPixel = 156_543.03392 * cos(latitude * PI / 180.0) / 2.0.pow(zoomLevel)
     return max(120.0, metersPerPixel * 24.0)
 }
+
+/**
+ * Groups public map markers from a deterministic, coarse spatial grid. Buckets only limit distance
+ * candidates; final membership continues to use public-area great-circle distance.
+ */
+private fun spatialMarkerGroups(
+    orderedMarkers: List<PublicEventMarker>,
+    clusterDistanceMeters: Double,
+): List<List<PublicEventMarker>> {
+    if (orderedMarkers.isEmpty()) return emptyList()
+
+    val grid = publicMarkerGridFor(orderedMarkers, clusterDistanceMeters)
+    val buckets = orderedMarkers.groupBy { marker -> grid.cellFor(marker) }
+    val unassignedIds = orderedMarkers.map(PublicEventMarker::eventId).toMutableSet()
+
+    return buildList {
+        orderedMarkers.forEach { anchor ->
+            if (anchor.eventId !in unassignedIds) return@forEach
+            val group = buildList {
+                add(anchor)
+                grid.neighboringCells(anchor).forEach { cell ->
+                    buckets[cell].orEmpty().forEach { candidate ->
+                        if (
+                            candidate.eventId != anchor.eventId &&
+                            candidate.eventId in unassignedIds &&
+                            publicDistanceMeters(anchor, candidate) <= clusterDistanceMeters
+                        ) {
+                            add(candidate)
+                        }
+                    }
+                }
+            }.sortedBy(PublicEventMarker::eventId)
+            unassignedIds.removeAll(group.map(PublicEventMarker::eventId).toSet())
+            add(group)
+        }
+    }
+}
+
+private data class PublicMarkerGrid(
+    val latitudeCellDegrees: Double,
+    val longitudeCellCount: Int,
+) {
+    private val longitudeCellDegrees = FULL_LONGITUDE_DEGREES / longitudeCellCount
+
+    fun cellFor(marker: PublicEventMarker): PublicMarkerGridCell = PublicMarkerGridCell(
+        latitude = floor(marker.area.center.latitude / latitudeCellDegrees).toInt(),
+        longitude = floor(normalizedPublicLongitude(marker.area.center.longitude) / longitudeCellDegrees)
+            .toInt()
+            .coerceAtMost(longitudeCellCount - 1),
+    )
+
+    fun neighboringCells(marker: PublicEventMarker): List<PublicMarkerGridCell> {
+        val cell = cellFor(marker)
+        return buildList {
+            for (latitudeOffset in -1..1) {
+                for (longitudeOffset in -1..1) {
+                    add(
+                        PublicMarkerGridCell(
+                            latitude = cell.latitude + latitudeOffset,
+                            longitude = (cell.longitude + longitudeOffset + longitudeCellCount) % longitudeCellCount,
+                        ),
+                    )
+                }
+            }
+        }.distinct()
+    }
+}
+
+private data class PublicMarkerGridCell(
+    val latitude: Int,
+    val longitude: Int,
+)
+
+private fun publicMarkerGridFor(
+    markers: List<PublicEventMarker>,
+    clusterDistanceMeters: Double,
+): PublicMarkerGrid {
+    val smallestLongitudeScale = markers
+        .minOf { marker -> abs(cos(marker.area.center.latitude * PI / 180.0)) }
+    val maximumLongitudeCellDegrees = if (smallestLongitudeScale < MINIMUM_LONGITUDE_SCALE) {
+        360.0
+    } else {
+        clusterDistanceMeters / (METERS_PER_LATITUDE_DEGREE * smallestLongitudeScale)
+    }
+    return PublicMarkerGrid(
+        latitudeCellDegrees = clusterDistanceMeters / METERS_PER_LATITUDE_DEGREE,
+        longitudeCellCount = floor(FULL_LONGITUDE_DEGREES / maximumLongitudeCellDegrees)
+            .toInt()
+            .coerceAtLeast(1),
+    )
+}
+
+private const val METERS_PER_LATITUDE_DEGREE = 111_320.0
+private const val MINIMUM_LONGITUDE_SCALE = 0.000001
+private const val FULL_LONGITUDE_DEGREES = 360.0
+
+private fun normalizedPublicLongitude(longitude: Double): Double =
+    ((longitude + 180.0) % FULL_LONGITUDE_DEGREES + FULL_LONGITUDE_DEGREES) % FULL_LONGITUDE_DEGREES
 
 private fun publicDistanceMeters(first: PublicEventMarker, second: PublicEventMarker): Double {
     val lat1 = first.area.center.latitude * PI / 180.0

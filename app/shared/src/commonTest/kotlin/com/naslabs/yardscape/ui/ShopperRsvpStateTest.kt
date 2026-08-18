@@ -651,6 +651,8 @@ class ShopperRsvpStateTest {
         assertNull(cancelled.exactAddress)
         assertNull(state.directionsEventId)
         assertEquals(listOf(ShopperRsvpAction.OpenEvent), cancelled.visibleActions)
+        assertFalse(state.detailStateFor(eventId)?.revealState is LocationRevealState.Revealed)
+        assertFalse(state.browseItems().single { it.id == eventId }.locationLabel.contains("Street"))
     }
 
     @Test

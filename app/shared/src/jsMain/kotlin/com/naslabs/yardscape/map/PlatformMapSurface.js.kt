@@ -43,12 +43,12 @@ actual fun PlatformMapSurface(
     var map by remember { mutableStateOf<Map?>(null) }
     var pendingProgrammaticViewport by remember { mutableStateOf<MapViewport?>(state.viewport) }
     var lastObservedViewport by remember { mutableStateOf(state.viewport) }
-    val mapMarkers = remember { mutableListOf<Marker>() }
-    val latestViewportChanged by rememberUpdatedState(onViewportChanged)
-    val latestMarkerSelected by rememberUpdatedState(onMarkerSelected)
-    val latestClusterSelected by rememberUpdatedState(onClusterSelected)
-    val latestMapLoaded by rememberUpdatedState(onMapLoaded)
-    val latestMapLoadFailed by rememberUpdatedState(onMapLoadFailed)
+    val renderedMarkers = remember { mutableMapOf<String, RenderedMapMarker>() }
+    val latestViewportChanged = rememberUpdatedState(onViewportChanged)
+    val latestMarkerSelected = rememberUpdatedState(onMarkerSelected)
+    val latestClusterSelected = rememberUpdatedState(onClusterSelected)
+    val latestMapLoaded = rememberUpdatedState(onMapLoaded)
+    val latestMapLoadFailed = rememberUpdatedState(onMapLoadFailed)
 
     WebElementView(
         modifier = modifier.onGloballyPositioned { map?.resize() },
@@ -65,9 +65,9 @@ actual fun PlatformMapSurface(
                     addControl(NavigationControl(), "top-right")
                     on("load") {
                         resize()
-                        latestMapLoaded()
+                        latestMapLoaded.value()
                     }
-                    on("error") { event -> latestMapLoadFailed(event.toString()) }
+                    on("error") { event -> latestMapLoadFailed.value(event.toString()) }
                     val publishCamera = {
                         val currentViewport = MapViewport(
                             center = ViewportCenter(
@@ -83,7 +83,7 @@ actual fun PlatformMapSurface(
                             !currentViewport.approximatelyEquals(lastObservedViewport)
                         ) {
                             lastObservedViewport = currentViewport
-                            latestViewportChanged(
+                            latestViewportChanged.value(
                                 currentViewport,
                             )
                         }
@@ -111,40 +111,109 @@ actual fun PlatformMapSurface(
 
     LaunchedEffect(map, state.markers, state.clusters, state.selectedEventId) {
         val activeMap = map ?: return@LaunchedEffect
-        mapMarkers.forEach(Marker::remove)
-        mapMarkers.clear()
-
-        state.clusters.forEach { cluster ->
-            val element = mapMarkerElement(
-                description = "${cluster.eventCount} sales near ${cluster.area.displayLabel}",
-                color = "#1F5B4A",
-                label = cluster.eventCount.toString(),
-                onClick = { latestClusterSelected(cluster.id) },
-            )
-            mapMarkers += Marker(jsObject<MarkerOptions> { this.element = element })
-                .setLngLat(arrayOf(cluster.area.center.longitude, cluster.area.center.latitude))
-                .addTo(activeMap)
+        val currentItems = mapRenderItemsFor(
+            state = state,
+            onMarkerSelected = { eventId -> latestMarkerSelected.value(eventId) },
+            onClusterSelected = { clusterId -> latestClusterSelected.value(clusterId) },
+        )
+        val reconciliation = reconcile(
+            previous = renderedMarkers.mapValues { it.value.item },
+            current = currentItems,
+            previousSelectedId = renderedMarkers.values.firstOrNull { it.item.selected }?.item?.id,
+            selectedId = currentItems.values.firstOrNull { it.selected }?.id,
+        )
+        reconciliation.removedIds.forEach { id -> renderedMarkers.remove(id)?.marker?.remove() }
+        reconciliation.added.forEach { item ->
+            renderedMarkers[item.id] = createRenderedMapMarker(item, activeMap)
         }
-        state.markers.forEach { marker ->
-            val element = mapMarkerElement(
-                description = "Open ${marker.title} near ${marker.area.displayLabel}",
-                color = if (marker.eventId == state.selectedEventId) "#D76845" else "#3478A0",
-                onClick = { latestMarkerSelected(marker.eventId) },
-            )
-            mapMarkers += Marker(jsObject<MarkerOptions> { this.element = element })
-                .setLngLat(arrayOf(marker.area.center.longitude, marker.area.center.latitude))
-                .addTo(activeMap)
+        (reconciliation.retainedIds + reconciliation.selectionChangedIds).forEach { id ->
+            currentItems[id]?.let { item -> renderedMarkers[id]?.update(item) }
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            mapMarkers.forEach(Marker::remove)
-            mapMarkers.clear()
+            renderedMarkers.values.forEach { it.marker.remove() }
+            renderedMarkers.clear()
             map?.remove()
             map = null
         }
     }
+}
+
+private data class MapRenderItem(
+    val id: String,
+    val longitude: Double,
+    val latitude: Double,
+    val description: String,
+    val color: String,
+    val label: String,
+    val selected: Boolean = false,
+    val onClick: () -> Unit,
+)
+
+private class RenderedMapMarker(
+    val marker: Marker,
+    private val element: HTMLElement,
+    var item: MapRenderItem,
+) {
+    fun update(next: MapRenderItem) {
+        if (item.longitude != next.longitude || item.latitude != next.latitude) {
+            marker.setLngLat(arrayOf(next.longitude, next.latitude))
+        }
+        if (item.description != next.description) element.setAttribute("aria-label", next.description)
+        if (item.color != next.color) element.style.background = next.color
+        if (item.label != next.label) element.textContent = next.label
+        item = next
+    }
+}
+
+private fun mapRenderItemsFor(
+    state: PlatformMapState,
+    onMarkerSelected: (String) -> Unit,
+    onClusterSelected: (String) -> Unit,
+): kotlin.collections.Map<String, MapRenderItem> = buildList {
+    state.clusters.forEach { cluster ->
+        add(
+            MapRenderItem(
+                id = cluster.id,
+                longitude = cluster.area.center.longitude,
+                latitude = cluster.area.center.latitude,
+                description = "${cluster.eventCount} sales near ${cluster.area.displayLabel}",
+                color = "#1F5B4A",
+                label = cluster.eventCount.toString(),
+                onClick = { onClusterSelected(cluster.id) },
+            ),
+        )
+    }
+    state.markers.forEach { marker ->
+        add(
+            MapRenderItem(
+                id = marker.eventId,
+                longitude = marker.area.center.longitude,
+                latitude = marker.area.center.latitude,
+                description = "Open ${marker.title} near ${marker.area.displayLabel}",
+                color = if (marker.eventId == state.selectedEventId) "#D76845" else "#3478A0",
+                label = "",
+                selected = marker.eventId == state.selectedEventId,
+                onClick = { onMarkerSelected(marker.eventId) },
+            ),
+        )
+    }
+}.associateBy(MapRenderItem::id)
+
+private fun createRenderedMapMarker(item: MapRenderItem, map: Map): RenderedMapMarker {
+    lateinit var rendered: RenderedMapMarker
+    val element = mapMarkerElement(
+        description = item.description,
+        color = item.color,
+        label = item.label,
+        onClick = { rendered.item.onClick() },
+    )
+    val marker = Marker(jsObject<MarkerOptions> { this.element = element })
+        .setLngLat(arrayOf(item.longitude, item.latitude))
+        .addTo(map)
+    return RenderedMapMarker(marker, element, item).also { rendered = it }
 }
 
 private fun MapViewport.toJumpOptions(): JumpToOptions = JumpToOptions(

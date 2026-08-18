@@ -11,6 +11,29 @@ import kotlin.test.assertTrue
 
 class MapDiscoveryPresentationTest {
     @Test
+    fun thousandPublicMarkersClusterDeterministicallyAndRepresentEveryEventOnce() {
+        val markers = stressMarkers()
+
+        val forward = mapPresentationFor(markers)
+        val reversed = mapPresentationFor(markers.reversed())
+        val forwardIds = forward.clusters.flatMap { it.eventIds } + forward.unclusteredMarkers.map { it.eventId }
+        val reversedIds = reversed.clusters.flatMap { it.eventIds } + reversed.unclusteredMarkers.map { it.eventId }
+
+        assertEquals(markers.map { it.eventId }.toSet(), forwardIds.toSet())
+        assertEquals(markers.size, forwardIds.size)
+        assertEquals(333, forward.clusters.size)
+        assertEquals(334, forward.unclusteredMarkers.size)
+        assertEquals(
+            (0 until 333).map { group -> listOf("event-${group}-a", "event-${group}-b") }.toSet(),
+            forward.clusters.map { it.eventIds }.toSet(),
+        )
+        assertEquals(forward.clusters, reversed.clusters)
+        assertEquals(forward.unclusteredMarkers, reversed.unclusteredMarkers)
+        assertEquals(markers.map { it.eventId }.toSet(), reversedIds.toSet())
+        assertEquals(markers.size, reversedIds.size)
+    }
+
+    @Test
     fun nearbyMarkersClusterWhileSingleMarkersRemainIndividuallySelectable() {
         val mapleOne = marker("maple-1", 47.6150, -122.2100, "Maple Ridge")
         val mapleTwo = marker("maple-2", 47.6153, -122.2102, "Maple Ridge")
@@ -20,6 +43,20 @@ class MapDiscoveryPresentationTest {
 
         assertEquals(listOf("maple-1", "maple-2"), presentation.clusters.single().eventIds)
         assertEquals(listOf("old-mill"), presentation.unclusteredMarkers.map { it.eventId })
+    }
+
+    @Test
+    fun publicMarkersAcrossTheAntimeridianClusterWithAStableId() {
+        val east = marker("date-1", 0.0, 179.999, "Dateline East")
+        val west = marker("date-2", 0.0, -179.999, "Dateline West")
+
+        val forward = mapPresentationFor(listOf(east, west))
+        val reversed = mapPresentationFor(listOf(west, east))
+
+        assertEquals(listOf("date-1", "date-2"), forward.clusters.single().eventIds)
+        assertEquals("cluster-date-1-date-2", forward.clusters.single().id)
+        assertEquals(forward.clusters, reversed.clusters)
+        assertTrue(forward.unclusteredMarkers.isEmpty())
     }
 
     @Test
@@ -75,4 +112,17 @@ class MapDiscoveryPresentationTest {
                 displayLabel = label,
             ),
         )
+
+    private fun stressMarkers(): List<PublicEventMarker> = buildList {
+        repeat(333) { group ->
+            val row = group / 18
+            val column = group % 18
+            val latitude = 30.0 + row * 0.05
+            val longitude = -120.0 + column * 0.05
+            add(marker("event-${group}-a", latitude, longitude, "Public area $group"))
+            add(marker("event-${group}-b", latitude, longitude + 0.01, "Public area $group"))
+            add(marker("event-${group}-c", latitude, longitude + 0.02, "Public area $group"))
+        }
+        add(marker("event-extra", 55.0, -100.0, "Public area extra"))
+    }
 }

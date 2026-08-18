@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
@@ -21,8 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 @Composable
 internal fun DetailRow(label: String, value: String) {
@@ -71,7 +70,7 @@ internal fun RoutePlaceholderScreen(
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
-            Button(onClick = onBack) {
+            Button(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onBack) {
                 Text("Back")
             }
         }
@@ -140,7 +139,7 @@ internal fun FilterChip(
     val presentation = filterControlPresentationFor(selected)
     MaterialFilterChip(
         modifier = Modifier
-            .heightIn(min = presentation.minimumHeight)
+            .yardScapeInteractiveTarget()
             .widthIn(max = 160.dp),
         selected = presentation.isSelected,
         onClick = onClick,
@@ -163,7 +162,7 @@ internal data class FilterControlPresentation(
 internal fun filterControlPresentationFor(selected: Boolean): FilterControlPresentation =
     FilterControlPresentation(
         isSelected = selected,
-        minimumHeight = 48.dp,
+        minimumHeight = YardScapeMinimumInteractiveTarget,
     )
 
 @Composable

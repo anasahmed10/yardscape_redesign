@@ -63,14 +63,14 @@ fun AccountScreen(
                 }
                 item {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { onViewProfile(UserRole.SHOPPER) }) { Text("Shopper profile") }
-                        OutlinedButton(onClick = { onViewProfile(UserRole.HOST) }) { Text("Host profile") }
+                        OutlinedButton(modifier = Modifier.yardScapeInteractiveTarget(), onClick = { onViewProfile(UserRole.SHOPPER) }) { Text("Shopper profile") }
+                        OutlinedButton(modifier = Modifier.yardScapeInteractiveTarget(), onClick = { onViewProfile(UserRole.HOST) }) { Text("Host profile") }
                     }
                 }
                 item {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AccountSettingsSection.entries.forEach { section ->
-                            OutlinedButton(onClick = { onOpenSettings(section) }) { Text(section.label) }
+                            OutlinedButton(modifier = Modifier.yardScapeInteractiveTarget(), onClick = { onOpenSettings(section) }) { Text(section.label) }
                         }
                     }
                 }
@@ -82,7 +82,7 @@ fun AccountScreen(
                     )
                 }
                 item {
-                    TextButton(onClick = onSignOut) { Text("Sign out") }
+                    TextButton(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onSignOut) { Text("Sign out") }
                 }
             }
         }
@@ -98,10 +98,10 @@ private fun SignedOutCard(title: String, message: String, onSignIn: (UserRole) -
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(message)
-            Button(modifier = Modifier.fillMaxWidth(), onClick = { onSignIn(UserRole.SHOPPER) }) {
+            Button(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = { onSignIn(UserRole.SHOPPER) }) {
                 Text("Use mock shopper session")
             }
-            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = { onSignIn(UserRole.HOST) }) {
+            OutlinedButton(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = { onSignIn(UserRole.HOST) }) {
                 Text("Use mock host session")
             }
         }
@@ -138,7 +138,7 @@ private fun AccountSettingsContent(
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Mock session", fontWeight = FontWeight.Bold)
                 Text("This local session contains no real credential, token, or production account data.")
-                OutlinedButton(onClick = onExpireSession) { Text("Simulate session expiry") }
+                OutlinedButton(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onExpireSession) { Text("Simulate session expiry") }
             }
         }
         AccountSettingsSection.Privacy -> Card(modifier = Modifier.fillMaxWidth()) {
@@ -174,6 +174,10 @@ private fun PreferenceRow(label: String, checked: Boolean, onCheckedChange: (Boo
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(
+            modifier = Modifier.yardScapeInteractiveTarget(),
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
     }
 }

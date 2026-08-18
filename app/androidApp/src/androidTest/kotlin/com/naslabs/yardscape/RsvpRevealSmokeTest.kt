@@ -38,6 +38,9 @@ class RsvpRevealSmokeTest {
 
     @Test
     fun browseDetailRsvpRevealShowsExactAddressOnlyAfterAcceptance() {
+        val appState = YardScapeAppState()
+        composeRule.activity.setContent { App(appState) }
+
         composeRule.onNodeWithTag(YardScapeTestTags.BrowseScreen)
             .assertIsDisplayed()
 
@@ -62,6 +65,17 @@ class RsvpRevealSmokeTest {
             .assertTextContains("123 Cedar Street", substring = true)
         composeRule.onNodeWithTag(YardScapeTestTags.DirectionsAction)
             .assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            check(appState.revokeRsvpAccess(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID))
+        }
+        composeRule.onAllNodesWithTag(YardScapeTestTags.ExactLocationContent)
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithTag(YardScapeTestTags.DirectionsAction)
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("123 Cedar Street", substring = true)
+            .assertCountEquals(0)
+        composeRule.onNodeWithText("Access revoked").assertIsDisplayed()
     }
 
     @Test
@@ -125,9 +139,13 @@ class RsvpRevealSmokeTest {
             composeRule.onAllNodesWithText("Sent").fetchSemanticsNodes().size == 2
         }
         composeRule.onAllNodesWithText("Can I bring a trailer?").assertCountEquals(1)
+        composeRule.onNodeWithContentDescription("Message composer")
+            .performTextInput("Private draft that must close")
+        composeRule.onAllNodesWithText("Private draft that must close").assertCountEquals(1)
 
         composeRule.runOnIdle { appState.revokeRsvpAccess(conversationKey.eventId) }
         composeRule.onAllNodes(hasContentDescription("Message composer")).assertCountEquals(0)
+        composeRule.onAllNodesWithText("Private draft that must close").assertCountEquals(0)
         composeRule.onNodeWithText("Location access revoked").assertIsDisplayed()
     }
 }

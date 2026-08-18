@@ -184,7 +184,7 @@ internal fun ShopperSectionHeader(
             TextButton(
                 onClick = onAction,
                 modifier = Modifier
-                    .heightIn(min = 48.dp)
+                    .yardScapeInteractiveTarget()
                     .semantics { contentDescription = actionLabel },
             ) {
                 Text(actionLabel)
@@ -199,10 +199,15 @@ internal fun ShopperStatePanel(
     message: String,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    statusMessageKind: YardScapeStatusMessageKind? = null,
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (statusMessageKind == null) Modifier else Modifier.yardScapeStatusAnnouncement(statusMessageKind),
+            ),
         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.62f),
         shape = MaterialTheme.shapes.medium,
     ) {
@@ -224,7 +229,7 @@ internal fun ShopperStatePanel(
                 TextButton(
                     onClick = onAction,
                     modifier = Modifier
-                        .heightIn(min = 48.dp)
+                        .yardScapeInteractiveTarget()
                         .semantics { contentDescription = actionLabel },
                 ) {
                     Text(actionLabel)

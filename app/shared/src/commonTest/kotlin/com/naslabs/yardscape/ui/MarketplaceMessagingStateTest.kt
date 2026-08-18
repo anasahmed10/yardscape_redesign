@@ -189,6 +189,7 @@ class MarketplaceMessagingStateTest {
         val state = MarketplaceMessagingState(repository, { SHOPPER }, { _, _ -> access })
         state.loadInbox()
         assertTrue(state.openThread(CONVERSATION_ID))
+        state.updateDraft("Private draft before access closes")
         assertEquals(
             protectedBody,
             assertIs<MessagingThreadUiState.Loaded>(state.threadState).presentation.messages.single().body,
@@ -198,6 +199,8 @@ class MarketplaceMessagingStateTest {
         state.synchronizeComposerAccess()
 
         val closed = assertIs<MessagingThreadUiState.Loaded>(state.threadState).presentation
+        assertFalse(closed.canCompose)
+        assertEquals("", closed.draft)
         assertEquals(
             "Message content hidden because this conversation is closed.",
             closed.messages.single().body,

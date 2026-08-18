@@ -236,6 +236,7 @@ object YardScapeTestTags {
     const val DiscoveryResultsSheet: String = "discovery-results-sheet"
 
     fun browseEventCard(eventId: String): String = "browse-event-card-$eventId"
+    fun mapResult(eventId: String): String = "discovery-map-result-$eventId"
     fun primaryDestination(destination: YardScapePrimaryDestination): String =
         "primary-destination-${destination.name.lowercase()}"
 }
@@ -1426,7 +1427,10 @@ class YardScapeAppState(
         publishHostEvent(HostEditorState(draft = draft, validationErrors = emptyList()))
 
     fun cancelHostEvent(eventId: String) {
-        if (repository.cancelHostEvent(eventId)) synchronizeMessagingComposer()
+        if (repository.cancelHostEvent(eventId)) {
+            if (directionsEventId == eventId) directionsEventId = null
+            synchronizeMessagingComposer()
+        }
         synchronizeDiscoveryMapMarkers()
         route = YardScapeRoute.HostCreateEdit(eventId)
     }
