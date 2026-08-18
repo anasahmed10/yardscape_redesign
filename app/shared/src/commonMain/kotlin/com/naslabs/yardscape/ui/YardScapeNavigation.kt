@@ -21,13 +21,16 @@ import com.naslabs.yardscape.data.ShopperSafetyRepository
 import com.naslabs.yardscape.domain.EventStatus
 import com.naslabs.yardscape.domain.ExactAddress
 import com.naslabs.yardscape.domain.LocationVisibility
+import com.naslabs.yardscape.domain.MapViewport
 import com.naslabs.yardscape.domain.PublicEventPreview
+import com.naslabs.yardscape.domain.PublicEventMarker
 import com.naslabs.yardscape.domain.Rsvp
 import com.naslabs.yardscape.domain.RsvpStatus
 import com.naslabs.yardscape.domain.ReportReason
 import com.naslabs.yardscape.domain.SafetyReportDraft
 import com.naslabs.yardscape.domain.UserRole
 import com.naslabs.yardscape.domain.YardSaleEvent
+import com.naslabs.yardscape.domain.toPublicEventMarker
 
 enum class YardScapePrimaryDestination(
     val label: String,
@@ -184,6 +187,8 @@ object YardScapeTestTags {
     const val MyRsvpsScreen: String = "my-rsvps-screen"
     const val MyFindsScreen: String = "my-finds-screen"
     const val MessagesScreen: String = "messages-screen"
+    const val DiscoveryMap: String = "discovery-map"
+    const val DiscoveryResultsSheet: String = "discovery-results-sheet"
 
     fun browseEventCard(eventId: String): String = "browse-event-card-$eventId"
     fun primaryDestination(destination: YardScapePrimaryDestination): String =
@@ -196,6 +201,7 @@ class YardScapeAppState(
     private val hostPhotoPicker: HostPhotoPicker = SeededHostPhotoPicker(),
     private val accountSessionController: AccountSessionController = SeededAccountSessionController(),
     private val shopperSafetyRepository: ShopperSafetyRepository = SeededShopperSafetyRepository(),
+    private val publicMapAreaSource: PublicMapAreaSource = SeededPublicMapAreaSource,
     initialAccountStatus: MockSessionStatus = MockSessionStatus.SignedIn,
     private val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
     private val shopperId: String = SeededYardSaleData.SHOPPER_WITHOUT_ACCESS_ID,
@@ -235,7 +241,18 @@ class YardScapeAppState(
     var discoveryFilters: DiscoveryFilters by mutableStateOf(DiscoveryFilters())
         private set
 
-    var discoveryDisplayMode: DiscoveryDisplayMode by mutableStateOf(DiscoveryDisplayMode.List)
+    var discoveryDisplayMode: DiscoveryDisplayMode by mutableStateOf(DiscoveryDisplayMode.Map)
+        private set
+
+    var mapDiscoveryState: MapDiscoveryState by mutableStateOf(
+        MapDiscoveryState(
+            mapAvailability = when (dataAvailability) {
+                AppDataAvailability.Available -> MapAvailability.Loading
+                AppDataAvailability.Offline -> MapAvailability.Offline
+                is AppDataAvailability.RecoverableError -> MapAvailability.Failed(dataAvailability.message)
+            },
+        ),
+    )
         private set
 
     var savedEventIds: Set<String> by mutableStateOf(emptySet())
@@ -257,6 +274,7 @@ class YardScapeAppState(
         private set
 
     init {
+        synchronizeDiscoveryMapMarkers()
         (initialRoute as? YardScapeRoute.EventSafety)?.let { safetyRoute ->
             openShopperSafety(safetyRoute.eventId, safetyRoute.action, safetyRoute.origin)
         }
@@ -374,8 +392,21 @@ class YardScapeAppState(
 
     fun discoveryState(): ShopperDiscoveryState {
         val allItems = browseItems()
+        val viewportEventIds = mapDiscoveryState.searchedViewport?.let { viewport ->
+            markersInViewport(
+                repository.publicPreviews(nowEpochMillis)
+                    .filterNot { it.id in blockedEventIds }
+                    .mapNotNull { event ->
+                        publicMapAreaSource.areaFor(event)?.let { area -> event.toPublicEventMarker(area) }
+                    },
+                viewport,
+            ).map(PublicEventMarker::eventId).toSet()
+        }
         return ShopperDiscoveryState(
-            items = allItems.filter { it.matches(discoveryFilters, nowEpochMillis) },
+            items = allItems.filter { item ->
+                item.matches(discoveryFilters, nowEpochMillis) &&
+                    (viewportEventIds == null || item.id in viewportEventIds)
+            },
             totalEventCount = allItems.size,
             availableCategories = allItems.flatMap { it.categoryLabels }.distinct().sorted(),
             filters = discoveryFilters,
@@ -384,30 +415,85 @@ class YardScapeAppState(
         )
     }
 
+    private fun synchronizeDiscoveryMapMarkers() {
+        val filteredMarkers = repository.publicPreviews(nowEpochMillis)
+            .filterNot { it.id in blockedEventIds }
+            .filter { it.toBrowseEventItem(nowEpochMillis).matches(discoveryFilters, nowEpochMillis) }
+            .mapNotNull { event ->
+                publicMapAreaSource.areaFor(event)?.let { area -> event.toPublicEventMarker(area) }
+            }
+        val markers = mapDiscoveryState.searchedViewport?.let { viewport ->
+            markersInViewport(filteredMarkers, viewport)
+        } ?: filteredMarkers
+        mapDiscoveryState = mapDiscoveryState.synchronizeMarkers(markers)
+    }
+
     fun updateDiscoveryQuery(query: String) {
         discoveryFilters = discoveryFilters.copy(query = query)
+        synchronizeDiscoveryMapMarkers()
     }
 
     fun updateDiscoveryDate(date: DiscoveryDateFilter) {
         discoveryFilters = discoveryFilters.copy(date = date)
+        synchronizeDiscoveryMapMarkers()
     }
 
     fun updateDiscoveryDistance(distance: DiscoveryDistanceFilter) {
         discoveryFilters = discoveryFilters.copy(distance = distance)
+        synchronizeDiscoveryMapMarkers()
     }
 
     fun toggleDiscoveryCategory(category: String) {
         val categories = discoveryFilters.categories.toMutableSet()
         if (!categories.add(category)) categories.remove(category)
         discoveryFilters = discoveryFilters.copy(categories = categories)
+        synchronizeDiscoveryMapMarkers()
     }
 
     fun clearDiscoveryFilters() {
         discoveryFilters = DiscoveryFilters()
+        synchronizeDiscoveryMapMarkers()
     }
 
     fun updateDiscoveryDisplayMode(mode: DiscoveryDisplayMode) {
         discoveryDisplayMode = mode
+    }
+
+    fun updateMapCameraViewport(viewport: MapViewport) {
+        mapDiscoveryState = mapDiscoveryState.onCameraViewportChanged(viewport)
+    }
+
+    fun settleMapCameraViewport() {
+        mapDiscoveryState = mapDiscoveryState.onCameraViewportSettled()
+    }
+
+    fun searchMapCameraArea() {
+        mapDiscoveryState = mapDiscoveryState.searchThisArea()
+        synchronizeDiscoveryMapMarkers()
+    }
+
+    fun selectDiscoveryEvent(eventId: String?): Boolean {
+        val updated = mapDiscoveryState.selectEvent(eventId)
+        mapDiscoveryState = updated
+        return eventId == null || updated.selectedEventId == eventId
+    }
+
+    fun updateMapResultsSheetPosition(position: MapResultsSheetPosition) {
+        mapDiscoveryState = mapDiscoveryState.updateSheetPosition(position)
+    }
+
+    fun updateMapAvailability(availability: MapAvailability) {
+        mapDiscoveryState = mapDiscoveryState.updateMapAvailability(availability)
+    }
+
+    fun requestApproximateLocation(): Boolean {
+        val previous = mapDiscoveryState
+        mapDiscoveryState = mapDiscoveryState.requestApproximateLocation()
+        return previous.locationPermission != mapDiscoveryState.locationPermission
+    }
+
+    fun updateApproximateLocationPermission(permission: ApproximateLocationPermission) {
+        mapDiscoveryState = mapDiscoveryState.updateLocationPermission(permission)
     }
 
     fun toggleSavedEvent(eventId: String): Boolean {
@@ -566,6 +652,9 @@ class YardScapeAppState(
             it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.MyFinds
         } ?: YardScapePrimaryDestination.Browse
         val myFindsSection = (route as? YardScapeRoute.MyFinds)?.section ?: MyFindsSection.Saved
+        if (origin == YardScapePrimaryDestination.Browse) {
+            selectDiscoveryEvent(eventId)
+        }
         route = YardScapeRoute.EventDetail(eventId, origin, myFindsSection)
     }
 
@@ -759,6 +848,7 @@ class YardScapeAppState(
         } else {
             blockedEventIds = blockedEventIds - update.affectedEventIds
         }
+        synchronizeDiscoveryMapMarkers()
     }
 
     fun openHostCreateEdit(eventId: String? = null) {
@@ -929,6 +1019,7 @@ class YardScapeAppState(
         published.savedEventId?.let { eventId ->
             hostAttendancePolicies[eventId] = HostAttendancePolicy(state.attendeeCap, state.approvalMode)
         }
+        synchronizeDiscoveryMapMarkers()
         return published
     }
 
@@ -937,11 +1028,13 @@ class YardScapeAppState(
 
     fun cancelHostEvent(eventId: String) {
         repository.cancelHostEvent(eventId)
+        synchronizeDiscoveryMapMarkers()
         route = YardScapeRoute.HostCreateEdit(eventId)
     }
 
     fun hideHostEvent(eventId: String) {
         repository.hideHostEvent(eventId)
+        synchronizeDiscoveryMapMarkers()
         route = YardScapeRoute.HostCreateEdit(eventId)
     }
 

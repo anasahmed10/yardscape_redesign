@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -28,6 +29,12 @@ import com.naslabs.yardscape.ui.YardScapeAppState
 import com.naslabs.yardscape.ui.YardScapePrimaryDestination
 import com.naslabs.yardscape.ui.YardScapeRoute
 import com.naslabs.yardscape.ui.YardScapeTheme
+import com.naslabs.yardscape.ui.ApproximateLocationPermission
+import com.naslabs.yardscape.map.ApproximateLocationResult
+import com.naslabs.yardscape.map.rememberApproximateLocationProvider
+import com.naslabs.yardscape.domain.MapViewport
+import com.naslabs.yardscape.domain.ViewportCenter
+import kotlinx.coroutines.launch
 
 @Composable
 @Preview
@@ -37,6 +44,8 @@ fun App() {
 
 @Composable
 fun App(appState: YardScapeAppState) {
+    val locationProvider = rememberApproximateLocationProvider()
+    val coroutineScope = rememberCoroutineScope()
     YardScapeTheme {
         Surface(
             modifier = Modifier
@@ -52,6 +61,7 @@ fun App(appState: YardScapeAppState) {
                 when (val currentRoute = appState.route) {
                     YardScapeRoute.Browse -> BrowseScreen(
                         state = appState.discoveryState(),
+                        mapState = appState.mapDiscoveryState,
                         dataAvailability = appState.dataAvailability,
                         onEventSelected = appState::openEvent,
                         onHostSelected = {
@@ -64,6 +74,37 @@ fun App(appState: YardScapeAppState) {
                         onDisplayModeChanged = appState::updateDiscoveryDisplayMode,
                         onResetFilters = appState::clearDiscoveryFilters,
                         onSavedToggled = { appState.toggleSavedEvent(it) },
+                        onMapViewportChanged = appState::updateMapCameraViewport,
+                        onMapViewportSettled = appState::settleMapCameraViewport,
+                        onSearchThisArea = appState::searchMapCameraArea,
+                        onMapEventSelected = appState::selectDiscoveryEvent,
+                        onMapAvailabilityChanged = appState::updateMapAvailability,
+                        onSheetPositionChanged = appState::updateMapResultsSheetPosition,
+                        onUseMyLocation = {
+                            if (appState.requestApproximateLocation()) coroutineScope.launch {
+                                when (val result = locationProvider.requestApproximateLocation()) {
+                                    is ApproximateLocationResult.Available -> {
+                                        appState.updateApproximateLocationPermission(ApproximateLocationPermission.Granted)
+                                        appState.updateMapCameraViewport(
+                                            MapViewport(
+                                                center = ViewportCenter(
+                                                    latitude = result.center.latitude,
+                                                    longitude = result.center.longitude,
+                                                ),
+                                                zoomLevel = 12.0,
+                                            ),
+                                        )
+                                        appState.settleMapCameraViewport()
+                                    }
+                                    ApproximateLocationResult.PermissionDenied -> {
+                                        appState.updateApproximateLocationPermission(ApproximateLocationPermission.Denied)
+                                    }
+                                    ApproximateLocationResult.Unavailable -> {
+                                        appState.updateApproximateLocationPermission(ApproximateLocationPermission.Unavailable)
+                                    }
+                                }
+                            }
+                        },
                     )
 
                     is YardScapeRoute.MyFinds -> MyFindsScreen(

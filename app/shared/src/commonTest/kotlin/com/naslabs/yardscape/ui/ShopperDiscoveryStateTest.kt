@@ -2,12 +2,24 @@ package com.naslabs.yardscape.ui
 
 import com.naslabs.yardscape.data.SeededYardSaleData
 import com.naslabs.yardscape.data.SeededYardSaleEventRepository
+import com.naslabs.yardscape.domain.MapViewport
+import com.naslabs.yardscape.domain.ViewportCenter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ShopperDiscoveryStateTest {
+    @Test
+    fun browseStartsInMapModeWithACompleteListAlternative() {
+        val state = YardScapeAppState()
+
+        assertEquals(DiscoveryDisplayMode.Map, state.discoveryState().displayMode)
+        state.updateDiscoveryDisplayMode(DiscoveryDisplayMode.List)
+        assertEquals(2, state.discoveryState().items.size)
+    }
+
     @Test
     fun seededEventsCanBeFoundThroughKeywordNeighborhoodAndCategory() {
         val state = YardScapeAppState()
@@ -124,5 +136,95 @@ class ShopperDiscoveryStateTest {
 
         assertFalse(state.toggleSavedEvent("private-or-unknown-event"))
         assertTrue(state.savedEventIds.isEmpty())
+    }
+
+    @Test
+    fun listResultsAndPublicMapMarkersUseTheSameFiltersAndSelection() {
+        val state = YardScapeAppState()
+        val familyEventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+
+        assertEquals(
+            state.discoveryState().items.map { it.id },
+            state.mapDiscoveryState.markers.map { it.eventId },
+        )
+        assertTrue(state.selectDiscoveryEvent(familyEventId))
+        assertEquals(familyEventId, state.mapDiscoveryState.selectedEventId)
+
+        state.updateDiscoveryQuery("vinyl")
+
+        assertEquals(
+            state.discoveryState().items.map { it.id },
+            state.mapDiscoveryState.markers.map { it.eventId },
+        )
+        assertEquals(null, state.mapDiscoveryState.selectedEventId)
+    }
+
+    @Test
+    fun mapViewportSelectionAndSheetPositionSurviveDetailAndBackNavigation() {
+        val state = YardScapeAppState()
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        val viewport = MapViewport(
+            center = ViewportCenter(47.62, -122.22),
+            zoomLevel = 12.0,
+        )
+        state.updateMapCameraViewport(viewport)
+        state.settleMapCameraViewport()
+        state.searchMapCameraArea()
+        state.updateMapResultsSheetPosition(MapResultsSheetPosition.Expanded)
+        state.selectDiscoveryEvent(eventId)
+        val beforeDetail = state.mapDiscoveryState
+
+        state.openEvent(eventId)
+        assertTrue(state.navigateBack())
+
+        assertEquals(YardScapeRoute.Browse, state.route)
+        assertEquals(beforeDetail, state.mapDiscoveryState)
+    }
+
+    @Test
+    fun blockingASelectedEventRemovesItsMarkerAndClearsMapSelection() {
+        val state = YardScapeAppState()
+        val eventId = SeededYardSaleData.ESTATE_TOOLS_EVENT_ID
+        assertTrue(state.selectDiscoveryEvent(eventId))
+
+        assertTrue(state.blockHostForEvent(eventId))
+
+        assertFalse(state.mapDiscoveryState.markers.any { it.eventId == eventId })
+        assertEquals(null, state.mapDiscoveryState.selectedEventId)
+        assertIs<LocationRevealState.Blocked>(state.detailStateFor(eventId)?.revealState)
+    }
+
+    @Test
+    fun offlineAppStartsWithADegradedMapWhileKeepingListResults() {
+        val state = YardScapeAppState(dataAvailability = AppDataAvailability.Offline)
+
+        assertEquals(MapAvailability.Offline, state.mapDiscoveryState.mapAvailability)
+        assertEquals(2, state.discoveryState().items.size)
+        assertEquals(2, state.mapDiscoveryState.markers.size)
+    }
+
+    @Test
+    fun repeatedLocationRequestsAreRejectedWhileOneIsPending() {
+        val state = YardScapeAppState()
+
+        assertTrue(state.requestApproximateLocation())
+        assertFalse(state.requestApproximateLocation())
+    }
+
+    @Test
+    fun searchThisAreaUpdatesBothMapMarkersAndListResults() {
+        val state = YardScapeAppState()
+        state.updateMapCameraViewport(
+            MapViewport(
+                center = ViewportCenter(48.8, -123.8),
+                zoomLevel = 14.0,
+            ),
+        )
+        state.settleMapCameraViewport()
+
+        state.searchMapCameraArea()
+
+        assertTrue(state.discoveryState().items.isEmpty())
+        assertTrue(state.mapDiscoveryState.markers.isEmpty())
     }
 }

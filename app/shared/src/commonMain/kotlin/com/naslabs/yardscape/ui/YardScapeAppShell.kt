@@ -37,7 +37,7 @@ fun YardScapeAppShell(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentAlignment = Alignment.TopCenter,
         ) {
-            Box(modifier = Modifier.widthIn(max = 960.dp).fillMaxSize()) {
+            Box(modifier = Modifier.widthIn(max = 1280.dp).fillMaxSize()) {
                 content()
             }
         }
