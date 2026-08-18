@@ -12,6 +12,34 @@ import kotlin.test.assertTrue
 
 class ShopperRsvpStateTest {
     @Test
+    fun rsvpActionIsAvailableOnlyBeforeAcceptanceOrWhileRequestIsPending() {
+        val detail = MockScenarioCatalog.createAppState(MockScenarioId.NewShopper)
+            .detailStateFor(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+            ?.detail
+        assertNotNull(detail)
+        val exactAddress = MockScenarioCatalog.createAppState(MockScenarioId.AcceptedAccess)
+            .myRsvpItems()
+            .first { it.state == ShopperRsvpUiState.Accepted }
+            .exactAddress
+        assertNotNull(exactAddress)
+
+        val expectedVisibility = listOf(
+            LocationRevealState.NotRequested to true,
+            LocationRevealState.Pending to true,
+            LocationRevealState.Revoked to false,
+            LocationRevealState.Expired to false,
+            LocationRevealState.Cancelled to false,
+            LocationRevealState.Blocked to false,
+            LocationRevealState.Revealed(exactAddress) to false,
+        )
+
+        expectedVisibility.forEach { (revealState, expected) ->
+            val state = EventDetailState(detail = detail, revealState = revealState)
+            assertEquals(expected, state.shouldShowRsvpAction, "Unexpected RSVP action for $revealState")
+        }
+    }
+
+    @Test
     fun deterministicScenariosCoverEveryShopperRsvpState() {
         val expected = mapOf(
             MockScenarioId.PendingRsvp to ShopperRsvpUiState.Requested,

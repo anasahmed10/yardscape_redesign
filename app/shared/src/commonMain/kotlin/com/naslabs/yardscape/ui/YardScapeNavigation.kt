@@ -179,6 +179,7 @@ object YardScapeTestTags {
     const val BrowseScreen: String = "browse-screen"
     const val LocationAccessPanel: String = "event-detail-location-access"
     const val ExactLocationContent: String = "event-detail-exact-location"
+    const val DirectionsAction: String = "event-detail-directions-action"
     const val RsvpAction: String = "event-detail-rsvp-action"
     const val RsvpConfirmAction: String = "rsvp-confirm-action"
     const val AppShell: String = "app-shell"
@@ -1113,8 +1114,8 @@ data class EventDetailState(
     val shouldShowRsvpAction: Boolean =
         detail.status == EventStatus.PUBLISHED &&
             attendanceState == EventAttendanceState.Available &&
-            revealState !is LocationRevealState.Revealed &&
-            revealState !is LocationRevealState.Blocked
+            (revealState is LocationRevealState.NotRequested ||
+                revealState is LocationRevealState.Pending)
 }
 
 sealed interface AppDataAvailability {

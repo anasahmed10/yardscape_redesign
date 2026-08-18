@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -30,6 +31,8 @@ class RsvpRevealSmokeTest {
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("123 Cedar Street", substring = true)
             .assertCountEquals(0)
+        composeRule.onAllNodesWithTag(YardScapeTestTags.DirectionsAction)
+            .assertCountEquals(0)
 
         composeRule.onNodeWithTag(YardScapeTestTags.RsvpAction)
             .performClick()
@@ -39,5 +42,7 @@ class RsvpRevealSmokeTest {
         composeRule.onNodeWithTag(YardScapeTestTags.ExactLocationContent)
             .assertIsDisplayed()
             .assertTextContains("123 Cedar Street", substring = true)
+        composeRule.onNodeWithTag(YardScapeTestTags.DirectionsAction)
+            .assertIsDisplayed()
     }
 }

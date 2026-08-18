@@ -143,6 +143,7 @@ fun App(appState: YardScapeAppState) {
                         state = appState.selectedEventDetailState(),
                         onBack = { appState.navigateBack() },
                         onRsvp = { appState.openRsvp(currentRoute.eventId) },
+                        onDirections = { appState.requestDirections(currentRoute.eventId) },
                         onReport = { appState.openReport(currentRoute.eventId) },
                         onBlock = { appState.openBlock(currentRoute.eventId) },
                     )
