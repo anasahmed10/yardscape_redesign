@@ -2,12 +2,15 @@ package com.naslabs.yardscape.ui
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -17,13 +20,21 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.naslabs.yardscape.data.SeededYardSaleData
+
+internal fun shopperWorkflowContentMaxWidthFor(availableWidth: Dp): Dp =
+    when (shopperMarketplaceLayoutFor(availableWidth)) {
+        ShopperMarketplaceLayout.Compact -> availableWidth
+        ShopperMarketplaceLayout.Expanded -> minOf(availableWidth, 840.dp)
+    }
 
 internal data class LocationRevealPresentation(
     val statusLabel: String,
@@ -70,12 +81,16 @@ fun PublicEventDetailScreen(
     val blockActionLabel =
         if (state.revealState is LocationRevealState.Blocked) "Review blocked host" else "Block host"
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = spacing.large),
-        verticalArrangement = Arrangement.spacedBy(spacing.medium),
-    ) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .widthIn(max = shopperWorkflowContentMaxWidthFor(maxWidth))
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .padding(horizontal = spacing.large),
+            verticalArrangement = Arrangement.spacedBy(spacing.medium),
+        ) {
         item {
             Column(
                 modifier = Modifier.padding(top = spacing.small),
@@ -188,11 +203,12 @@ fun PublicEventDetailScreen(
                 }
             }
         }
-        item {
-            HorizontalDivider(
-                modifier = Modifier.padding(bottom = spacing.large),
-                color = MaterialTheme.colorScheme.outlineVariant,
-            )
+            item {
+                HorizontalDivider(
+                    modifier = Modifier.padding(bottom = spacing.large),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+            }
         }
     }
 }

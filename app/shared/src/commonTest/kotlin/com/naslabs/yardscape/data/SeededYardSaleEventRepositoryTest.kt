@@ -100,6 +100,90 @@ class SeededYardSaleEventRepositoryTest {
     }
 
     @Test
+    fun submitRsvpCannotRestoreRevokedOrExpiredAccess() {
+        listOf(LocationVisibility.REVOKED, LocationVisibility.EXPIRED).forEach { visibility ->
+            val shopperId = "shopper-${visibility.name.lowercase()}"
+            val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+            val restrictedRepository = SeededYardSaleEventRepository(
+                rsvps = listOf(
+                    com.naslabs.yardscape.domain.Rsvp(
+                        id = "restricted-$shopperId",
+                        eventId = eventId,
+                        shopperId = shopperId,
+                        status = RsvpStatus.ACCEPTED,
+                        locationVisibility = visibility,
+                    ),
+                ),
+            )
+
+            restrictedRepository.submitRsvp(eventId, shopperId)
+
+            assertEquals(visibility, restrictedRepository.rsvpFor(eventId, shopperId)?.locationVisibility)
+            assertNull(restrictedRepository.exactLocationFor(eventId, shopperId, now))
+        }
+    }
+
+    @Test
+    fun submitRsvpRejectsUnavailableEndedAndAtCapacityEvents() {
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        val baseEvent = SeededYardSaleData.events.first { it.id == eventId }
+        val unavailableEvents = listOf(
+            baseEvent.copy(status = EventStatus.DRAFT),
+            baseEvent.copy(status = EventStatus.CANCELLED),
+            baseEvent.copy(status = EventStatus.COMPLETED),
+            baseEvent.copy(status = EventStatus.HIDDEN),
+            baseEvent.copy(
+                saleWindow = com.naslabs.yardscape.domain.SaleWindow(
+                    startsAtEpochMillis = now - 2_000L,
+                    endsAtEpochMillis = now - 1_000L,
+                ),
+            ),
+        )
+
+        unavailableEvents.forEach { event ->
+            val unavailableRepository = SeededYardSaleEventRepository(
+                events = listOf(event),
+                rsvps = emptyList(),
+            )
+
+            assertNull(unavailableRepository.submitRsvp(eventId, "shopper-unavailable"))
+            assertNull(unavailableRepository.rsvpFor(eventId, "shopper-unavailable"))
+        }
+
+        val capacityRepository = SeededYardSaleEventRepository(
+            events = listOf(baseEvent),
+            rsvps = emptyList(),
+            atCapacityEventIds = setOf(eventId),
+        )
+
+        assertNull(capacityRepository.submitRsvp(eventId, "shopper-capacity"))
+        assertNull(capacityRepository.rsvpFor(eventId, "shopper-capacity"))
+    }
+
+    @Test
+    fun shopperCancelledRsvpCanBeSubmittedAgain() {
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        val shopperId = "shopper-cancelled-then-returned"
+        val cancelledRepository = SeededYardSaleEventRepository(
+            rsvps = listOf(
+                com.naslabs.yardscape.domain.Rsvp(
+                    id = "cancelled-rsvp",
+                    eventId = eventId,
+                    shopperId = shopperId,
+                    status = RsvpStatus.CANCELLED,
+                    locationVisibility = LocationVisibility.PUBLIC_APPROXIMATION,
+                ),
+            ),
+        )
+
+        val submitted = cancelledRepository.submitRsvp(eventId, shopperId)
+
+        assertEquals(RsvpStatus.ACCEPTED, submitted?.status)
+        assertEquals(LocationVisibility.RSVP_ACCEPTED, submitted?.locationVisibility)
+        assertNotNull(cancelledRepository.exactLocationFor(eventId, shopperId, now))
+    }
+
+    @Test
     fun shopperRsvpLifecycleMutationsClearProtectedLocation() {
         val shopperId = "shopper-lifecycle"
         val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID

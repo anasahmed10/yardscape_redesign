@@ -1,5 +1,6 @@
 package com.naslabs.yardscape.ui
 
+import androidx.compose.ui.unit.dp
 import com.naslabs.yardscape.domain.ExactAddress
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -52,5 +53,11 @@ class LocationRevealPresentationTest {
             assertFalse(presentation.toString().contains(protectedAddress.streetAddress))
             assertFalse(presentation.toString().contains(protectedAddress.accessInstructions.orEmpty()))
         }
+    }
+
+    @Test
+    fun shopperWorkflowContentStaysMobileWidthAndCapsExpandedReadingWidth() {
+        assertEquals(390.dp, shopperWorkflowContentMaxWidthFor(390.dp))
+        assertEquals(840.dp, shopperWorkflowContentMaxWidthFor(1_440.dp))
     }
 }

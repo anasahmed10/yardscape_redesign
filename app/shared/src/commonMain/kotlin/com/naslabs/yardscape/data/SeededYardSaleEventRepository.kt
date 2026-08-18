@@ -9,6 +9,7 @@ import com.naslabs.yardscape.domain.LocationVisibility
 import com.naslabs.yardscape.domain.PublicEventPreview
 import com.naslabs.yardscape.domain.PublicLocation
 import com.naslabs.yardscape.domain.Rsvp
+import com.naslabs.yardscape.domain.RsvpEligibilityPolicy
 import com.naslabs.yardscape.domain.RsvpStatus
 import com.naslabs.yardscape.domain.SaleWindow
 import com.naslabs.yardscape.domain.UserProfile
@@ -20,6 +21,7 @@ import com.naslabs.yardscape.domain.toPublicPreview
 class SeededYardSaleEventRepository(
     events: List<YardSaleEvent> = SeededYardSaleData.events,
     rsvps: List<Rsvp> = SeededYardSaleData.rsvps,
+    private val atCapacityEventIds: Set<String> = emptySet(),
 ) : YardSaleEventRepository {
     private val events: MutableList<YardSaleEvent> = events.toMutableList()
     private val rsvps: MutableList<Rsvp> = rsvps.toMutableList()
@@ -69,8 +71,17 @@ class SeededYardSaleEventRepository(
 
     override fun submitRsvp(eventId: String, shopperId: String): Rsvp? {
         val event = events.firstOrNull { it.id == eventId } ?: return null
-        if (event.status != EventStatus.PUBLISHED || event.saleWindow.hasEnded(SeededYardSaleData.BASE_NOW_EPOCH_MILLIS)) {
-            return rsvpFor(eventId, shopperId)
+        val currentRsvp = rsvpFor(eventId, shopperId)
+        if (!RsvpEligibilityPolicy.canSubmit(
+                eventStatus = event.status,
+                saleWindow = event.saleWindow,
+                currentLocationVisibility = currentRsvp?.locationVisibility,
+                nowEpochMillis = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
+                isBlocked = false,
+                isAtCapacity = eventId in atCapacityEventIds,
+            )
+        ) {
+            return currentRsvp
         }
 
         val acceptedRsvp = Rsvp(
