@@ -20,6 +20,15 @@ import kotlin.test.assertTrue
 
 class ShopperRsvpStateTest {
     @Test
+    fun rsvpItemsKeepThePublicPhotoReferenceUsedByBrowseAndSavedRows() {
+        val item = YardScapeAppState(
+            shopperId = SeededYardSaleData.SHOPPER_WITH_ACCEPTED_ACCESS_ID,
+        ).myRsvpItems().single { it.eventId == SeededYardSaleData.ESTATE_TOOLS_EVENT_ID }
+
+        assertEquals("seed://marin-tools-records", item.photoReference)
+    }
+
+    @Test
     fun acceptedActiveAccessCannotReopenRsvpAndKeepsMyFindsOrigin() {
         val eventId = SeededYardSaleData.ESTATE_TOOLS_EVENT_ID
         val expectedDetailRoute = YardScapeRoute.EventDetail(

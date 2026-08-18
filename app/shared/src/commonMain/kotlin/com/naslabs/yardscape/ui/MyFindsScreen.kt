@@ -5,11 +5,12 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -54,8 +55,8 @@ fun MyFindsScreen(
         val layout = myFindsWorkspaceLayoutFor(maxWidth.value.toInt())
         LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
-                .widthIn(max = 1120.dp)
+                .width(myFindsWorkspaceContentWidthFor(maxWidth))
+                .fillMaxHeight()
                 .align(Alignment.TopCenter)
                 .testTag(YardScapeTestTags.MyFindsScreen)
                 .padding(horizontal = spacing.large),
@@ -233,8 +234,8 @@ private fun MyFindsRsvpRow(
     dateLabel = item.dateLabel,
     locationLabel = item.approximateLocationLabel,
     statusLabel = item.state.label,
-    description = item.state.nextAction,
-    photoReference = null,
+    description = item.supportingCopy,
+    photoReference = item.photoReference,
     layout = layout,
 ) {
     if (ShopperRsvpAction.Directions in item.visibleActions) {

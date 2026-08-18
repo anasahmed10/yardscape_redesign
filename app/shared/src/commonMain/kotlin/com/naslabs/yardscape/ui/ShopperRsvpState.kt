@@ -42,6 +42,7 @@ data class ShopperRsvpItem(
     val exactAddress: ExactAddress?,
     val reminderAdded: Boolean,
     val calendarExportPrepared: Boolean,
+    val photoReference: String? = null,
 ) {
     val canCancel: Boolean
         get() = state in setOf(
@@ -62,6 +63,15 @@ data class ShopperRsvpItem(
 
     val canExportCalendar: Boolean
         get() = canAddReminder
+
+    internal val supportingCopy: String
+        get() = when {
+            state == ShopperRsvpUiState.Accepted && canOpenDirections ->
+                "Protected location and directions are available."
+            state == ShopperRsvpUiState.Accepted ->
+                "RSVP accepted. Protected location access is not currently available."
+            else -> state.nextAction
+        }
 
     internal val visibleActions: List<ShopperRsvpAction>
         get() = buildList {

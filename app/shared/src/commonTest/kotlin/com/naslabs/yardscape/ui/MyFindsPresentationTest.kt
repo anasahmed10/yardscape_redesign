@@ -1,6 +1,7 @@
 package com.naslabs.yardscape.ui
 
 import com.naslabs.yardscape.domain.ExactAddress
+import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -117,6 +118,27 @@ class MyFindsPresentationTest {
     fun workspaceUsesCompactAndExpandedDensityAtTargetWidths() {
         assertEquals(MyFindsWorkspaceLayout.Compact, myFindsWorkspaceLayoutFor(390))
         assertEquals(MyFindsWorkspaceLayout.Expanded, myFindsWorkspaceLayoutFor(1440))
+        assertEquals(390.dp, myFindsWorkspaceContentWidthFor(390.dp))
+        assertEquals(1120.dp, myFindsWorkspaceContentWidthFor(1440.dp))
+    }
+
+    @Test
+    fun acceptedRsvpSupportingCopyMatchesProtectedLocationEligibility() {
+        val withActiveGrant = rsvpItem(
+            state = ShopperRsvpUiState.Accepted,
+            group = RsvpGroup.Upcoming,
+            exactAddress = exactAddress(),
+        )
+        val withoutActiveGrant = rsvpItem(
+            state = ShopperRsvpUiState.Accepted,
+            group = RsvpGroup.Upcoming,
+        )
+
+        assertEquals("Protected location and directions are available.", withActiveGrant.supportingCopy)
+        assertEquals(
+            "RSVP accepted. Protected location access is not currently available.",
+            withoutActiveGrant.supportingCopy,
+        )
     }
 
     private fun rsvpItem(

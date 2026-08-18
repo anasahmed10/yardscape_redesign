@@ -576,6 +576,7 @@ class YardScapeAppState(
                     },
                     reminderAdded = rsvp.eventId in reminderEventIds,
                     calendarExportPrepared = rsvp.eventId in calendarExportEventIds,
+                    photoReference = detail.photos.firstOrNull()?.url,
                 )
             }.sortedWith(compareBy({ it.group.ordinal }, { it.dateLabel }))
         }
