@@ -99,6 +99,32 @@ class YardScapeAppStateTest {
     }
 
     @Test
+    fun returningFromAnRsvpFlowRestoresTheRsvpsSection() {
+        val state = YardScapeAppState()
+
+        state.openMyFinds(MyFindsSection.Rsvps)
+        state.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+        state.openRsvp(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+
+        assertTrue(state.navigateBack())
+        assertTrue(state.navigateBack())
+        assertEquals(YardScapeRoute.MyFinds(MyFindsSection.Rsvps), state.route)
+    }
+
+    @Test
+    fun returningFromAnEventSafetyFlowRestoresTheRsvpsSection() {
+        val state = YardScapeAppState()
+
+        state.openMyFinds(MyFindsSection.Rsvps)
+        state.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+        state.openReport(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+
+        assertTrue(state.navigateBack())
+        assertTrue(state.navigateBack())
+        assertEquals(YardScapeRoute.MyFinds(MyFindsSection.Rsvps), state.route)
+    }
+
+    @Test
     fun revokedAndExpiredAccessHideExactAddress() {
         val revokedState = YardScapeAppState(
             repository = SeededYardSaleEventRepository(

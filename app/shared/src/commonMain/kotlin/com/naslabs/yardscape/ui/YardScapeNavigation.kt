@@ -100,6 +100,7 @@ sealed interface YardScapeRoute {
     data class Rsvp(
         val eventId: String,
         val origin: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse,
+        val myFindsSection: MyFindsSection = MyFindsSection.Saved,
     ) : YardScapeRoute {
         init {
             require(origin == YardScapePrimaryDestination.Browse || origin == YardScapePrimaryDestination.MyFinds)
@@ -114,6 +115,7 @@ sealed interface YardScapeRoute {
         val eventId: String,
         val action: ShopperSafetyAction,
         val origin: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse,
+        val myFindsSection: MyFindsSection = MyFindsSection.Saved,
     ) : YardScapeRoute {
         init {
             require(origin == YardScapePrimaryDestination.Browse || origin == YardScapePrimaryDestination.MyFinds)
@@ -342,8 +344,16 @@ class YardScapeAppState(
                 YardScapePrimaryDestination.MyFinds -> YardScapeRoute.MyFinds(current.myFindsSection)
                 else -> YardScapeRoute.Browse
             }
-            is YardScapeRoute.Rsvp -> YardScapeRoute.EventDetail(current.eventId, current.origin)
-            is YardScapeRoute.EventSafety -> YardScapeRoute.EventDetail(current.eventId, current.origin)
+            is YardScapeRoute.Rsvp -> YardScapeRoute.EventDetail(
+                current.eventId,
+                current.origin,
+                current.myFindsSection,
+            )
+            is YardScapeRoute.EventSafety -> YardScapeRoute.EventDetail(
+                current.eventId,
+                current.origin,
+                current.myFindsSection,
+            )
             is YardScapeRoute.HostCreateEdit -> YardScapeRoute.Host
             is YardScapeRoute.HostAttendees -> YardScapeRoute.Host
         }
@@ -553,25 +563,24 @@ class YardScapeAppState(
     }
 
     fun openRsvp(eventId: String) {
+        val detailRoute = (route as? YardScapeRoute.EventDetail)?.takeIf { it.eventId == eventId }
+        val origin = detailRoute?.origin ?: YardScapePrimaryDestination.Browse
+        val myFindsSection = detailRoute?.myFindsSection ?: MyFindsSection.Saved
         if (eventId in blockedEventIds) {
-            route = YardScapeRoute.EventDetail(eventId)
+            route = YardScapeRoute.EventDetail(eventId, origin, myFindsSection)
             return
         }
         val gate = protectedActionDecision(ProtectedAction.Rsvp)
         if (gate is ProtectedActionDecision.SignInRequired) {
             pendingProtectedAction = PendingProtectedAction(
                 ProtectedAction.Rsvp,
-                YardScapeRoute.EventDetail(eventId),
+                YardScapeRoute.EventDetail(eventId, origin, myFindsSection),
             )
             accountState = accountState.copy(signInReason = gate.message)
             route = YardScapeRoute.Account
             return
         }
-        val origin = (route as? YardScapeRoute.EventDetail)
-            ?.takeIf { it.eventId == eventId }
-            ?.origin
-            ?: YardScapePrimaryDestination.Browse
-        route = YardScapeRoute.Rsvp(eventId, origin)
+        route = YardScapeRoute.Rsvp(eventId, origin, myFindsSection)
     }
 
     fun confirmRsvp(eventId: String) {
@@ -579,19 +588,17 @@ class YardScapeAppState(
             openRsvp(eventId)
             return
         }
+        val rsvpRoute = (route as? YardScapeRoute.Rsvp)?.takeIf { it.eventId == eventId }
+        val origin = rsvpRoute?.origin ?: route.primaryDestination.takeIf {
+            it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.MyFinds
+        } ?: YardScapePrimaryDestination.Browse
+        val myFindsSection = rsvpRoute?.myFindsSection ?: MyFindsSection.Saved
         if (eventId in blockedEventIds) {
-            val origin = route.primaryDestination.takeIf {
-                it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.MyFinds
-            } ?: YardScapePrimaryDestination.Browse
-            route = YardScapeRoute.EventDetail(eventId, origin)
+            route = YardScapeRoute.EventDetail(eventId, origin, myFindsSection)
             return
         }
         repository.submitRsvp(eventId, shopperId)
-        val origin = (route as? YardScapeRoute.Rsvp)
-            ?.takeIf { it.eventId == eventId }
-            ?.origin
-            ?: YardScapePrimaryDestination.Browse
-        route = YardScapeRoute.EventDetail(eventId, origin)
+        route = YardScapeRoute.EventDetail(eventId, origin, myFindsSection)
     }
 
     fun openReport(eventId: String) {
@@ -608,10 +615,16 @@ class YardScapeAppState(
         requestedOrigin: YardScapePrimaryDestination? = null,
     ) {
         val detail = repository.publicEventDetail(eventId) ?: return
+        val detailRoute = route as? YardScapeRoute.EventDetail
         val origin = requestedOrigin ?: route.primaryDestination.takeIf {
             it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.MyFinds
         } ?: YardScapePrimaryDestination.Browse
-        val target = YardScapeRoute.EventSafety(eventId, action, origin)
+        val target = YardScapeRoute.EventSafety(
+            eventId,
+            action,
+            origin,
+            detailRoute?.myFindsSection ?: MyFindsSection.Saved,
+        )
         shopperSafetyState = shopperSafetyState
             ?.takeIf { it.eventId == eventId && it.action == action }
             ?.copy(isBlocked = eventId in blockedEventIds)
