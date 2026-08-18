@@ -444,19 +444,27 @@ class YardScapeNavigationTest {
 
     @Test
     fun hostCancelAndHideSynchronouslyCloseDraftedComposer() = runTest {
-        suspend fun verify(mutate: (YardScapeAppState) -> Unit) {
+        suspend fun verify(
+            verifyProtectedDirections: Boolean = false,
+            mutate: (YardScapeAppState) -> Unit,
+        ) {
             val state = messagingState(
                 shopperId = SeededAttendeeIds.Accepted,
                 activeUserRole = UserRole.HOST,
             )
             openDraftedThread(state)
+            if (verifyProtectedDirections) assertTrue(state.requestDirections(MESSAGE_EVENT_ID) != null)
 
             mutate(state)
 
             assertComposerClosedAndDraftCleared(state)
+            if (verifyProtectedDirections) {
+                assertNull(state.directionsEventId)
+                assertFalse(state.detailStateFor(MESSAGE_EVENT_ID)?.revealState is LocationRevealState.Revealed)
+            }
         }
 
-        verify { it.cancelHostEvent(MESSAGE_EVENT_ID) }
+        verify(verifyProtectedDirections = true) { it.cancelHostEvent(MESSAGE_EVENT_ID) }
         verify { it.hideHostEvent(MESSAGE_EVENT_ID) }
     }
 

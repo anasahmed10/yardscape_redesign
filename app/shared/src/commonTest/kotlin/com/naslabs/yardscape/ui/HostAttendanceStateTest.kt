@@ -119,6 +119,7 @@ class HostAttendanceStateTest {
         val shopperId = SeededAttendeeIds.Accepted
         val appState = YardScapeAppState(shopperId = shopperId)
         assertNotNull(appState.myRsvpItems().single { it.eventId == eventId }.exactAddress)
+        assertNotNull(appState.requestDirections(eventId))
 
         assertTrue(appState.requestHostAttendeeAction(eventId, shopperId, HostAttendeeAction.Revoke))
         assertNotNull(appState.myRsvpItems().single { it.eventId == eventId }.exactAddress)
@@ -128,8 +129,10 @@ class HostAttendanceStateTest {
         val shopperItem = appState.myRsvpItems().single { it.eventId == eventId }
         assertEquals(HostAttendeeUiState.Revoked, hostItem?.state)
         assertFalse(hostItem?.hasLocationAccess == true)
+        assertFalse(hostItem?.canMessageAttendee == true)
         assertEquals(ShopperRsvpUiState.Revoked, shopperItem.state)
         assertNull(shopperItem.exactAddress)
+        assertNull(appState.directionsEventId)
     }
 
     @Test

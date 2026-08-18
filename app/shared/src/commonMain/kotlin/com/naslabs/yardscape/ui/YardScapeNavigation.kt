@@ -1427,7 +1427,10 @@ class YardScapeAppState(
         publishHostEvent(HostEditorState(draft = draft, validationErrors = emptyList()))
 
     fun cancelHostEvent(eventId: String) {
-        if (repository.cancelHostEvent(eventId)) synchronizeMessagingComposer()
+        if (repository.cancelHostEvent(eventId)) {
+            directionsEventId = null
+            synchronizeMessagingComposer()
+        }
         synchronizeDiscoveryMapMarkers()
         route = YardScapeRoute.HostCreateEdit(eventId)
     }
