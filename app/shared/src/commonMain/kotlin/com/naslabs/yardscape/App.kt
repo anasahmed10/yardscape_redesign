@@ -129,7 +129,9 @@ fun App(appState: YardScapeAppState) {
                         onEditEvent = appState::openHostCreateEdit,
                         onManageAttendees = { appState.openHostAttendees(it) },
                     )
-                    YardScapeRoute.Messages -> MessagesScreen()
+                    YardScapeRoute.Messages,
+                    is YardScapeRoute.MessageThread,
+                    -> MessagesScreen()
                     YardScapeRoute.Account -> AccountScreen(
                         state = appState.accountState,
                         onSignIn = appState::signInMock,
