@@ -11,6 +11,23 @@ import kotlin.test.assertTrue
 
 class MapDiscoveryPresentationTest {
     @Test
+    fun thousandPublicMarkersClusterDeterministicallyAndRepresentEveryEventOnce() {
+        val markers = stressMarkers()
+
+        val forward = mapPresentationFor(markers)
+        val reversed = mapPresentationFor(markers.reversed())
+        val forwardIds = forward.clusters.flatMap { it.eventIds } + forward.unclusteredMarkers.map { it.eventId }
+        val reversedIds = reversed.clusters.flatMap { it.eventIds } + reversed.unclusteredMarkers.map { it.eventId }
+
+        assertEquals(markers.map { it.eventId }.toSet(), forwardIds.toSet())
+        assertEquals(markers.size, forwardIds.size)
+        assertEquals(forward.clusters, reversed.clusters)
+        assertEquals(forward.unclusteredMarkers, reversed.unclusteredMarkers)
+        assertEquals(markers.map { it.eventId }.toSet(), reversedIds.toSet())
+        assertEquals(markers.size, reversedIds.size)
+    }
+
+    @Test
     fun nearbyMarkersClusterWhileSingleMarkersRemainIndividuallySelectable() {
         val mapleOne = marker("maple-1", 47.6150, -122.2100, "Maple Ridge")
         val mapleTwo = marker("maple-2", 47.6153, -122.2102, "Maple Ridge")
@@ -75,4 +92,17 @@ class MapDiscoveryPresentationTest {
                 displayLabel = label,
             ),
         )
+
+    private fun stressMarkers(): List<PublicEventMarker> = buildList {
+        repeat(333) { group ->
+            val row = group / 18
+            val column = group % 18
+            val latitude = 30.0 + row * 0.05
+            val longitude = -120.0 + column * 0.05
+            add(marker("event-${group}-a", latitude, longitude, "Public area $group"))
+            add(marker("event-${group}-b", latitude, longitude + 0.01, "Public area $group"))
+            add(marker("event-${group}-c", latitude, longitude + 0.02, "Public area $group"))
+        }
+        add(marker("event-extra", 55.0, -100.0, "Public area extra"))
+    }
 }

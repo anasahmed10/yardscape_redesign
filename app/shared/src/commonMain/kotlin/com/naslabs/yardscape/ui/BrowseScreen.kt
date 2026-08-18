@@ -296,9 +296,11 @@ private fun MapDiscoveryExperience(
     onUseMyLocation: () -> Unit,
     onSheetPositionChanged: (MapResultsSheetPosition) -> Unit,
 ) {
-    val defaultPresentation = mapPresentationFor(mapState.markers)
-    val viewport = mapState.cameraViewportDraft ?: defaultPresentation.defaultViewport
-    val presentation = mapPresentationFor(mapState.markers, viewport.zoomLevel)
+    val defaultViewport = remember(mapState.markers) { defaultViewportFor(mapState.markers) }
+    val viewport = mapState.cameraViewportDraft ?: defaultViewport
+    val presentation = remember(mapState.markers, viewport.zoomLevel) {
+        mapPresentationFor(mapState.markers, viewport.zoomLevel)
+    }
     LaunchedEffect(mapState.cameraViewportDraft, mapState.viewportSearchReadiness) {
         if (mapState.viewportSearchReadiness == ViewportSearchReadiness.WaitingForDebounce) {
             delay(350)

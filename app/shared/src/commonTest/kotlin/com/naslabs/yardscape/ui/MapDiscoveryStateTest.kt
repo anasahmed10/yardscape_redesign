@@ -8,6 +8,7 @@ import com.naslabs.yardscape.domain.ViewportCenter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import com.naslabs.yardscape.map.PlatformMapCapability
 
@@ -65,6 +66,21 @@ class MapDiscoveryStateTest {
 
         val unknownSelection = filtered.selectEvent("blocked-or-filtered")
         assertEquals(null, unknownSelection.selectedEventId)
+    }
+
+    @Test
+    fun selectionAndSheetChangesKeepTheStableMarkerInputForMapPresentation() {
+        val maple = marker("maple", "Maple Ridge Sale", 47.615, -122.21)
+        val oldMill = marker("old-mill", "Old Mill Sale", 47.625, -122.23)
+        val state = MapDiscoveryState().synchronizeMarkers(listOf(maple, oldMill))
+
+        val selected = state.selectEvent(maple.eventId)
+        val movedSheet = selected.updateSheetPosition(MapResultsSheetPosition.HalfExpanded)
+
+        assertSame(state.markers, selected.markers)
+        assertSame(state.markers, movedSheet.markers)
+        assertEquals(maple.eventId, movedSheet.selectedEventId)
+        assertEquals(MapResultsSheetPosition.HalfExpanded, movedSheet.sheetPosition)
     }
 
     @Test
