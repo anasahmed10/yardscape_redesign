@@ -194,6 +194,73 @@ class YardScapeNavigationTest {
     }
 
     @Test
+    fun delayedHostEntryCannotCommitAfterRouteChangeRevocationOrSignOut() = runTest {
+        suspend fun verify(
+            mutate: (YardScapeAppState) -> Unit,
+            expectedRoute: YardScapeRoute,
+        ) {
+            val result = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessageThread>>()
+            val key = MarketplaceConversationKey(MESSAGE_EVENT_ID, SeededAttendeeIds.Accepted)
+            val state = YardScapeAppState(
+                shopperId = key.shopperId,
+                activeUserRole = UserRole.HOST,
+                initialRoute = YardScapeRoute.HostAttendees(key.eventId),
+                messagingRepository = TransitionMessagingRepository(key, result),
+            )
+
+            val open = async { state.openHostAttendeeMessage(key.eventId, key.shopperId) }
+            runCurrent()
+            mutate(state)
+            result.complete(MessagingRepositoryResult.Success(messageThread(key)))
+
+            assertFalse(open.await())
+            assertEquals(expectedRoute, state.route)
+            assertFalse(
+                state.messagingThreadState is MessagingThreadUiState.Loaded &&
+                    (state.messagingThreadState as MessagingThreadUiState.Loaded).presentation.canCompose,
+            )
+        }
+
+        verify(
+            mutate = { it.navigateTo(YardScapePrimaryDestination.Browse) },
+            expectedRoute = YardScapeRoute.Browse,
+        )
+        verify(
+            mutate = {
+                assertTrue(it.requestHostAttendeeAction(MESSAGE_EVENT_ID, SeededAttendeeIds.Accepted, HostAttendeeAction.Revoke))
+                assertTrue(it.confirmHostAttendeeAction())
+            },
+            expectedRoute = YardScapeRoute.HostAttendees(MESSAGE_EVENT_ID),
+        )
+        verify(
+            mutate = { it.signOutMock() },
+            expectedRoute = YardScapeRoute.Account,
+        )
+    }
+
+    @Test
+    fun delayedHostEntryCannotCrossASignOutAndSameRoleSignInSession() = runTest {
+        val result = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessageThread>>()
+        val key = MarketplaceConversationKey(MESSAGE_EVENT_ID, SeededAttendeeIds.Accepted)
+        val state = YardScapeAppState(
+            shopperId = key.shopperId,
+            activeUserRole = UserRole.HOST,
+            initialRoute = YardScapeRoute.Account,
+            messagingRepository = TransitionMessagingRepository(key, result),
+        )
+
+        val open = async { state.openHostAttendeeMessage(key.eventId, key.shopperId) }
+        runCurrent()
+        state.signOutMock()
+        state.signInMock(UserRole.HOST)
+        result.complete(MessagingRepositoryResult.Success(messageThread(key)))
+
+        assertFalse(open.await())
+        assertEquals(YardScapeRoute.Account, state.route)
+        assertFalse(state.messagingThreadState is MessagingThreadUiState.Loaded)
+    }
+
+    @Test
     fun viewSaleInvalidatesDelayedMessageSendBeforeLeavingTheThread() = runTest {
         val result = CompletableDeferred<MessagingRepositoryResult<MarketplaceMessage>>()
         val key = MarketplaceConversationKey(MESSAGE_EVENT_ID, SeededAttendeeIds.Accepted)

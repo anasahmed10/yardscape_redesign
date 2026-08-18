@@ -89,6 +89,14 @@ class MarketplaceMessagingPresentationTest {
         val presentation = marketplaceThreadPresentation(
             MessagingThreadPresentation(
                 thread = thread(
+                    messages = listOf(
+                        message(
+                            "message-0000002a",
+                            HOST_ID,
+                            "Meet at 123 Cedar Street, unit 7. Use the side gate.",
+                            2_000L,
+                        ),
+                    ),
                     composerAccess = MessagingComposerAccess.Closed(MessagingClosedReason.EVENT_CANCELLED),
                 ),
                 draft = "private draft",
@@ -101,6 +109,12 @@ class MarketplaceMessagingPresentationTest {
         assertTrue(presentation.showReportAction)
         assertTrue(presentation.showBlockAction)
         assertEquals(48.dp, presentation.eventAction.minimumHeight)
+        assertEquals(
+            "Message content hidden because this conversation is closed.",
+            presentation.messages.single().body,
+        )
+        assertFalse(presentation.messages.single().body.contains("123 Cedar Street"))
+        assertFalse(presentation.messages.single().body.contains("side gate"))
     }
 
     @Test

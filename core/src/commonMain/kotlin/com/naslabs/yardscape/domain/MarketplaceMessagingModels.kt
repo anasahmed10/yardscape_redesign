@@ -1,6 +1,8 @@
 package com.naslabs.yardscape.domain
 
 const val MARKETPLACE_MESSAGE_MAX_LENGTH: Int = 2_000
+const val CLOSED_MARKETPLACE_MESSAGE_BODY: String =
+    "Message content hidden because this conversation is closed."
 
 data class MarketplaceConversationKey(
     val eventId: String,
@@ -96,3 +98,18 @@ data class MarketplaceMessageThread(
             "hasEventPhoto=${eventPhoto != null}, messageCount=${messages.size}, " +
             "composerAccess=$composerAccess)"
 }
+
+/**
+ * Removes arbitrary private message text as soon as conversation access closes while retaining
+ * sender, time, delivery, and ordering metadata so the history remains useful and reportable.
+ */
+fun MarketplaceMessageThread.withPrivacySafeAccess(
+    access: MessagingComposerAccess,
+): MarketplaceMessageThread = copy(
+    messages = if (access is MessagingComposerAccess.Closed) {
+        messages.map { message -> message.copy(body = CLOSED_MARKETPLACE_MESSAGE_BODY) }
+    } else {
+        messages
+    },
+    composerAccess = access,
+)

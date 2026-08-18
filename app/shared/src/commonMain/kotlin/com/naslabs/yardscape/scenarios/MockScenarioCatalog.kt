@@ -376,7 +376,6 @@ object MockScenarioCatalog {
                     conversation(
                         eventId = SeededYardSaleData.ESTATE_TOOLS_EVENT_ID,
                         shopperId = SeededYardSaleData.SHOPPER_WITH_ACCEPTED_ACCESS_ID,
-                        senderId = SeededYardSaleData.HOST_AVERY_ID,
                         body = "Thanks for your RSVP. I will see you at the sale.",
                     ),
                 ),
@@ -579,7 +578,7 @@ private const val EXPIRED_MESSAGES_SHOPPER_ID = "scenario-expired-messages-shopp
 private fun conversation(
     eventId: String = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID,
     shopperId: String,
-    senderId: String = SeededYardSaleData.HOST_AVERY_ID,
+    senderId: String = SeededYardSaleData.events.single { it.id == eventId }.host.id,
     body: String = "Thanks for reaching out about the sale.",
     deliveryState: MessageDeliveryState = MessageDeliveryState.SENT,
 ): SeededMessagingConversation = SeededMessagingConversation(

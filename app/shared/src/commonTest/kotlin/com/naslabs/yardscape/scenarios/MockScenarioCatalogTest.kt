@@ -216,9 +216,25 @@ class MockScenarioCatalogTest {
             val closed = MockScenarioCatalog.createAppState(id)
             assertTrue(closed.loadMessagingInbox())
             val summary = assertIs<MessagingInboxUiState.Loaded>(closed.messagingInboxState).threads.single()
+            listOf("123 Cedar Street", "Private Unit 7B", "side gate by the blue planter").forEach { protectedText ->
+                assertFalse(summary.lastMessagePreview.orEmpty().contains(protectedText), id.name)
+            }
             assertTrue(closed.openMessageThread(summary.conversationId))
-            assertIs<MessagingComposerAccess.Closed>(
-                assertIs<MessagingThreadUiState.Loaded>(closed.messagingThreadState).presentation.composerAccess,
+            val presentation = assertIs<MessagingThreadUiState.Loaded>(closed.messagingThreadState).presentation
+            assertIs<MessagingComposerAccess.Closed>(presentation.composerAccess)
+            assertEquals(
+                "Message content hidden because this conversation is closed.",
+                presentation.messages.single().body,
+                id.name,
+            )
+            val hostId = SeededYardSaleData.events.single {
+                it.id == presentation.thread.conversationKey.eventId
+            }.host.id
+            assertTrue(
+                presentation.messages.all { message ->
+                    message.senderId == hostId || message.senderId == presentation.thread.conversationKey.shopperId
+                },
+                id.name,
             )
         }
 

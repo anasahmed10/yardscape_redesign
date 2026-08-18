@@ -169,6 +169,44 @@ class MarketplaceMessagingStateTest {
     }
 
     @Test
+    fun accessTransitionImmediatelyHidesProtectedBodiesFromLoadedState() = runTest {
+        var access: MessagingComposerAccess = MessagingComposerAccess.Open
+        val protectedBody = "Meet at 123 Cedar Street by the side gate"
+        val repository = ControllableRepository(
+            thread = thread(
+                messages = listOf(
+                    MarketplaceMessage(
+                        id = "message-0000002a",
+                        conversationId = CONVERSATION_ID,
+                        senderId = HOST.userId,
+                        body = protectedBody,
+                        sentAtEpochMillis = NOW,
+                        deliveryState = MessageDeliveryState.SENT,
+                    ),
+                ),
+            ),
+        )
+        val state = MarketplaceMessagingState(repository, { SHOPPER }, { _, _ -> access })
+        state.loadInbox()
+        assertTrue(state.openThread(CONVERSATION_ID))
+        assertEquals(
+            protectedBody,
+            assertIs<MessagingThreadUiState.Loaded>(state.threadState).presentation.messages.single().body,
+        )
+
+        access = MessagingComposerAccess.Closed(MessagingClosedReason.LOCATION_ACCESS_REVOKED)
+        state.synchronizeComposerAccess()
+
+        val closed = assertIs<MessagingThreadUiState.Loaded>(state.threadState).presentation
+        assertEquals(
+            "Message content hidden because this conversation is closed.",
+            closed.messages.single().body,
+        )
+        assertFalse(closed.thread.messages.single().body.contains("123 Cedar Street"))
+        assertFalse(closed.thread.messages.single().body.contains("side gate"))
+    }
+
+    @Test
     fun failureDiagnosticsDoNotEchoRepositoryMessages() {
         val privateFailure = "Server rejected directions to 123 Cedar Street by the side gate"
         val diagnosticText = listOf(
@@ -484,12 +522,13 @@ class MarketplaceMessagingStateTest {
             key: MarketplaceConversationKey = KEY,
             conversationId: String = CONVERSATION_ID,
             composerAccess: MessagingComposerAccess = MessagingComposerAccess.Open,
+            messages: List<MarketplaceMessage> = emptyList(),
         ) = MarketplaceMessageThread(
             conversationId = conversationId,
             conversationKey = key,
             eventTitle = "Sale",
             eventPhoto = null,
-            messages = emptyList(),
+            messages = messages,
             composerAccess = composerAccess,
         )
 

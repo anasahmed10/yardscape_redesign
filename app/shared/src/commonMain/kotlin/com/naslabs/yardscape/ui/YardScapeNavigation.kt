@@ -1271,8 +1271,21 @@ class YardScapeAppState(
         val key = MarketplaceConversationKey(eventId, shopperId)
         val actor = MessagingActor(hostId, UserRole.HOST)
         if (currentMessagingComposerAccess(key, actor) !is MessagingComposerAccess.Open) return false
+        val origin = route
+        val navigationVersion = messagingNavigationVersion
+        val sessionVersion = messagingSessionVersion
 
         val result = marketplaceMessagingRepository.threadFor(key, actor)
+        if (route != origin ||
+            messagingNavigationVersion != navigationVersion ||
+            messagingActor() != actor ||
+            messagingSessionVersion != sessionVersion ||
+            !accountState.isSignedIn ||
+            activeUserRole != UserRole.HOST
+        ) return false
+        val currentEvent = repository.hostEvent(eventId) ?: return false
+        if (currentEvent.host.id != hostId) return false
+        if (currentMessagingComposerAccess(key, actor) !is MessagingComposerAccess.Open) return false
         val thread = (result as? MessagingRepositoryResult.Success)?.value ?: return false
         if (thread.conversationKey != key || thread.composerAccess !is MessagingComposerAccess.Open) return false
         val opaqueId = MarketplaceConversationId.parse(thread.conversationId) ?: return false

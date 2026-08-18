@@ -15,6 +15,8 @@ import com.naslabs.yardscape.domain.MessagingComposerAccess
 import com.naslabs.yardscape.domain.PublicEventPreview
 import com.naslabs.yardscape.domain.UserRole
 import com.naslabs.yardscape.domain.toPublicPreview
+import com.naslabs.yardscape.domain.withPrivacySafeAccess
+import kotlin.uuid.Uuid
 
 enum class SeededMessageOutcome {
     Success,
@@ -44,22 +46,26 @@ class SeededMarketplaceMessagingRepository(
     eventPreviews: List<PublicEventPreview> = SeededYardSaleData.events.map { it.toPublicPreview() },
     private val behavior: SeededMessagingBehavior = SeededMessagingBehavior(),
     initialConversations: List<SeededMessagingConversation> = emptyList(),
+    private val opaqueIdTokenSource: () -> String = { Uuid.random().toHexString() },
 ) : MarketplaceMessagingRepository {
     private val eventPreviewsById = eventPreviews.associateBy { it.id }
     private val conversationsByKey = linkedMapOf<MarketplaceConversationKey, ConversationRecord>()
-    private var nextConversationNumber = 1
-    private var nextMessageNumber = 1
+    private val issuedOpaqueTokens = mutableSetOf<String>()
     private var nextDeliveryOutcomeIndex = 0
 
     init {
         initialConversations.forEach { seed ->
             val record = createConversation(seed.conversationKey)
-            accessSource.accessContextFor(seed.conversationKey)?.let { context ->
-                record.authorizeParticipants(context)
-            }
+            val context = accessSource.accessContextFor(seed.conversationKey)
+                ?: throw IllegalArgumentException("Seeded conversations require an access context.")
+            record.authorizeParticipants(context)
             seed.messages.forEach { message ->
+                require(
+                    message.senderId == context.hostId ||
+                        message.senderId == context.conversationKey.shopperId,
+                ) { "Seeded message sender must be a conversation participant." }
                 val stored = MarketplaceMessage(
-                    id = nextOpaqueId(prefix = "message", number = nextMessageNumber++),
+                    id = nextOpaqueId(prefix = "message"),
                     conversationId = record.conversationId,
                     senderId = message.senderId,
                     body = message.body,
@@ -139,7 +145,7 @@ class SeededMarketplaceMessagingRepository(
         record.authorizeParticipants(context)
         val outcome = nextDeliveryOutcome()
         val message = MarketplaceMessage(
-            id = nextOpaqueId(prefix = "message", number = nextMessageNumber++),
+            id = nextOpaqueId(prefix = "message"),
             conversationId = record.conversationId,
             senderId = actor.userId,
             body = normalizedBody,
@@ -219,7 +225,7 @@ class SeededMarketplaceMessagingRepository(
     private fun createConversation(key: MarketplaceConversationKey): ConversationRecord {
         val preview = eventPreviewsById[key.eventId]
         return ConversationRecord(
-            conversationId = nextOpaqueId(prefix = "conversation", number = nextConversationNumber++),
+            conversationId = nextOpaqueId(prefix = "conversation"),
             key = key,
             eventTitle = preview?.title ?: "Yard sale",
             eventPhoto = preview?.photos?.firstOrNull(),
@@ -270,13 +276,14 @@ class SeededMarketplaceMessagingRepository(
         actor: MessagingActor,
         access: MessagingComposerAccess,
     ): MarketplaceMessageThread = MarketplaceMessageThread(
-        conversationId = conversationId,
-        conversationKey = key,
-        eventTitle = eventTitle,
-        eventPhoto = eventPhoto,
-        messages = visibleMessages(actor),
-        composerAccess = access,
-    )
+            conversationId = conversationId,
+            conversationKey = key,
+            eventTitle = eventTitle,
+            eventPhoto = eventPhoto,
+            messages = visibleMessages(actor),
+            composerAccess = access,
+        )
+        .withPrivacySafeAccess(access)
 
     private fun ConversationRecord.visibleMessages(actor: MessagingActor): List<MarketplaceMessage> =
         messages.filter { message ->
@@ -297,8 +304,16 @@ class SeededMarketplaceMessagingRepository(
         UserRole.SHOPPER -> actor.userId == context.conversationKey.shopperId
     }
 
-    private fun nextOpaqueId(prefix: String, number: Int): String =
-        "$prefix-${number.toString(16).padStart(8, '0')}"
+    private fun nextOpaqueId(prefix: String): String {
+        repeat(MAX_OPAQUE_ID_ATTEMPTS) {
+            val token = opaqueIdTokenSource()
+            require(token.length == OPAQUE_ID_TOKEN_LENGTH && token.all { it in '0'..'9' || it in 'a'..'f' }) {
+                "Opaque ID tokens must be 32 lowercase hexadecimal characters."
+            }
+            if (issuedOpaqueTokens.add(token)) return "$prefix-$token"
+        }
+        error("Unable to allocate a unique opaque messaging identifier.")
+    }
 
     private data class ConversationRecord(
         val conversationId: String,
@@ -309,4 +324,9 @@ class SeededMarketplaceMessagingRepository(
         val readByMessageId: MutableMap<String, MutableSet<String>> = mutableMapOf(),
         val authorizedActors: MutableSet<MessagingActor> = mutableSetOf(),
     )
+
+    private companion object {
+        const val OPAQUE_ID_TOKEN_LENGTH = 32
+        const val MAX_OPAQUE_ID_ATTEMPTS = 64
+    }
 }

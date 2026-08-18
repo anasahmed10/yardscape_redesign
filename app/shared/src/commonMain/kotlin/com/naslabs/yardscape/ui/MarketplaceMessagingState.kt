@@ -13,6 +13,7 @@ import com.naslabs.yardscape.domain.MessageThreadSummary
 import com.naslabs.yardscape.domain.MessagingActor
 import com.naslabs.yardscape.domain.MessagingClosedReason
 import com.naslabs.yardscape.domain.MessagingComposerAccess
+import com.naslabs.yardscape.domain.withPrivacySafeAccess
 
 enum class MessagingFailureKind {
     Validation,
@@ -85,7 +86,7 @@ data class MessagingThreadPresentation(
     val eventPhoto: EventPhoto?
         get() = thread.eventPhoto
     val messages: List<MarketplaceMessage>
-        get() = thread.messages
+        get() = thread.withPrivacySafeAccess(composerAccess).messages
     val composerAccess: MessagingComposerAccess
         get() = thread.composerAccess
     val canCompose: Boolean
@@ -163,10 +164,11 @@ class MarketplaceMessagingState(
                     )
                     return false
                 }
-                val thread = result.value.copy(
-                    composerAccess = result.value.composerAccess
-                        .narrowedBy(summary.composerAccess)
-                        .narrowedBy(composerAccessFor(result.value.conversationKey, request.actor)),
+                val access = result.value.composerAccess
+                    .narrowedBy(summary.composerAccess)
+                    .narrowedBy(composerAccessFor(result.value.conversationKey, request.actor))
+                val thread = result.value.withPrivacySafeAccess(
+                    access = access,
                 )
                 if (!thread.isVisibleToParticipant()) {
                     narrowAccess(thread.conversationKey, thread.closedReasonOrUnavailable())
@@ -343,7 +345,7 @@ class MarketplaceMessagingState(
         val draft = if (access is MessagingComposerAccess.Open) loaded.presentation.draft else ""
         threadState = MessagingThreadUiState.Loaded(
             loaded.presentation.copy(
-                thread = loaded.presentation.thread.copy(composerAccess = access),
+                thread = loaded.presentation.thread.withPrivacySafeAccess(access),
                 draft = draft,
                 operation = if (access is MessagingComposerAccess.Open) {
                     loaded.presentation.operation
@@ -480,8 +482,8 @@ class MarketplaceMessagingState(
         val loaded = threadState as? MessagingThreadUiState.Loaded ?: return
         threadState = MessagingThreadUiState.Loaded(
             loaded.presentation.copy(
-                thread = loaded.presentation.thread.copy(
-                    composerAccess = MessagingComposerAccess.Closed(reason),
+                thread = loaded.presentation.thread.withPrivacySafeAccess(
+                    MessagingComposerAccess.Closed(reason),
                 ),
                 draft = "",
                 operation = operation,
@@ -509,7 +511,7 @@ class MarketplaceMessagingState(
     }
 
     private fun MarketplaceMessageThread.withCurrentAccess(actor: MessagingActor): MarketplaceMessageThread =
-        copy(composerAccess = composerAccess.narrowedBy(composerAccessFor(conversationKey, actor)))
+        withPrivacySafeAccess(composerAccess.narrowedBy(composerAccessFor(conversationKey, actor)))
 
     private fun MessageThreadSummary.withCurrentAccess(actor: MessagingActor): MessageThreadSummary =
         copy(composerAccess = composerAccess.narrowedBy(composerAccessFor(conversationKey, actor)))

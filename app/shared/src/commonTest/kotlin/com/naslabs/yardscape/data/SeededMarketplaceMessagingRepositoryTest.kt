@@ -253,6 +253,78 @@ class SeededMarketplaceMessagingRepositoryTest {
     }
 
     @Test
+    fun closedThreadHidesProtectedBodiesButPreservesUsefulHistoryMetadata() = runTest {
+        closedContexts().forEach { (label, closedContext) ->
+            val accessSource = MutableAccessSource(openContext())
+            val repository = SeededMarketplaceMessagingRepository(accessSource = accessSource)
+            val sent = assertIs<MessagingRepositoryResult.Success<MarketplaceMessage>>(
+                repository.sendMessage(KEY, HOST, PRIVATE_LOCATION_BODY, NOW),
+            ).value
+
+            accessSource.context = closedContext
+            val closedMessage = successThread(repository.threadFor(KEY, SHOPPER)).messages.single()
+
+            assertEquals(sent.id, closedMessage.id, label)
+            assertEquals(sent.senderId, closedMessage.senderId, label)
+            assertEquals(sent.sentAtEpochMillis, closedMessage.sentAtEpochMillis, label)
+            assertEquals(sent.deliveryState, closedMessage.deliveryState, label)
+            assertEquals("Message content hidden because this conversation is closed.", closedMessage.body, label)
+            PRIVATE_LOCATION_TOKENS.forEach { protectedText ->
+                assertFalse(closedMessage.body.contains(protectedText), label)
+            }
+        }
+    }
+
+    @Test
+    fun seededConversationRejectsMessagesFromNonParticipants() {
+        val invalidSeed = SeededMessagingConversation(
+            conversationKey = KEY,
+            messages = listOf(
+                SeededMessagingMessage(
+                    senderId = SeededYardSaleData.HOST_MARIN_ID,
+                    body = "This sender does not host the event.",
+                    sentAtEpochMillis = NOW,
+                ),
+            ),
+        )
+
+        kotlin.test.assertFailsWith<IllegalArgumentException> {
+            SeededMarketplaceMessagingRepository(
+                accessSource = MutableAccessSource(openContext()),
+                initialConversations = listOf(invalidSeed),
+            )
+        }
+    }
+
+    @Test
+    fun opaqueIdsUseInjectedTokensAndRetryCollisionsWithoutEnumeratingRecords() = runTest {
+        val tokens = ArrayDeque(
+            listOf(
+                "11111111111111111111111111111111",
+                "11111111111111111111111111111111",
+                "22222222222222222222222222222222",
+                "33333333333333333333333333333333",
+            ),
+        )
+        val repository = SeededMarketplaceMessagingRepository(
+            accessSource = MutableAccessSource(openContext()),
+            opaqueIdTokenSource = { tokens.removeFirst() },
+        )
+
+        val thread = successThread(repository.threadFor(KEY, SHOPPER))
+        val firstMessage = assertIs<MessagingRepositoryResult.Success<MarketplaceMessage>>(
+            repository.sendMessage(KEY, SHOPPER, "First", NOW),
+        ).value
+        val secondMessage = assertIs<MessagingRepositoryResult.Success<MarketplaceMessage>>(
+            repository.sendMessage(KEY, HOST, "Second", NOW + 1),
+        ).value
+
+        assertEquals("conversation-11111111111111111111111111111111", thread.conversationId)
+        assertEquals("message-22222222222222222222222222222222", firstMessage.id)
+        assertEquals("message-33333333333333333333333333333333", secondMessage.id)
+    }
+
+    @Test
     fun projectionsAndDiagnosticStringsExcludeProtectedLocationAndPrivateBodies() = runTest {
         val protectedEvent = SeededYardSaleData.events
             .single { it.id == KEY.eventId }
