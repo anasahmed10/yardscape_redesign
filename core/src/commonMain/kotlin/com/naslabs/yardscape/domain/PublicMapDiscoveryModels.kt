@@ -4,7 +4,16 @@ package com.naslabs.yardscape.domain
 data class NeighborhoodCenter(
     val latitude: Double,
     val longitude: Double,
-)
+) {
+    init {
+        require(latitude.isFinite() && latitude in -90.0..90.0) {
+            "Public map center latitude must be between -90 and 90."
+        }
+        require(longitude.isFinite() && longitude in -180.0..180.0) {
+            "Public map center longitude must be between -180 and 180."
+        }
+    }
+}
 
 /** Public map placement that cannot carry an exact address or access details. */
 data class PublicMapArea(
@@ -42,7 +51,13 @@ data class ViewportCenter(
 data class MapViewport(
     val center: ViewportCenter,
     val zoomLevel: Double,
-)
+) {
+    init {
+        require(zoomLevel.isFinite() && zoomLevel in 0.0..24.0) {
+            "Map zoom level must be between 0 and 24."
+        }
+    }
+}
 
 /** A public event pin. Its position is necessarily a [PublicMapArea], never an exact address. */
 data class PublicEventMarker(

@@ -12,6 +12,15 @@ import kotlin.test.assertTrue
 
 class ShopperDiscoveryStateTest {
     @Test
+    fun browseStartsInMapModeWithACompleteListAlternative() {
+        val state = YardScapeAppState()
+
+        assertEquals(DiscoveryDisplayMode.Map, state.discoveryState().displayMode)
+        state.updateDiscoveryDisplayMode(DiscoveryDisplayMode.List)
+        assertEquals(2, state.discoveryState().items.size)
+    }
+
+    @Test
     fun seededEventsCanBeFoundThroughKeywordNeighborhoodAndCategory() {
         val state = YardScapeAppState()
 

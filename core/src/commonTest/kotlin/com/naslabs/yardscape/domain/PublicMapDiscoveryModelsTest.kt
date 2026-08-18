@@ -77,6 +77,22 @@ class PublicMapDiscoveryModelsTest {
         }
     }
 
+    @Test
+    fun publicCentersAndViewportZoomRejectInvalidWorldValues() {
+        assertFailsWith<IllegalArgumentException> {
+            NeighborhoodCenter(latitude = Double.NaN, longitude = -122.2)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            NeighborhoodCenter(latitude = 47.6, longitude = 181.0)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MapViewport(
+                center = ViewportCenter(latitude = 47.6, longitude = -122.2),
+                zoomLevel = 25.0,
+            )
+        }
+    }
+
     private fun publicMapArea(
         approximationRadiusMeters: Int = 800,
     ): PublicMapArea =

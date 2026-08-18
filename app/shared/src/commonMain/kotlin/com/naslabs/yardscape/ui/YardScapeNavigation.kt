@@ -186,6 +186,8 @@ object YardScapeTestTags {
     const val MyRsvpsScreen: String = "my-rsvps-screen"
     const val MyFindsScreen: String = "my-finds-screen"
     const val MessagesScreen: String = "messages-screen"
+    const val DiscoveryMap: String = "discovery-map"
+    const val DiscoveryResultsSheet: String = "discovery-results-sheet"
 
     fun browseEventCard(eventId: String): String = "browse-event-card-$eventId"
     fun primaryDestination(destination: YardScapePrimaryDestination): String =
@@ -238,7 +240,7 @@ class YardScapeAppState(
     var discoveryFilters: DiscoveryFilters by mutableStateOf(DiscoveryFilters())
         private set
 
-    var discoveryDisplayMode: DiscoveryDisplayMode by mutableStateOf(DiscoveryDisplayMode.List)
+    var discoveryDisplayMode: DiscoveryDisplayMode by mutableStateOf(DiscoveryDisplayMode.Map)
         private set
 
     var mapDiscoveryState: MapDiscoveryState by mutableStateOf(
