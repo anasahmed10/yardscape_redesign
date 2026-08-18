@@ -53,6 +53,10 @@ internal fun RsvpEligibilityStatus.toRsvpScreenState(): RsvpScreenState {
             "The sale window has ended and RSVPs are closed."
         RsvpEligibilityStatus.AT_CAPACITY -> "Sale at capacity" to
             "This sale has reached its attendee limit and cannot accept another RSVP."
+        RsvpEligibilityStatus.WAITLISTED -> "RSVP waitlisted" to
+            "This RSVP is waiting for space and cannot be submitted again."
+        RsvpEligibilityStatus.DECLINED -> "RSVP declined" to
+            "This RSVP was declined and cannot be submitted again."
         RsvpEligibilityStatus.ALREADY_ACCEPTED -> "RSVP already accepted" to
             "Your RSVP is already accepted. Return to the event for your current access details."
     }

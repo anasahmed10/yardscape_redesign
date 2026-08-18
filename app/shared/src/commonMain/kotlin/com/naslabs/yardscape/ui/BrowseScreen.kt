@@ -72,6 +72,7 @@ fun BrowseScreen(
     onMapViewportChanged: (MapViewport) -> Unit,
     onMapViewportSettled: () -> Unit,
     onSearchThisArea: () -> Unit,
+    onShowAllNearbySales: () -> Unit,
     onMapEventSelected: (String?) -> Unit,
     onMapAvailabilityChanged: (MapAvailability) -> Unit,
     onUseMyLocation: () -> Unit,
@@ -123,12 +124,17 @@ fun BrowseScreen(
 
         when {
             presentation.availability == ShopperBrowseAvailability.EmptyNearby ||
+                presentation.availability == ShopperBrowseAvailability.EmptySearchArea ||
                 presentation.availability == ShopperBrowseAvailability.FilteredEmpty -> item {
                 ShopperStatePanel(
                     title = presentation.title,
                     message = presentation.message,
                     actionLabel = presentation.actionLabel,
-                    onAction = presentation.actionLabel?.let { onResetFilters },
+                    onAction = when (presentation.availability) {
+                        ShopperBrowseAvailability.EmptySearchArea -> onShowAllNearbySales
+                        ShopperBrowseAvailability.FilteredEmpty -> onResetFilters
+                        else -> null
+                    },
                     modifier = Modifier.testTag(YardScapeTestTags.DiscoveryNoResults),
                 )
             }
@@ -614,6 +620,7 @@ private fun CompactMapResultCard(
     onOpen: () -> Unit,
     onSave: () -> Unit,
 ) {
+    val actions = compactMapResultActionsFor(saved)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -630,26 +637,15 @@ private fun CompactMapResultCard(
             Text(event.locationLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
                 Button(modifier = Modifier.heightIn(min = 48.dp), onClick = onOpen) { Text("View sale") }
-                OutlinedButton(modifier = Modifier.heightIn(min = 48.dp), onClick = onSave) {
-                    Text(if (saved) "Saved" else "Save")
+                OutlinedButton(
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .semantics { contentDescription = actions.saveLabel },
+                    onClick = onSave,
+                ) {
+                    Text(actions.saveLabel)
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun BrowseAvailabilityCard(title: String, message: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = SkyWash),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(message, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

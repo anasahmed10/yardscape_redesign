@@ -41,18 +41,23 @@ data class ShopperDiscoveryState(
     val filters: DiscoveryFilters,
     val displayMode: DiscoveryDisplayMode,
     val savedEventIds: Set<String>,
+    val hasCommittedMapAreaSearch: Boolean = false,
 ) {
     val hasNoMatches: Boolean
         get() = totalEventCount > 0 && items.isEmpty() && filters.isActive
 
     val hasNoNearbyEvents: Boolean
         get() = totalEventCount == 0
+
+    val hasNoEventsInMapArea: Boolean
+        get() = totalEventCount > 0 && items.isEmpty() && hasCommittedMapAreaSearch
 }
 
 internal enum class ShopperBrowseAvailability {
     Loading,
     Results,
     EmptyNearby,
+    EmptySearchArea,
     FilteredEmpty,
     OfflineCached,
     RecoverableError,
@@ -90,6 +95,12 @@ internal fun ShopperDiscoveryState.browsePresentationFor(
             title = "No nearby sales yet",
             message = "Check again soon or use Host to add the first sale in this area.",
         )
+        hasNoEventsInMapArea -> ShopperBrowsePresentation(
+            availability = ShopperBrowseAvailability.EmptySearchArea,
+            title = "No sales in this map area",
+            message = "Show all nearby public previews, then move the map to search a different area.",
+            actionLabel = "Show all nearby sales",
+        )
         hasNoMatches -> ShopperBrowsePresentation(
             availability = ShopperBrowseAvailability.FilteredEmpty,
             title = "No sales match those filters",
@@ -123,3 +134,6 @@ internal fun shopperBrowseEventActionsFor(isSaved: Boolean): ShopperBrowseEventA
         saveLabel = if (isSaved) "Remove saved" else "Save",
         isSaved = isSaved,
     )
+
+internal fun compactMapResultActionsFor(isSaved: Boolean): ShopperBrowseEventActions =
+    shopperBrowseEventActionsFor(isSaved)

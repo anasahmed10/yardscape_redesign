@@ -197,6 +197,56 @@ class SeededYardSaleEventRepositoryTest {
     }
 
     @Test
+    fun terminalOrQueuedRsvpStatusesCannotBePromotedByDirectSubmission() {
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        listOf(
+            RsvpStatus.WAITLISTED,
+            RsvpStatus.DECLINED,
+            RsvpStatus.FULL,
+            RsvpStatus.ACCEPTED,
+        ).forEach { status ->
+            val shopperId = "shopper-${status.name.lowercase()}"
+            val original = com.naslabs.yardscape.domain.Rsvp(
+                id = "rsvp-$shopperId",
+                eventId = eventId,
+                shopperId = shopperId,
+                status = status,
+                locationVisibility = LocationVisibility.PUBLIC_APPROXIMATION,
+            )
+            val repository = SeededYardSaleEventRepository(rsvps = listOf(original))
+
+            val result = repository.submitRsvp(eventId, shopperId)
+
+            assertEquals(original, result, "$status was promoted by submitRsvp")
+            assertEquals(original, repository.rsvpFor(eventId, shopperId))
+            assertNull(repository.exactLocationFor(eventId, shopperId, now))
+        }
+    }
+
+    @Test
+    fun cancelledRsvpCannotBypassCurrentEventCapacity() {
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        val shopperId = "cancelled-at-capacity"
+        val original = com.naslabs.yardscape.domain.Rsvp(
+            id = "rsvp-$shopperId",
+            eventId = eventId,
+            shopperId = shopperId,
+            status = RsvpStatus.CANCELLED,
+            locationVisibility = LocationVisibility.PUBLIC_APPROXIMATION,
+        )
+        val repository = SeededYardSaleEventRepository(
+            rsvps = listOf(original),
+            atCapacityEventIds = setOf(eventId),
+        )
+
+        val result = repository.submitRsvp(eventId, shopperId)
+
+        assertEquals(original, result)
+        assertEquals(original, repository.rsvpFor(eventId, shopperId))
+        assertNull(repository.exactLocationFor(eventId, shopperId, now))
+    }
+
+    @Test
     fun shopperRsvpLifecycleMutationsClearProtectedLocation() {
         val shopperId = "shopper-lifecycle"
         val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID

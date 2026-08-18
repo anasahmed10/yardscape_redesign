@@ -27,6 +27,14 @@ class ShopperBrowsePresentationTest {
     }
 
     @Test
+    fun compactMapResultUsesTheSameStatefulSaveActionAsListResults() {
+        val saved = compactMapResultActionsFor(isSaved = true)
+
+        assertEquals("Remove saved", saved.saveLabel)
+        assertTrue(saved.isSaved)
+    }
+
+    @Test
     fun browsePresentationUsesOnlyPublicDiscoveryMetadata() {
         val presentation = YardScapeAppState().discoveryState()
             .browsePresentationFor(AppDataAvailability.Available)

@@ -10,6 +10,8 @@ enum class RsvpEligibilityStatus {
     EVENT_UNAVAILABLE,
     EVENT_ENDED,
     AT_CAPACITY,
+    WAITLISTED,
+    DECLINED,
     ALREADY_ACCEPTED,
 }
 
@@ -17,6 +19,7 @@ object RsvpEligibilityPolicy {
     fun statusFor(
         eventStatus: EventStatus,
         saleWindow: SaleWindow,
+        currentRsvpStatus: RsvpStatus?,
         currentLocationVisibility: LocationVisibility?,
         nowEpochMillis: Long,
         isBlocked: Boolean,
@@ -29,24 +32,13 @@ object RsvpEligibilityPolicy {
         eventStatus == EventStatus.COMPLETED -> RsvpEligibilityStatus.EVENT_COMPLETED
         eventStatus != EventStatus.PUBLISHED -> RsvpEligibilityStatus.EVENT_UNAVAILABLE
         saleWindow.hasEnded(nowEpochMillis) -> RsvpEligibilityStatus.EVENT_ENDED
-        currentLocationVisibility == LocationVisibility.RSVP_ACCEPTED -> RsvpEligibilityStatus.ALREADY_ACCEPTED
+        currentRsvpStatus == RsvpStatus.ACCEPTED ||
+            currentLocationVisibility == LocationVisibility.RSVP_ACCEPTED -> RsvpEligibilityStatus.ALREADY_ACCEPTED
+        currentRsvpStatus == RsvpStatus.WAITLISTED -> RsvpEligibilityStatus.WAITLISTED
+        currentRsvpStatus == RsvpStatus.DECLINED -> RsvpEligibilityStatus.DECLINED
+        currentRsvpStatus == RsvpStatus.FULL -> RsvpEligibilityStatus.AT_CAPACITY
+        currentRsvpStatus == RsvpStatus.REMOVED -> RsvpEligibilityStatus.ACCESS_REVOKED
         isAtCapacity -> RsvpEligibilityStatus.AT_CAPACITY
         else -> RsvpEligibilityStatus.ELIGIBLE
     }
-
-    fun canSubmit(
-        eventStatus: EventStatus,
-        saleWindow: SaleWindow,
-        currentLocationVisibility: LocationVisibility?,
-        nowEpochMillis: Long,
-        isBlocked: Boolean,
-        isAtCapacity: Boolean,
-    ): Boolean = statusFor(
-        eventStatus = eventStatus,
-        saleWindow = saleWindow,
-        currentLocationVisibility = currentLocationVisibility,
-        nowEpochMillis = nowEpochMillis,
-        isBlocked = isBlocked,
-        isAtCapacity = isAtCapacity,
-    ) == RsvpEligibilityStatus.ELIGIBLE
 }

@@ -260,7 +260,33 @@ class ShopperDiscoveryStateTest {
 
         state.searchMapCameraArea()
 
-        assertTrue(state.discoveryState().items.isEmpty())
+        val discovery = state.discoveryState()
+        val presentation = discovery.browsePresentationFor(AppDataAvailability.Available)
+        assertTrue(discovery.items.isEmpty())
+        assertEquals(2, discovery.totalEventCount)
+        assertFalse(discovery.filters.isActive)
         assertTrue(state.mapDiscoveryState.markers.isEmpty())
+        assertEquals("No sales in this map area", presentation.title)
+        assertEquals("Show all nearby sales", presentation.actionLabel)
+    }
+
+    @Test
+    fun showAllNearbySalesClearsACommittedEmptyMapArea() {
+        val state = YardScapeAppState()
+        state.updateMapCameraViewport(
+            MapViewport(
+                center = ViewportCenter(48.8, -123.8),
+                zoomLevel = 14.0,
+            ),
+        )
+        state.settleMapCameraViewport()
+        state.searchMapCameraArea()
+        assertTrue(state.discoveryState().items.isEmpty())
+
+        state.showAllNearbySales()
+
+        assertEquals(2, state.discoveryState().items.size)
+        assertEquals(2, state.mapDiscoveryState.markers.size)
+        assertEquals(null, state.mapDiscoveryState.searchedViewport)
     }
 }

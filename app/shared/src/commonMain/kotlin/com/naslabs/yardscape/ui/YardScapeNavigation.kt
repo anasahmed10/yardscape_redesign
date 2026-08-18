@@ -187,7 +187,6 @@ object YardScapeTestTags {
     const val AppShell: String = "app-shell"
     const val DiscoveryNoResults: String = "discovery-no-results"
     const val SavedScreen: String = "saved-screen"
-    const val MyRsvpsScreen: String = "my-rsvps-screen"
     const val MyFindsScreen: String = "my-finds-screen"
     const val MessagesScreen: String = "messages-screen"
     const val DiscoveryMap: String = "discovery-map"
@@ -430,6 +429,7 @@ class YardScapeAppState(
             filters = discoveryFilters,
             displayMode = discoveryDisplayMode,
             savedEventIds = savedEventIds,
+            hasCommittedMapAreaSearch = mapDiscoveryState.searchedViewport != null,
         )
     }
 
@@ -487,6 +487,12 @@ class YardScapeAppState(
 
     fun searchMapCameraArea() {
         mapDiscoveryState = mapDiscoveryState.searchThisArea()
+        synchronizeDiscoveryMapMarkers()
+    }
+
+    fun showAllNearbySales() {
+        discoveryFilters = DiscoveryFilters()
+        mapDiscoveryState = mapDiscoveryState.clearSearchedArea()
         synchronizeDiscoveryMapMarkers()
     }
 
@@ -734,10 +740,12 @@ class YardScapeAppState(
 
     private fun rsvpEligibilityStatusFor(eventId: String): RsvpEligibilityStatus {
         val detail = repository.publicEventDetail(eventId) ?: return RsvpEligibilityStatus.EVENT_UNAVAILABLE
+        val currentRsvp = repository.rsvpFor(eventId, shopperId)
         return RsvpEligibilityPolicy.statusFor(
             eventStatus = detail.status,
             saleWindow = detail.saleWindow,
-            currentLocationVisibility = repository.rsvpFor(eventId, shopperId)?.locationVisibility,
+            currentRsvpStatus = currentRsvp?.status,
+            currentLocationVisibility = currentRsvp?.locationVisibility,
             nowEpochMillis = nowEpochMillis,
             isBlocked = eventId in blockedEventIds,
             isAtCapacity = eventCapacitySource.isAtCapacity(eventId),
@@ -1216,6 +1224,30 @@ sealed interface LocationRevealState {
             "The host has not granted exact-location access yet."
     }
 
+    data object Waitlisted : LocationRevealState {
+        override val title: String = "RSVP waitlisted"
+        override val message: String =
+            "This RSVP is waiting for space. Exact-location access has not been granted."
+    }
+
+    data object Declined : LocationRevealState {
+        override val title: String = "RSVP declined"
+        override val message: String =
+            "This RSVP was declined, so exact-location access remains private."
+    }
+
+    data object AtCapacity : LocationRevealState {
+        override val title: String = "Sale at capacity"
+        override val message: String =
+            "This RSVP could not be accepted because the sale reached its attendee limit."
+    }
+
+    data object AcceptedWithoutAccess : LocationRevealState {
+        override val title: String = "RSVP accepted"
+        override val message: String =
+            "Your RSVP is accepted, but exact-location access is not currently available."
+    }
+
     data object Revoked : LocationRevealState {
         override val title: String = "Access revoked"
         override val message: String =
@@ -1382,6 +1414,10 @@ private fun PublicEventDetail.toLocationRevealState(
         locationVisibility == LocationVisibility.EXPIRED -> LocationRevealState.Expired
         rsvpStatus == RsvpStatus.REQUESTED ||
             locationVisibility == LocationVisibility.RSVP_REQUESTED -> LocationRevealState.Pending
+        rsvpStatus == RsvpStatus.WAITLISTED -> LocationRevealState.Waitlisted
+        rsvpStatus == RsvpStatus.DECLINED -> LocationRevealState.Declined
+        rsvpStatus == RsvpStatus.FULL -> LocationRevealState.AtCapacity
+        rsvpStatus == RsvpStatus.ACCEPTED -> LocationRevealState.AcceptedWithoutAccess
         else -> LocationRevealState.NotRequested
     }
 }

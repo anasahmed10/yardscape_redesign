@@ -10,6 +10,7 @@ import com.naslabs.yardscape.domain.PublicEventPreview
 import com.naslabs.yardscape.domain.PublicLocation
 import com.naslabs.yardscape.domain.Rsvp
 import com.naslabs.yardscape.domain.RsvpEligibilityPolicy
+import com.naslabs.yardscape.domain.RsvpEligibilityStatus
 import com.naslabs.yardscape.domain.RsvpStatus
 import com.naslabs.yardscape.domain.SaleWindow
 import com.naslabs.yardscape.domain.UserProfile
@@ -72,15 +73,16 @@ class SeededYardSaleEventRepository(
     override fun submitRsvp(eventId: String, shopperId: String): Rsvp? {
         val event = events.firstOrNull { it.id == eventId } ?: return null
         val currentRsvp = rsvpFor(eventId, shopperId)
-        if (!RsvpEligibilityPolicy.canSubmit(
-                eventStatus = event.status,
-                saleWindow = event.saleWindow,
-                currentLocationVisibility = currentRsvp?.locationVisibility,
-                nowEpochMillis = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
-                isBlocked = false,
-                isAtCapacity = eventId in atCapacityEventIds,
-            )
-        ) {
+        val eligibility = RsvpEligibilityPolicy.statusFor(
+            eventStatus = event.status,
+            saleWindow = event.saleWindow,
+            currentRsvpStatus = currentRsvp?.status,
+            currentLocationVisibility = currentRsvp?.locationVisibility,
+            nowEpochMillis = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
+            isBlocked = false,
+            isAtCapacity = eventId in atCapacityEventIds,
+        )
+        if (eligibility != RsvpEligibilityStatus.ELIGIBLE) {
             return currentRsvp
         }
 

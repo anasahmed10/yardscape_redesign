@@ -180,6 +180,62 @@ class ShopperRsvpStateTest {
     }
 
     @Test
+    fun queuedAndTerminalRsvpsKeepTruthfulDetailAndRejectDirectRoutes() {
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        val event = SeededYardSaleData.events.first { it.id == eventId }
+        val cases = listOf(
+            Triple(RsvpStatus.WAITLISTED, RsvpEligibilityStatus.WAITLISTED, "RSVP waitlisted"),
+            Triple(RsvpStatus.DECLINED, RsvpEligibilityStatus.DECLINED, "RSVP declined"),
+            Triple(RsvpStatus.FULL, RsvpEligibilityStatus.AT_CAPACITY, "Sale at capacity"),
+            Triple(RsvpStatus.ACCEPTED, RsvpEligibilityStatus.ALREADY_ACCEPTED, "RSVP accepted"),
+        )
+
+        cases.forEach { (rsvpStatus, eligibilityStatus, revealTitle) ->
+            val shopperId = "direct-${rsvpStatus.name.lowercase()}"
+            val original = Rsvp(
+                id = "rsvp-$shopperId",
+                eventId = eventId,
+                shopperId = shopperId,
+                status = rsvpStatus,
+                locationVisibility = LocationVisibility.PUBLIC_APPROXIMATION,
+            )
+            val repository = SeededYardSaleEventRepository(
+                events = listOf(event),
+                rsvps = listOf(original),
+            )
+            val expectedDetailRoute = YardScapeRoute.EventDetail(
+                eventId = eventId,
+                origin = YardScapePrimaryDestination.MyFinds,
+                myFindsSection = MyFindsSection.Rsvps,
+            )
+            val state = YardScapeAppState(
+                repository = repository,
+                shopperId = shopperId,
+                initialRoute = YardScapeRoute.Rsvp(
+                    eventId = eventId,
+                    origin = YardScapePrimaryDestination.MyFinds,
+                    myFindsSection = MyFindsSection.Rsvps,
+                ),
+            )
+
+            assertEquals(eligibilityStatus, state.rsvpScreenStateFor(eventId).status)
+            assertFalse(state.rsvpScreenStateFor(eventId).canConfirm)
+            assertEquals(revealTitle, state.detailStateFor(eventId)?.revealState?.title)
+            assertFalse(state.detailStateFor(eventId)?.shouldShowRsvpAction ?: true)
+
+            state.confirmRsvp(eventId)
+
+            assertEquals(expectedDetailRoute, state.route)
+            assertEquals(original, repository.rsvpFor(eventId, shopperId))
+            assertNull(repository.exactLocationFor(eventId, shopperId, SeededYardSaleData.BASE_NOW_EPOCH_MILLIS))
+
+            state.openRsvp(eventId)
+            assertEquals(expectedDetailRoute, state.route)
+            assertEquals(original, repository.rsvpFor(eventId, shopperId))
+        }
+    }
+
+    @Test
     fun revocationAndExpiryExitOpenRsvpToItsDetailContext() {
         val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
         val event = SeededYardSaleData.events.first { it.id == eventId }
@@ -455,6 +511,10 @@ class ShopperRsvpStateTest {
         val expectedVisibility = listOf(
             LocationRevealState.NotRequested to true,
             LocationRevealState.Pending to true,
+            LocationRevealState.Waitlisted to false,
+            LocationRevealState.Declined to false,
+            LocationRevealState.AtCapacity to false,
+            LocationRevealState.AcceptedWithoutAccess to false,
             LocationRevealState.Revoked to false,
             LocationRevealState.Expired to false,
             LocationRevealState.Cancelled to false,

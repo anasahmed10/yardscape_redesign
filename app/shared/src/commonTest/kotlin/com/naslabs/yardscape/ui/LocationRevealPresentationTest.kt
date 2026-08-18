@@ -38,6 +38,10 @@ class LocationRevealPresentationTest {
         val unauthorizedStates = listOf(
             LocationRevealState.NotRequested,
             LocationRevealState.Pending,
+            LocationRevealState.Waitlisted,
+            LocationRevealState.Declined,
+            LocationRevealState.AtCapacity,
+            LocationRevealState.AcceptedWithoutAccess,
             LocationRevealState.Revoked,
             LocationRevealState.Expired,
             LocationRevealState.Cancelled,

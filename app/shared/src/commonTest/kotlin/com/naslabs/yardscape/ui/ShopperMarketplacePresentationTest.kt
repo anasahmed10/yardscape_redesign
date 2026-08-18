@@ -24,6 +24,17 @@ class ShopperMarketplacePresentationTest {
     }
 
     @Test
+    fun filterControlsExposeSelectedStateWithA48DpMinimumTarget() {
+        val selected = filterControlPresentationFor(selected = true)
+        val unselected = filterControlPresentationFor(selected = false)
+
+        assertTrue(selected.isSelected)
+        assertTrue(!unselected.isSelected)
+        assertEquals(48.dp, selected.minimumHeight)
+        assertEquals(48.dp, unselected.minimumHeight)
+    }
+
+    @Test
     fun seededPhotoReferencesResolveToTheirBundledArtworkAndTrustedAltText() {
         val mapleArtwork = shopperArtworkFor(
             eventId = "maple-ridge",

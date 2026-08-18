@@ -78,6 +78,7 @@ fun App(appState: YardScapeAppState) {
                         onMapViewportChanged = appState::updateMapCameraViewport,
                         onMapViewportSettled = appState::settleMapCameraViewport,
                         onSearchThisArea = appState::searchMapCameraArea,
+                        onShowAllNearbySales = appState::showAllNearbySales,
                         onMapEventSelected = appState::selectDiscoveryEvent,
                         onMapAvailabilityChanged = appState::updateMapAvailability,
                         onSheetPositionChanged = appState::updateMapResultsSheetPosition,
