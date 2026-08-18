@@ -26,6 +26,14 @@ sealed interface MapAvailability {
     data class Failed(val message: String) : MapAvailability
 }
 
+fun usesMapFallback(
+    capability: com.naslabs.yardscape.map.PlatformMapCapability,
+    availability: MapAvailability,
+): Boolean = capability == com.naslabs.yardscape.map.PlatformMapCapability.StaticFallback ||
+    availability == MapAvailability.Offline ||
+    availability == MapAvailability.Unavailable ||
+    availability is MapAvailability.Failed
+
 enum class ApproximateLocationPermission {
     NotRequested,
     Requesting,

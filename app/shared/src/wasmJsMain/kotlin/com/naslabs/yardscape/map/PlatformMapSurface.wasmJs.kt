@@ -18,6 +18,8 @@ import com.naslabs.yardscape.domain.MapViewport
 
 actual fun platformMapCapability(): PlatformMapCapability = PlatformMapCapability.StaticFallback
 
+actual fun platformMapSupportsComposeOverlay(): Boolean = true
+
 @Composable
 actual fun PlatformMapSurface(
     state: PlatformMapState,

@@ -71,7 +71,7 @@ kotlin {
     }
 
     sourceSets {
-        val maplibreMain by creating {
+        val nativeMapMain by creating {
             dependsOn(commonMain.get())
             dependencies {
                 implementation(libs.maplibre.compose)
@@ -81,7 +81,7 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.compose.uiToolingPreview)
         }
-        androidMain.get().dependsOn(maplibreMain)
+        androidMain.get().dependsOn(nativeMapMain)
         commonMain.dependencies {
             api(projects.core)
             implementation(libs.compose.runtime)
@@ -100,10 +100,10 @@ kotlin {
             implementation(libs.ktor.clientMock)
         }
         jsMain.dependencies {
+            implementation(libs.maplibre.js.bindings)
             implementation(libs.wrappers.browser)
         }
-        jsMain.get().dependsOn(maplibreMain)
-        iosMain.get().dependsOn(maplibreMain)
+        iosMain.get().dependsOn(nativeMapMain)
     }
 }
 

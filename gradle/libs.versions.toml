@@ -50,6 +50,7 @@ ktor-clientCore = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-clientMock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 wrappers-browser = { module = "org.jetbrains.kotlin-wrappers:kotlin-browser", version.ref = "kotlin-wrappers" }
 maplibre-compose = { module = "org.maplibre.compose:maplibre-compose", version.ref = "maplibre-compose" }
+maplibre-js-bindings = { module = "org.maplibre.compose:maplibre-js-bindings", version.ref = "maplibre-compose" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

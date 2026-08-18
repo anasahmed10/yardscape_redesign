@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import com.naslabs.yardscape.map.PlatformMapCapability
 
 class MapDiscoveryStateTest {
     @Test
@@ -85,6 +86,14 @@ class MapDiscoveryStateTest {
         assertEquals(marker.eventId, degraded.selectedEventId)
         assertEquals(ApproximateLocationPermission.Denied, degraded.locationPermission)
         assertEquals(MapAvailability.Offline, degraded.mapAvailability)
+    }
+
+    @Test
+    fun failedAndOfflineInteractiveMapsUseTheFallbackUntilRetry() {
+        assertTrue(usesMapFallback(PlatformMapCapability.Interactive, MapAvailability.Offline))
+        assertTrue(usesMapFallback(PlatformMapCapability.Interactive, MapAvailability.Failed("tiles")))
+        assertFalse(usesMapFallback(PlatformMapCapability.Interactive, MapAvailability.Loading))
+        assertTrue(usesMapFallback(PlatformMapCapability.StaticFallback, MapAvailability.Available))
     }
 
     private fun viewport(latitude: Double, longitude: Double, zoom: Double): MapViewport =

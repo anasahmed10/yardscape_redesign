@@ -202,4 +202,29 @@ class ShopperDiscoveryStateTest {
         assertEquals(2, state.discoveryState().items.size)
         assertEquals(2, state.mapDiscoveryState.markers.size)
     }
+
+    @Test
+    fun repeatedLocationRequestsAreRejectedWhileOneIsPending() {
+        val state = YardScapeAppState()
+
+        assertTrue(state.requestApproximateLocation())
+        assertFalse(state.requestApproximateLocation())
+    }
+
+    @Test
+    fun searchThisAreaUpdatesBothMapMarkersAndListResults() {
+        val state = YardScapeAppState()
+        state.updateMapCameraViewport(
+            MapViewport(
+                center = ViewportCenter(48.8, -123.8),
+                zoomLevel = 14.0,
+            ),
+        )
+        state.settleMapCameraViewport()
+
+        state.searchMapCameraArea()
+
+        assertTrue(state.discoveryState().items.isEmpty())
+        assertTrue(state.mapDiscoveryState.markers.isEmpty())
+    }
 }

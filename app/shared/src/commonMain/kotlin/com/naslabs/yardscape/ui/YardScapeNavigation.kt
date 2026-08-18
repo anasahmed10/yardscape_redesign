@@ -23,6 +23,7 @@ import com.naslabs.yardscape.domain.ExactAddress
 import com.naslabs.yardscape.domain.LocationVisibility
 import com.naslabs.yardscape.domain.MapViewport
 import com.naslabs.yardscape.domain.PublicEventPreview
+import com.naslabs.yardscape.domain.PublicEventMarker
 import com.naslabs.yardscape.domain.Rsvp
 import com.naslabs.yardscape.domain.RsvpStatus
 import com.naslabs.yardscape.domain.ReportReason
@@ -391,8 +392,21 @@ class YardScapeAppState(
 
     fun discoveryState(): ShopperDiscoveryState {
         val allItems = browseItems()
+        val viewportEventIds = mapDiscoveryState.searchedViewport?.let { viewport ->
+            markersInViewport(
+                repository.publicPreviews(nowEpochMillis)
+                    .filterNot { it.id in blockedEventIds }
+                    .mapNotNull { event ->
+                        publicMapAreaSource.areaFor(event)?.let { area -> event.toPublicEventMarker(area) }
+                    },
+                viewport,
+            ).map(PublicEventMarker::eventId).toSet()
+        }
         return ShopperDiscoveryState(
-            items = allItems.filter { it.matches(discoveryFilters, nowEpochMillis) },
+            items = allItems.filter { item ->
+                item.matches(discoveryFilters, nowEpochMillis) &&
+                    (viewportEventIds == null || item.id in viewportEventIds)
+            },
             totalEventCount = allItems.size,
             availableCategories = allItems.flatMap { it.categoryLabels }.distinct().sorted(),
             filters = discoveryFilters,
@@ -402,12 +416,15 @@ class YardScapeAppState(
     }
 
     private fun synchronizeDiscoveryMapMarkers() {
-        val markers = repository.publicPreviews(nowEpochMillis)
+        val filteredMarkers = repository.publicPreviews(nowEpochMillis)
             .filterNot { it.id in blockedEventIds }
             .filter { it.toBrowseEventItem(nowEpochMillis).matches(discoveryFilters, nowEpochMillis) }
             .mapNotNull { event ->
                 publicMapAreaSource.areaFor(event)?.let { area -> event.toPublicEventMarker(area) }
             }
+        val markers = mapDiscoveryState.searchedViewport?.let { viewport ->
+            markersInViewport(filteredMarkers, viewport)
+        } ?: filteredMarkers
         mapDiscoveryState = mapDiscoveryState.synchronizeMarkers(markers)
     }
 
@@ -452,6 +469,7 @@ class YardScapeAppState(
 
     fun searchMapCameraArea() {
         mapDiscoveryState = mapDiscoveryState.searchThisArea()
+        synchronizeDiscoveryMapMarkers()
     }
 
     fun selectDiscoveryEvent(eventId: String?): Boolean {
@@ -468,8 +486,10 @@ class YardScapeAppState(
         mapDiscoveryState = mapDiscoveryState.updateMapAvailability(availability)
     }
 
-    fun requestApproximateLocation() {
+    fun requestApproximateLocation(): Boolean {
+        val previous = mapDiscoveryState
         mapDiscoveryState = mapDiscoveryState.requestApproximateLocation()
+        return previous.locationPermission != mapDiscoveryState.locationPermission
     }
 
     fun updateApproximateLocationPermission(permission: ApproximateLocationPermission) {

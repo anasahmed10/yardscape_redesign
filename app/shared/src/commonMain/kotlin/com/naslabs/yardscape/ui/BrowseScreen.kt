@@ -27,6 +27,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,10 +42,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.naslabs.yardscape.map.PlatformMapCapability
+import com.naslabs.yardscape.map.MapFallbackSurface
 import com.naslabs.yardscape.map.PlatformMapState
+import com.naslabs.yardscape.map.PlatformMapStyle
 import com.naslabs.yardscape.map.PlatformMapSurface
 import com.naslabs.yardscape.map.platformMapCapability
+import com.naslabs.yardscape.map.platformMapSupportsComposeOverlay
 import com.naslabs.yardscape.domain.MapViewport
+import com.naslabs.yardscape.domain.ViewportCenter
+import kotlinx.coroutines.delay
 
 @Composable
 fun BrowseScreen(
@@ -296,8 +302,15 @@ private fun MapDiscoveryExperience(
     onUseMyLocation: () -> Unit,
     onSheetPositionChanged: (MapResultsSheetPosition) -> Unit,
 ) {
-    val presentation = mapPresentationFor(mapState.markers)
-    val viewport = mapState.cameraViewportDraft ?: presentation.defaultViewport
+    val defaultPresentation = mapPresentationFor(mapState.markers)
+    val viewport = mapState.cameraViewportDraft ?: defaultPresentation.defaultViewport
+    val presentation = mapPresentationFor(mapState.markers, viewport.zoomLevel)
+    LaunchedEffect(mapState.cameraViewportDraft, mapState.viewportSearchReadiness) {
+        if (mapState.viewportSearchReadiness == ViewportSearchReadiness.WaitingForDebounce) {
+            delay(350)
+            onMapViewportSettled()
+        }
+    }
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val expanded = maxWidth >= 760.dp
         if (expanded) {
@@ -315,7 +328,6 @@ private fun MapDiscoveryExperience(
                         selectedEventId = mapState.selectedEventId,
                     ),
                     onMapViewportChanged = onMapViewportChanged,
-                    onMapViewportSettled = onMapViewportSettled,
                     onSearchThisArea = onSearchThisArea,
                     onMapEventSelected = onMapEventSelected,
                     onMapAvailabilityChanged = onMapAvailabilityChanged,
@@ -331,7 +343,7 @@ private fun MapDiscoveryExperience(
                     onSavedToggled = onSavedToggled,
                 )
             }
-        } else {
+        } else if (platformMapSupportsComposeOverlay()) {
             Box(modifier = Modifier.fillMaxWidth().height(620.dp)) {
                 DiscoveryMapPanel(
                     modifier = Modifier.fillMaxSize(),
@@ -343,7 +355,6 @@ private fun MapDiscoveryExperience(
                         selectedEventId = mapState.selectedEventId,
                     ),
                     onMapViewportChanged = onMapViewportChanged,
-                    onMapViewportSettled = onMapViewportSettled,
                     onSearchThisArea = onSearchThisArea,
                     onMapEventSelected = onMapEventSelected,
                     onMapAvailabilityChanged = onMapAvailabilityChanged,
@@ -351,6 +362,38 @@ private fun MapDiscoveryExperience(
                 )
                 MobileNearbySheet(
                     modifier = Modifier.align(Alignment.BottomCenter),
+                    position = mapState.sheetPosition,
+                    events = events,
+                    savedEventIds = savedEventIds,
+                    selectedEventId = mapState.selectedEventId,
+                    onPositionChanged = onSheetPositionChanged,
+                    onEventSelected = onEventSelected,
+                    onMapEventSelected = onMapEventSelected,
+                    onSavedToggled = onSavedToggled,
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+            ) {
+                DiscoveryMapPanel(
+                    modifier = Modifier.fillMaxWidth().height(420.dp),
+                    mapState = mapState,
+                    platformState = PlatformMapState(
+                        viewport = viewport,
+                        markers = presentation.unclusteredMarkers,
+                        clusters = presentation.clusters,
+                        selectedEventId = mapState.selectedEventId,
+                    ),
+                    onMapViewportChanged = onMapViewportChanged,
+                    onSearchThisArea = onSearchThisArea,
+                    onMapEventSelected = onMapEventSelected,
+                    onMapAvailabilityChanged = onMapAvailabilityChanged,
+                    onUseMyLocation = onUseMyLocation,
+                )
+                MobileNearbySheet(
+                    modifier = Modifier.fillMaxWidth(),
                     position = mapState.sheetPosition,
                     events = events,
                     savedEventIds = savedEventIds,
@@ -371,44 +414,26 @@ private fun DiscoveryMapPanel(
     mapState: MapDiscoveryState,
     platformState: PlatformMapState,
     onMapViewportChanged: (MapViewport) -> Unit,
-    onMapViewportSettled: () -> Unit,
     onSearchThisArea: () -> Unit,
     onMapEventSelected: (String?) -> Unit,
     onMapAvailabilityChanged: (MapAvailability) -> Unit,
     onUseMyLocation: () -> Unit,
 ) {
-    val isFallback = platformMapCapability() == PlatformMapCapability.StaticFallback ||
-        mapState.mapAvailability == MapAvailability.Offline ||
-        mapState.mapAvailability == MapAvailability.Unavailable ||
-        mapState.mapAvailability is MapAvailability.Failed
-    Box(
+    val isFallback = usesMapFallback(platformMapCapability(), mapState.mapAvailability)
+    Column(
         modifier = modifier
             .testTag(YardScapeTestTags.DiscoveryMap)
             .semantics { contentDescription = "Approximate neighborhood map of nearby yard sales" },
+        verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
     ) {
-        PlatformMapSurface(
-            state = platformState,
-            modifier = Modifier.fillMaxSize(),
-            onViewportChanged = { viewport ->
-                onMapViewportChanged(viewport)
-                onMapViewportSettled()
-            },
-            onMarkerSelected = onMapEventSelected,
-            onClusterSelected = { clusterId ->
-                platformState.clusters.firstOrNull { it.id == clusterId }?.eventIds?.firstOrNull()
-                    ?.let(onMapEventSelected)
-            },
-            onMapLoaded = { onMapAvailabilityChanged(MapAvailability.Available) },
-            onMapLoadFailed = { reason ->
-                onMapAvailabilityChanged(MapAvailability.Failed(reason ?: "Map tiles could not be loaded."))
-            },
-        )
-        Row(
-            modifier = Modifier.align(Alignment.TopCenter).padding(YardScapeDesign.spacing.small),
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
         ) {
             OutlinedButton(
                 modifier = Modifier.heightIn(min = 48.dp),
+                enabled = mapState.locationPermission != ApproximateLocationPermission.Requesting,
                 onClick = onUseMyLocation,
             ) {
                 Text(locationButtonLabel(mapState.locationPermission))
@@ -421,9 +446,47 @@ private fun DiscoveryMapPanel(
                     Text("Search this area")
                 }
             }
+            if (isFallback && platformMapCapability() == PlatformMapCapability.Interactive) {
+                OutlinedButton(
+                    modifier = Modifier.heightIn(min = 48.dp),
+                    onClick = { onMapAvailabilityChanged(MapAvailability.Loading) },
+                ) {
+                    Text("Retry map")
+                }
+            }
+        }
+        if (isFallback) {
+            MapFallbackSurface(
+                state = platformState,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            )
+        } else {
+            PlatformMapSurface(
+                state = platformState,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                onViewportChanged = onMapViewportChanged,
+                onMarkerSelected = onMapEventSelected,
+                onClusterSelected = { clusterId ->
+                    platformState.clusters.firstOrNull { it.id == clusterId }?.let { cluster ->
+                        onMapViewportChanged(
+                            MapViewport(
+                                center = ViewportCenter(
+                                    cluster.area.center.latitude,
+                                    cluster.area.center.longitude,
+                                ),
+                                zoomLevel = (platformState.viewport.zoomLevel + 2.0).coerceAtMost(18.0),
+                            ),
+                        )
+                    }
+                },
+                onMapLoaded = { onMapAvailabilityChanged(MapAvailability.Available) },
+                onMapLoadFailed = { reason ->
+                    onMapAvailabilityChanged(MapAvailability.Failed(reason ?: "Map tiles could not be loaded."))
+                },
+            )
         }
         Surface(
-            modifier = Modifier.align(Alignment.BottomStart).padding(YardScapeDesign.spacing.small),
+            modifier = Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
         ) {
@@ -432,6 +495,11 @@ private fun DiscoveryMapPanel(
                 Text(
                     if (isFallback) "Map unavailable · List remains fully usable" else "No street addresses shown",
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    PlatformMapStyle.OpenFreeMapLiberty.attribution,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

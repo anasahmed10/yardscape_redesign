@@ -3,6 +3,8 @@ package com.naslabs.yardscape.ui
 import com.naslabs.yardscape.domain.NeighborhoodCenter
 import com.naslabs.yardscape.domain.PublicEventMarker
 import com.naslabs.yardscape.domain.PublicMapArea
+import com.naslabs.yardscape.domain.MapViewport
+import com.naslabs.yardscape.domain.ViewportCenter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -32,6 +34,35 @@ class MapDiscoveryPresentationTest {
         assertEquals(47.62, presentation.defaultViewport.center.latitude, absoluteTolerance = 0.0001)
         assertEquals(-122.22, presentation.defaultViewport.center.longitude, absoluteTolerance = 0.0001)
         assertTrue(presentation.defaultViewport.zoomLevel in 10.0..13.0)
+    }
+
+    @Test
+    fun clusteringUsesPublicDistanceInsteadOfNeighborhoodLabel() {
+        val nearbyDifferentLabel = listOf(
+            marker("near-1", 47.6150, -122.2100, "Maple Ridge"),
+            marker("near-2", 47.6153, -122.2102, "South Park"),
+        )
+        val farSameLabel = listOf(
+            marker("far-1", 47.6150, -122.2100, "Maple Ridge"),
+            marker("far-2", 47.6350, -122.2400, "Maple Ridge"),
+        )
+
+        assertEquals(2, mapPresentationFor(nearbyDifferentLabel).clusters.single().eventCount)
+        assertTrue(mapPresentationFor(farSameLabel).clusters.isEmpty())
+    }
+
+    @Test
+    fun viewportSearchKeepsOnlyMarkersInsideTheSearchedPublicArea() {
+        val markers = listOf(
+            marker("center", 47.6150, -122.2100, "Maple Ridge"),
+            marker("far", 48.6150, -123.2100, "Far Away"),
+        )
+        val viewport = MapViewport(
+            center = ViewportCenter(47.6150, -122.2100),
+            zoomLevel = 12.0,
+        )
+
+        assertEquals(listOf("center"), markersInViewport(markers, viewport).map { it.eventId })
     }
 
     private fun marker(eventId: String, latitude: Double, longitude: Double, label: String) =

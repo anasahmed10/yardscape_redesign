@@ -81,8 +81,7 @@ fun App(appState: YardScapeAppState) {
                         onMapAvailabilityChanged = appState::updateMapAvailability,
                         onSheetPositionChanged = appState::updateMapResultsSheetPosition,
                         onUseMyLocation = {
-                            appState.requestApproximateLocation()
-                            coroutineScope.launch {
+                            if (appState.requestApproximateLocation()) coroutineScope.launch {
                                 when (val result = locationProvider.requestApproximateLocation()) {
                                     is ApproximateLocationResult.Available -> {
                                         appState.updateApproximateLocationPermission(ApproximateLocationPermission.Granted)

@@ -36,6 +36,8 @@ enum class PlatformMapCapability {
 
 expect fun platformMapCapability(): PlatformMapCapability
 
+expect fun platformMapSupportsComposeOverlay(): Boolean
+
 @Composable
 expect fun PlatformMapSurface(
     state: PlatformMapState,
