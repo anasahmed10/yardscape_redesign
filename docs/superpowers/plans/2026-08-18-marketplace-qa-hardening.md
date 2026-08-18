@@ -142,4 +142,3 @@ transitions.forEach { transition ->
 - [ ] Record map debounce/clustering fixture time, JS/Wasm production bundle sizes, bundled image dimensions/bytes, and map/list/fallback observations. Avoid flaky wall-clock assertions in unit tests.
 - [ ] Run `:core:testAndroidHostTest`, `:app:shared:testAndroidHostTest`, `:server:test`, Android debug/androidTest compilation, JS/Wasm browser tests and compatibility distribution, iOS simulator tests, unsigned Xcode simulator build, and `check`. Run Android instrumentation when an emulator is available; otherwise record it explicitly as unavailable.
 - [ ] Self-review the full issue diff, run `git diff --check` and a secret scan, update docs/roadmap with the exact evidence and remaining manual launch gates, and commit `docs: complete marketplace QA hardening`.
-
