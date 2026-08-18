@@ -48,6 +48,7 @@ import com.naslabs.yardscape.domain.EventPhoto
 @Composable
 fun HostCreateEditScreen(
     editorState: HostEditorState,
+    nowEpochMillis: Long,
     availablePhotos: List<EventPhoto>,
     onAddressSearch: (String) -> List<MapSelectedLocation>,
     onEditorStateChanged: (HostEditorState) -> Unit,
@@ -112,6 +113,7 @@ fun HostCreateEditScreen(
                         onStepSelected = onStepSelected,
                         onSaveDraft = onSaveDraft,
                         isExpanded = isExpanded,
+                        nowEpochMillis = nowEpochMillis,
                     )
                 }
             }
@@ -154,6 +156,7 @@ private fun HostEventForm(
     onStepSelected: (HostEditorStep) -> Unit,
     onSaveDraft: () -> Unit,
     isExpanded: Boolean,
+    nowEpochMillis: Long,
 ) {
     val draft = state.draft
     fun updateDraft(updated: HostEventDraft) {
@@ -193,6 +196,7 @@ private fun HostEventForm(
             onEditorStateChanged = onEditorStateChanged,
             onSaveDraft = onSaveDraft,
             isExpanded = isExpanded,
+            nowEpochMillis = nowEpochMillis,
         )
 
         if (state.progress.previousStep != null || state.step != HostEditorStep.Preview) {
@@ -265,6 +269,7 @@ private fun HostEditorStepContent(
     onEditorStateChanged: (HostEditorState) -> Unit,
     onSaveDraft: () -> Unit,
     isExpanded: Boolean,
+    nowEpochMillis: Long,
 ) {
     val draft = state.draft
     when (state.step) {
@@ -306,6 +311,7 @@ private fun HostEditorStepContent(
             onSaveDraft = onSaveDraft,
             onRequestConfirmation = { onEditorStateChanged(state.requestConfirmation(it)) },
             isExpanded = isExpanded,
+            nowEpochMillis = nowEpochMillis,
         )
     }
 }
@@ -423,8 +429,9 @@ private fun HostPreviewStep(
     onSaveDraft: () -> Unit,
     onRequestConfirmation: (HostConfirmationAction) -> Unit,
     isExpanded: Boolean,
+    nowEpochMillis: Long,
 ) {
-    val preview = state.publicPreview()
+    val preview = state.publicPreview(nowEpochMillis)
     FormSectionLabel("Public shopper preview")
     val previewContent: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

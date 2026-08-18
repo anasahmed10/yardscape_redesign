@@ -86,7 +86,7 @@ class HostEditorFlowTest {
         val seeded = appState.hostEditorState(SeededYardSaleData.DRAFT_EVENT_ID)
         val previewText = seeded.copy(
             draft = seeded.draft.copy(accessInstructions = "Use private gate 2468"),
-        ).publicPreview().toString()
+        ).publicPreview(SeededYardSaleData.BASE_NOW_EPOCH_MILLIS).toString()
 
         assertFalse(previewText.contains(seeded.draft.exactStreetAddress))
         assertFalse(previewText.contains("private gate 2468"))
@@ -110,8 +110,8 @@ class HostEditorFlowTest {
 
         assertTrue(published.validationErrors.isEmpty())
         assertEquals(photos, published.draft.photos)
-        assertEquals(listOf("Second caption", "First caption"), published.publicPreview().photoCaptions)
-        assertEquals(listOf("mock://photo/second", "mock://photo/first"), published.publicPreview().photoReferences)
+        assertEquals(listOf("Second caption", "First caption"), published.publicPreview(SeededYardSaleData.BASE_NOW_EPOCH_MILLIS).photoCaptions)
+        assertEquals(listOf("mock://photo/second", "mock://photo/first"), published.publicPreview(SeededYardSaleData.BASE_NOW_EPOCH_MILLIS).photoReferences)
     }
 
     @Test

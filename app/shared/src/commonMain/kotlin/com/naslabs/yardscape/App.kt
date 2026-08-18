@@ -214,6 +214,7 @@ private fun HostEditorRoute(appState: YardScapeAppState, route: YardScapeRoute.H
     }
     HostCreateEditScreen(
         editorState = editorState,
+        nowEpochMillis = appState.nowEpochMillis,
         availablePhotos = appState.availableHostPhotos(),
         onAddressSearch = appState::searchHostLocations,
         onEditorStateChanged = { updated ->

@@ -259,7 +259,7 @@ class YardScapeAppState(
     private val publicMapAreaSource: PublicMapAreaSource = SeededPublicMapAreaSource,
     messagingRepository: MarketplaceMessagingRepository? = null,
     initialAccountStatus: MockSessionStatus = MockSessionStatus.SignedIn,
-    private val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
+    val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
     private val shopperId: String = SeededYardSaleData.SHOPPER_WITHOUT_ACCESS_ID,
     private val hostId: String = SeededYardSaleData.HOST_AVERY_ID,
     activeUserRole: UserRole = UserRole.SHOPPER,
@@ -1711,18 +1711,23 @@ fun YardSaleEvent.toHostEventDraft(): HostEventDraft =
     )
 
 fun PublicEventDetail.toDetailSections(nowEpochMillis: Long): List<Pair<String, String>> =
-    shopperDetailSections(
-        scheduleLabel = saleWindow.toBrowseDateLabel(nowEpochMillis),
-        approximateLocationLabel = listOfNotNull(
-            publicLocation.neighborhood,
-            publicLocation.city,
-            publicLocation.distanceLabel ?: publicLocation.areaDescription,
-        ).joinToString(" - "),
-        categories = categories,
-        acceptedPaymentTypes = acceptedPaymentTypes,
-        accessibilityNotes = accessibilityNotes,
-        hostContext = listOf(hostDisplayName, hostTrustSignals.firstOrNull()).filterNotNull().joinToString(" - "),
-    )
+    shopperScheduleAndArea(
+        saleWindow = saleWindow,
+        publicNeighborhood = publicLocation.neighborhood,
+        publicCity = publicLocation.city,
+        publicDistanceLabel = publicLocation.distanceLabel,
+        publicAreaDescription = publicLocation.areaDescription,
+        nowEpochMillis = nowEpochMillis,
+    ).run {
+        shopperDetailSections(
+            scheduleLabel = scheduleLabel,
+            approximateLocationLabel = approximateLocationLabel,
+            categories = categories,
+            acceptedPaymentTypes = acceptedPaymentTypes,
+            accessibilityNotes = accessibilityNotes,
+            hostContext = listOf(hostDisplayName, hostTrustSignals.firstOrNull()).filterNotNull().joinToString(" - "),
+        )
+    }
 
 private fun PublicEventDetail.toLocationRevealState(
     rsvpStatus: RsvpStatus?,
@@ -1847,7 +1852,7 @@ fun String.toClockMinutesSinceMidnight(): Int? {
     return hour24 * 60 + minute
 }
 
-private fun com.naslabs.yardscape.domain.SaleWindow.toBrowseDateLabel(
+internal fun com.naslabs.yardscape.domain.SaleWindow.toBrowseDateLabel(
     nowEpochMillis: Long,
 ): String {
     val dayOffset = (startsAtEpochMillis - nowEpochMillis).floorDiv(MILLIS_PER_DAY)
