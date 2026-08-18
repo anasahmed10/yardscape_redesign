@@ -95,10 +95,11 @@ class ShopperDiscoveryStateTest {
         assertEquals(ShopperBrowseAvailability.EmptyNearby, noNearby.browsePresentationFor(AppDataAvailability.Available).availability)
         assertEquals(ShopperBrowseAvailability.FilteredEmpty, filtered.browsePresentationFor(AppDataAvailability.Available).availability)
         assertEquals(ShopperBrowseAvailability.OfflineCached, populated.browsePresentationFor(AppDataAvailability.Offline).availability)
-        assertEquals(
-            ShopperBrowseAvailability.RecoverableError,
-            populated.browsePresentationFor(AppDataAvailability.RecoverableError("Try again in a moment.")).availability,
+        val recoverable = populated.browsePresentationFor(
+            AppDataAvailability.RecoverableError("Try again in a moment."),
         )
+        assertEquals(ShopperBrowseAvailability.RecoverableError, recoverable.availability)
+        assertEquals("Retry", recoverable.actionLabel)
     }
 
     @Test
@@ -222,6 +223,20 @@ class ShopperDiscoveryStateTest {
         assertEquals(MapAvailability.Offline, state.mapDiscoveryState.mapAvailability)
         assertEquals(2, state.discoveryState().items.size)
         assertEquals(2, state.mapDiscoveryState.markers.size)
+    }
+
+    @Test
+    fun retryingARecoverableBrowseErrorRestoresDataAndRestartsMapLoading() {
+        val state = YardScapeAppState(
+            dataAvailability = AppDataAvailability.RecoverableError("Try again in a moment."),
+        )
+
+        assertTrue(state.retryBrowseData())
+
+        assertEquals(AppDataAvailability.Available, state.dataAvailability)
+        assertEquals(MapAvailability.Loading, state.mapDiscoveryState.mapAvailability)
+        assertEquals(2, state.discoveryState().items.size)
+        assertFalse(state.retryBrowseData())
     }
 
     @Test

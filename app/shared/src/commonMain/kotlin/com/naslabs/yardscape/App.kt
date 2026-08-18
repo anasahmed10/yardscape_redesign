@@ -73,6 +73,7 @@ fun App(appState: YardScapeAppState) {
                         onCategoryToggled = appState::toggleDiscoveryCategory,
                         onDisplayModeChanged = appState::updateDiscoveryDisplayMode,
                         onResetFilters = appState::clearDiscoveryFilters,
+                        onRetryData = appState::retryBrowseData,
                         onSavedToggled = { appState.toggleSavedEvent(it) },
                         onMapViewportChanged = appState::updateMapCameraViewport,
                         onMapViewportSettled = appState::settleMapCameraViewport,

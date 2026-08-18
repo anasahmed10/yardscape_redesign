@@ -22,6 +22,7 @@ import com.naslabs.yardscape.ui.ShopperSafetyAction
 enum class MockScenarioId {
     NewShopper,
     PopulatedBrowse,
+    Loading,
     NoNearbyEvents,
     PendingRsvp,
     AcceptedAccess,
@@ -87,6 +88,13 @@ object MockScenarioCatalog {
             id = MockScenarioId.PopulatedBrowse,
             name = "Populated browse",
             assertions = listOf("Shows two upcoming public previews", "Previews contain approximate areas only"),
+            repositoryFactory = { seeded(rsvps = emptyList()) },
+        ),
+        scenario(
+            id = MockScenarioId.Loading,
+            name = "Loading nearby sales",
+            assertions = listOf("Browse reports loading", "Public previews remain privacy-safe"),
+            availability = AppDataAvailability.Loading,
             repositoryFactory = { seeded(rsvps = emptyList()) },
         ),
         scenario(

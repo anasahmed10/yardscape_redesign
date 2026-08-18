@@ -67,6 +67,7 @@ fun BrowseScreen(
     onCategoryToggled: (String) -> Unit,
     onDisplayModeChanged: (DiscoveryDisplayMode) -> Unit,
     onResetFilters: () -> Unit,
+    onRetryData: () -> Unit,
     onSavedToggled: (String) -> Unit,
     onMapViewportChanged: (MapViewport) -> Unit,
     onMapViewportSettled: () -> Unit,
@@ -102,6 +103,8 @@ fun BrowseScreen(
                 ShopperStatePanel(
                     title = presentation.title,
                     message = presentation.message,
+                    actionLabel = presentation.actionLabel,
+                    onAction = presentation.actionLabel?.let { onRetryData },
                 )
             }
         }
@@ -811,7 +814,7 @@ private fun BrowseEventActions(
                 .semantics { contentDescription = actions.saveLabel },
             onClick = onSave,
         ) {
-            Text(if (actions.isSaved) "Saved" else actions.saveLabel)
+            Text(actions.saveLabel)
         }
     }
 }

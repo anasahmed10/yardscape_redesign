@@ -82,6 +82,7 @@ internal fun ShopperDiscoveryState.browsePresentationFor(
         availability = ShopperBrowseAvailability.RecoverableError,
         title = "Couldn't refresh sales",
         message = dataAvailability.message,
+        actionLabel = "Retry",
     )
     AppDataAvailability.Available -> when {
         hasNoNearbyEvents -> ShopperBrowsePresentation(
@@ -119,6 +120,6 @@ internal data class ShopperBrowseEventActions(
 
 internal fun shopperBrowseEventActionsFor(isSaved: Boolean): ShopperBrowseEventActions =
     ShopperBrowseEventActions(
-        saveLabel = if (isSaved) "Remove from saved" else "Save sale",
+        saveLabel = if (isSaved) "Remove saved" else "Save",
         isSaved = isSaved,
     )

@@ -207,7 +207,7 @@ class YardScapeAppState(
     private val shopperId: String = SeededYardSaleData.SHOPPER_WITHOUT_ACCESS_ID,
     private val hostId: String = SeededYardSaleData.HOST_AVERY_ID,
     activeUserRole: UserRole = UserRole.SHOPPER,
-    val dataAvailability: AppDataAvailability = AppDataAvailability.Available,
+    dataAvailability: AppDataAvailability = AppDataAvailability.Available,
     private val eventCapacitySource: EventCapacitySource = EventCapacitySource.None,
     initialRoute: YardScapeRoute = YardScapeRoute.Browse,
 ) {
@@ -242,6 +242,9 @@ class YardScapeAppState(
         private set
 
     var discoveryDisplayMode: DiscoveryDisplayMode by mutableStateOf(DiscoveryDisplayMode.Map)
+        private set
+
+    var dataAvailability: AppDataAvailability by mutableStateOf(dataAvailability)
         private set
 
     var mapDiscoveryState: MapDiscoveryState by mutableStateOf(
@@ -485,6 +488,14 @@ class YardScapeAppState(
 
     fun updateMapAvailability(availability: MapAvailability) {
         mapDiscoveryState = mapDiscoveryState.updateMapAvailability(availability)
+    }
+
+    fun retryBrowseData(): Boolean {
+        if (dataAvailability !is AppDataAvailability.RecoverableError) return false
+        dataAvailability = AppDataAvailability.Available
+        mapDiscoveryState = mapDiscoveryState.updateMapAvailability(MapAvailability.Loading)
+        synchronizeDiscoveryMapMarkers()
+        return true
     }
 
     fun requestApproximateLocation(): Boolean {

@@ -14,14 +14,14 @@ class ShopperBrowsePresentationTest {
     }
 
     @Test
-    fun browseActionsKeepOpeningPrimaryAndSavingExplicit() {
+    fun browseActionsProvideExplicitVisibleOpenAndSaveLabels() {
         val unsaved = shopperBrowseEventActionsFor(isSaved = false)
         val saved = shopperBrowseEventActionsFor(isSaved = true)
 
         assertEquals("View sale", unsaved.openLabel)
-        assertEquals("Save sale", unsaved.saveLabel)
+        assertEquals("Save", unsaved.saveLabel)
         assertEquals("View sale", saved.openLabel)
-        assertEquals("Remove from saved", saved.saveLabel)
+        assertEquals("Remove saved", saved.saveLabel)
         assertFalse(unsaved.isSaved)
         assertTrue(saved.isSaved)
     }
