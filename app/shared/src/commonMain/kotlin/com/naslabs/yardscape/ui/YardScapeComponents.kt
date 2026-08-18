@@ -70,7 +70,7 @@ internal fun RoutePlaceholderScreen(
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
-            Button(onClick = onBack) {
+            Button(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onBack) {
                 Text("Back")
             }
         }

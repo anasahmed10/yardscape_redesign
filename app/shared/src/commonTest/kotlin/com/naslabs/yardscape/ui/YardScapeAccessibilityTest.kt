@@ -28,6 +28,17 @@ class YardScapeAccessibilityTest {
     }
 
     @Test
+    fun halfExpandedMapSheetOffersBothLegalResizeActions() {
+        val accessibility = mapSheetAccessibilityFor(MapResultsSheetPosition.HalfExpanded)
+
+        assertEquals("Partially expanded", accessibility.stateDescription)
+        assertEquals(
+            listOf("Expand nearby sales", "Collapse nearby sales"),
+            accessibility.actionLabels,
+        )
+    }
+
+    @Test
     fun asynchronousStatusPresentationUsesPoliteLiveRegions() {
         assertEquals(
             LiveRegionMode.Polite,
