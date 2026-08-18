@@ -596,7 +596,9 @@ class YardScapeAppState(
         pendingRsvpCancellationEventId = null
         val cancelled = repository.cancelRsvp(eventId, shopperId) ?: return false
         directionsEventId = null
-        return cancelled.status == RsvpStatus.CANCELLED
+        val cancellationCompleted = cancelled.status == RsvpStatus.CANCELLED
+        if (cancellationCompleted) exitMatchingRsvp(eventId)
+        return cancellationCompleted
     }
 
     fun addMockReminder(eventId: String): Boolean {
@@ -623,7 +625,9 @@ class YardScapeAppState(
     fun revokeRsvpAccess(eventId: String): Boolean {
         val updated = repository.revokeRsvpAccess(eventId, shopperId) ?: return false
         directionsEventId = null
-        return updated.locationVisibility == LocationVisibility.REVOKED
+        val revoked = updated.locationVisibility == LocationVisibility.REVOKED
+        if (revoked) exitMatchingRsvp(eventId)
+        return revoked
     }
 
     fun blockHostForEvent(eventId: String): Boolean =
@@ -638,7 +642,9 @@ class YardScapeAppState(
     fun expireRsvpAccess(eventId: String): Boolean {
         val updated = repository.expireRsvpAccess(eventId, shopperId) ?: return false
         directionsEventId = null
-        return updated.locationVisibility == LocationVisibility.EXPIRED
+        val expired = updated.locationVisibility == LocationVisibility.EXPIRED
+        if (expired) exitMatchingRsvp(eventId)
+        return expired
     }
 
     fun selectedEventDetailState(): EventDetailState? {
@@ -752,6 +758,16 @@ class YardScapeAppState(
             else -> (route as? YardScapeRoute.MyFinds)?.section ?: MyFindsSection.Saved
         }
         return RsvpRouteContext(origin = origin, myFindsSection = myFindsSection)
+    }
+
+    private fun exitMatchingRsvp(eventId: String) {
+        val currentRoute = route as? YardScapeRoute.Rsvp ?: return
+        if (currentRoute.eventId != eventId) return
+        route = YardScapeRoute.EventDetail(
+            eventId = eventId,
+            origin = currentRoute.origin,
+            myFindsSection = currentRoute.myFindsSection,
+        )
     }
 
     fun openReport(eventId: String) {
@@ -897,6 +913,7 @@ class YardScapeAppState(
             blockedEventIds = blockedEventIds + update.affectedEventIds
             update.affectedEventIds.forEach { eventId ->
                 repository.revokeRsvpAccess(eventId, shopperId)
+                exitMatchingRsvp(eventId)
             }
             directionsEventId = null
             if (pendingRsvpCancellationEventId in update.affectedEventIds) {

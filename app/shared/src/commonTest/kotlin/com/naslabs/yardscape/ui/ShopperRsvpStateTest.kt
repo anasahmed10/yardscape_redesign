@@ -171,7 +171,7 @@ class ShopperRsvpStateTest {
     }
 
     @Test
-    fun openRsvpPresentationReflectsRevocationAndExpiryTransitions() {
+    fun revocationAndExpiryExitOpenRsvpToItsDetailContext() {
         val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
         val event = SeededYardSaleData.events.first { it.id == eventId }
         listOf(
@@ -195,10 +195,63 @@ class ShopperRsvpStateTest {
             assertTrue(transition(appState, eventId))
 
             val presentation = appState.rsvpScreenStateFor(eventId)
-            assertIs<YardScapeRoute.Rsvp>(appState.route)
+            assertEquals(
+                YardScapeRoute.EventDetail(
+                    eventId = eventId,
+                    origin = YardScapePrimaryDestination.MyFinds,
+                    myFindsSection = MyFindsSection.Rsvps,
+                ),
+                appState.route,
+            )
             assertEquals(expectedStatus, presentation.status)
             assertFalse(presentation.canConfirm)
         }
+    }
+
+    @Test
+    fun blockingHostExitsOpenRsvpToItsDetailContext() {
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        val appState = rsvpState(
+            event = SeededYardSaleData.events.first { it.id == eventId },
+            shopperId = "blocking-transition-shopper",
+        )
+        assertTrue(appState.rsvpScreenStateFor(eventId).canConfirm)
+
+        assertTrue(appState.blockHostForEvent(eventId))
+
+        assertEquals(
+            YardScapeRoute.EventDetail(
+                eventId = eventId,
+                origin = YardScapePrimaryDestination.MyFinds,
+                myFindsSection = MyFindsSection.Rsvps,
+            ),
+            appState.route,
+        )
+        assertEquals(RsvpEligibilityStatus.BLOCKED, appState.rsvpScreenStateFor(eventId).status)
+    }
+
+    @Test
+    fun cancellingAttendanceExitsOpenRsvpToItsDetailContext() {
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        val shopperId = "cancellation-transition-shopper"
+        val appState = rsvpState(
+            event = SeededYardSaleData.events.first { it.id == eventId },
+            shopperId = shopperId,
+            rsvp = restrictedRsvp(eventId, shopperId, LocationVisibility.RSVP_ACCEPTED),
+        )
+        assertTrue(appState.requestRsvpCancellation(eventId))
+
+        assertTrue(appState.confirmRsvpCancellation())
+
+        assertEquals(
+            YardScapeRoute.EventDetail(
+                eventId = eventId,
+                origin = YardScapePrimaryDestination.MyFinds,
+                myFindsSection = MyFindsSection.Rsvps,
+            ),
+            appState.route,
+        )
+        assertEquals(ShopperRsvpUiState.Cancelled, appState.myRsvpItems().single().state)
     }
 
     @Test
