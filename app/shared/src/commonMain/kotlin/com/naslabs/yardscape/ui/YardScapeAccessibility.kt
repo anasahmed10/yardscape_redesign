@@ -5,6 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 internal val YardScapeMinimumInteractiveTarget = 48.dp
@@ -36,6 +37,23 @@ internal fun mapSheetAccessibilityFor(position: MapResultsSheetPosition): MapShe
             actionLabels = listOf("Collapse nearby sales"),
         )
     }
+
+internal data class MapSheetLayout(
+    val height: Dp,
+    val mapBottomClearance: Dp,
+)
+
+internal fun mapSheetLayoutFor(position: MapResultsSheetPosition): MapSheetLayout {
+    val height = when (position) {
+        MapResultsSheetPosition.Collapsed -> 190.dp
+        MapResultsSheetPosition.HalfExpanded -> 300.dp
+        MapResultsSheetPosition.Expanded -> 470.dp
+    }
+    return MapSheetLayout(
+        height = height,
+        mapBottomClearance = height,
+    )
+}
 
 internal enum class YardScapeStatusMessageKind {
     Success,

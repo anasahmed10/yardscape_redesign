@@ -39,6 +39,20 @@ class YardScapeAccessibilityTest {
     }
 
     @Test
+    fun mapSheetLayoutReservesItsFullHeightAboveOverlayedMapAttribution() {
+        val collapsed = mapSheetLayoutFor(MapResultsSheetPosition.Collapsed)
+        val halfExpanded = mapSheetLayoutFor(MapResultsSheetPosition.HalfExpanded)
+        val expanded = mapSheetLayoutFor(MapResultsSheetPosition.Expanded)
+
+        assertEquals(190.dp, collapsed.height)
+        assertEquals(collapsed.height, collapsed.mapBottomClearance)
+        assertEquals(300.dp, halfExpanded.height)
+        assertEquals(halfExpanded.height, halfExpanded.mapBottomClearance)
+        assertEquals(470.dp, expanded.height)
+        assertEquals(expanded.height, expanded.mapBottomClearance)
+    }
+
+    @Test
     fun asynchronousStatusPresentationUsesPoliteLiveRegions() {
         assertEquals(
             LiveRegionMode.Polite,

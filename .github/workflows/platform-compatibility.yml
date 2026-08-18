@@ -54,5 +54,8 @@ jobs:
           cache-provider: basic
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      - name: Run portable JS and Wasm browser tests
+        run: ./gradlew --no-daemon :app:shared:jsBrowserTest :app:shared:wasmJsBrowserTest
+
       - name: Build JS and Wasm distributions
         run: ./gradlew --no-daemon :app:webApp:composeCompatibilityBrowserDistribution

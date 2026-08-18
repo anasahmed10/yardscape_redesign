@@ -340,9 +340,12 @@ private fun MapDiscoveryExperience(
                 )
             }
         } else if (platformMapSupportsComposeOverlay()) {
+            val sheetLayout = mapSheetLayoutFor(mapState.sheetPosition)
             Box(modifier = Modifier.fillMaxWidth().height(620.dp)) {
                 DiscoveryMapPanel(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = sheetLayout.mapBottomClearance),
                     mapState = mapState,
                     platformState = PlatformMapState(
                         viewport = viewport,
@@ -557,15 +560,11 @@ private fun MobileNearbySheet(
     var dragDistance by remember { mutableFloatStateOf(0f) }
     val dragState = rememberDraggableState { delta -> dragDistance += delta }
     val accessibility = mapSheetAccessibilityFor(position)
-    val height = when (position) {
-        MapResultsSheetPosition.Collapsed -> 190.dp
-        MapResultsSheetPosition.HalfExpanded -> 300.dp
-        MapResultsSheetPosition.Expanded -> 470.dp
-    }
+    val layout = mapSheetLayoutFor(position)
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(height)
+            .height(layout.height)
             .draggable(
                 orientation = Orientation.Vertical,
                 state = dragState,
