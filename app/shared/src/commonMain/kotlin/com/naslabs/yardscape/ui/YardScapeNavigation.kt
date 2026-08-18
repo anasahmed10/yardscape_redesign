@@ -268,8 +268,15 @@ class YardScapeAppState(
     fun navigateTo(destination: YardScapePrimaryDestination) {
         route = when (destination) {
             YardScapePrimaryDestination.Browse -> YardScapeRoute.Browse
-            YardScapePrimaryDestination.MyFinds -> (route as? YardScapeRoute.MyFinds)
-                ?: YardScapeRoute.MyFinds()
+            YardScapePrimaryDestination.MyFinds -> YardScapeRoute.MyFinds(
+                when (val currentRoute = route) {
+                    is YardScapeRoute.MyFinds -> currentRoute.section
+                    is YardScapeRoute.EventDetail -> currentRoute.myFindsSection
+                    is YardScapeRoute.Rsvp -> currentRoute.myFindsSection
+                    is YardScapeRoute.EventSafety -> currentRoute.myFindsSection
+                    else -> MyFindsSection.Saved
+                },
+            )
             YardScapePrimaryDestination.Host -> YardScapeRoute.Host
             YardScapePrimaryDestination.Messages -> YardScapeRoute.Messages
             YardScapePrimaryDestination.Account -> YardScapeRoute.Account

@@ -125,6 +125,31 @@ class YardScapeAppStateTest {
     }
 
     @Test
+    fun reselectingMyFindsFromChildRoutesRestoresTheirRequestedSection() {
+        val openChildRoutes = listOf<(YardScapeAppState) -> Unit>(
+            { state -> state.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID) },
+            { state ->
+                state.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+                state.openRsvp(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+            },
+            { state ->
+                state.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+                state.openReport(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+            },
+        )
+
+        openChildRoutes.forEach { openChildRoute ->
+            val state = YardScapeAppState()
+            state.openMyFinds(MyFindsSection.Rsvps)
+            openChildRoute(state)
+
+            state.navigateTo(YardScapePrimaryDestination.MyFinds)
+
+            assertEquals(YardScapeRoute.MyFinds(MyFindsSection.Rsvps), state.route)
+        }
+    }
+
+    @Test
     fun revokedAndExpiredAccessHideExactAddress() {
         val revokedState = YardScapeAppState(
             repository = SeededYardSaleEventRepository(
