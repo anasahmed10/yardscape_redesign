@@ -48,7 +48,7 @@ fun ShopperSafetyScreen(
                 modifier = Modifier.padding(top = spacing.large),
                 verticalArrangement = Arrangement.spacedBy(spacing.small),
             ) {
-                TextButton(onClick = onBack) { Text("Back to event") }
+                TextButton(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onBack) { Text("Back to event") }
                 Text(state.action.label, style = MaterialTheme.typography.headlineMedium)
                 Text(state.eventTitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -89,11 +89,11 @@ fun ShopperSafetyScreen(
                 )
             },
             confirmButton = {
-                Button(onClick = onConfirmBlockMutation) {
+                Button(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onConfirmBlockMutation) {
                     Text(if (mutation == BlockMutation.Block) "Block host" else "Unblock host")
                 }
             },
-            dismissButton = { TextButton(onClick = onDismissBlockMutation) { Text("Cancel") } },
+            dismissButton = { TextButton(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onDismissBlockMutation) { Text("Cancel") } },
         )
     }
 }
@@ -115,9 +115,9 @@ private fun ReportForm(
             ) {
                 ReportReason.entries.forEach { reason ->
                     if (state.reason == reason) {
-                        Button(onClick = { onReasonChanged(reason) }) { Text(reason.displayLabel) }
+                        Button(modifier = Modifier.yardScapeInteractiveTarget(), onClick = { onReasonChanged(reason) }) { Text(reason.displayLabel) }
                     } else {
-                        OutlinedButton(onClick = { onReasonChanged(reason) }) { Text(reason.displayLabel) }
+                        OutlinedButton(modifier = Modifier.yardScapeInteractiveTarget(), onClick = { onReasonChanged(reason) }) { Text(reason.displayLabel) }
                     }
                 }
             }
@@ -132,7 +132,7 @@ private fun ReportForm(
                 minLines = 3,
             )
             ReportFeedback(state.reportState)
-            Button(modifier = Modifier.fillMaxWidth(), onClick = onSubmit) { Text("Submit mock report") }
+            Button(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = onSubmit) { Text("Submit mock report") }
         }
     }
 }
@@ -142,12 +142,14 @@ private fun ReportFeedback(state: ReportSubmissionState) {
     when (state) {
         ReportSubmissionState.Idle -> Unit
         is ReportSubmissionState.Submitted -> Text(
-            "Report received for review. Reference: ${state.receiptId}",
+            text = "Report received for review. Reference: ${state.receiptId}",
+            modifier = Modifier.yardScapeStatusAnnouncement(YardScapeStatusMessageKind.Success),
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.SemiBold,
         )
         is ReportSubmissionState.Failed -> Text(
-            "Report not submitted. ${state.message}",
+            text = "Report not submitted. ${state.message}",
+            modifier = Modifier.yardScapeStatusAnnouncement(YardScapeStatusMessageKind.Failure),
             color = MaterialTheme.colorScheme.error,
         )
     }
@@ -171,13 +173,18 @@ private fun BlockForm(state: ShopperSafetyUiState, onRequestMutation: () -> Unit
             )
             when (val feedback = state.blockState) {
                 BlockMutationState.Idle -> Unit
-                is BlockMutationState.Completed -> Text(feedback.message, color = MaterialTheme.colorScheme.primary)
+                is BlockMutationState.Completed -> Text(
+                    feedback.message,
+                    modifier = Modifier.yardScapeStatusAnnouncement(YardScapeStatusMessageKind.Success),
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 is BlockMutationState.Failed -> Text(
                     "Action not completed. ${feedback.message}",
+                    modifier = Modifier.yardScapeStatusAnnouncement(YardScapeStatusMessageKind.Failure),
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            Button(modifier = Modifier.fillMaxWidth(), onClick = onRequestMutation) {
+            Button(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = onRequestMutation) {
                 Text(if (state.isBlocked) "Unblock host" else "Block host")
             }
         }

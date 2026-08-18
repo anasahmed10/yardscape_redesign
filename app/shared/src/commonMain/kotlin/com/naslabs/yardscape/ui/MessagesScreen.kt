@@ -160,6 +160,11 @@ private fun MessagingInboxContent(
                     message = presentation.message,
                     actionLabel = presentation.actionLabel,
                     onAction = { launchAction(onRetry) },
+                    statusMessageKind = if ((state as? MessagingInboxUiState.Failed)?.kind == MessagingFailureKind.Offline) {
+                        YardScapeStatusMessageKind.Offline
+                    } else {
+                        YardScapeStatusMessageKind.Failure
+                    },
                 )
             }
             is MarketplaceInboxPresentation.Content -> items(presentation.rows, key = { it.conversationId }) { row ->
@@ -243,7 +248,7 @@ private fun MessageThreadLoadedContent(
     ) {
         item {
             Column(Modifier.padding(top = spacing.medium)) {
-                TextButton(onBack, Modifier.heightIn(min = 48.dp)) { Text("Back to messages") }
+                TextButton(onBack, Modifier.yardScapeInteractiveTarget()) { Text("Back to messages") }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ShopperEventArtwork(presentation.artwork, Modifier.width(96.dp), 72.dp)
                     Spacer(Modifier.width(spacing.medium))
@@ -253,13 +258,21 @@ private fun MessageThreadLoadedContent(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(spacing.small)) {
-                    TextButton({ onOpenEvent(state.thread.conversationKey.eventId) }, Modifier.heightIn(min = 48.dp)) { Text("View sale") }
-                    if (presentation.showReportAction) TextButton(onReport, Modifier.heightIn(min = 48.dp)) { Text("Report") }
-                    if (presentation.showBlockAction) TextButton(onBlock, Modifier.heightIn(min = 48.dp)) { Text("Block") }
+                    TextButton({ onOpenEvent(state.thread.conversationKey.eventId) }, Modifier.yardScapeInteractiveTarget()) { Text("View sale") }
+                    if (presentation.showReportAction) TextButton(onReport, Modifier.yardScapeInteractiveTarget()) { Text("Report") }
+                    if (presentation.showBlockAction) TextButton(onBlock, Modifier.yardScapeInteractiveTarget()) { Text("Block") }
                 }
             }
         }
-        presentation.closedBanner?.let { item { ShopperStatePanel(it.title, it.message) } }
+        presentation.closedBanner?.let { banner ->
+            item {
+                ShopperStatePanel(
+                    title = banner.title,
+                    message = banner.message,
+                    statusMessageKind = YardScapeStatusMessageKind.ClosedAccess,
+                )
+            }
+        }
         items(presentation.messages, key = { it.id }) { message -> MessageBubble(message) { launchAction { onRetry(message.id) } } }
         if (presentation.composer.isVisible) item { Composer(state.draft, presentation.composer.isEnabled, onDraftChanged) { launchAction(onSend) } }
         (state.operation as? MessagingOperationState.Failed)?.let { failure ->
@@ -271,6 +284,13 @@ private fun MessageThreadLoadedContent(
                         MessagingFailureKind.Validation -> "Check your message and try again."
                         MessagingFailureKind.Unauthorized -> "Messaging access is no longer available."
                     },
+                    modifier = Modifier.yardScapeStatusAnnouncement(
+                        if (failure.kind == MessagingFailureKind.Offline) {
+                            YardScapeStatusMessageKind.Offline
+                        } else {
+                            YardScapeStatusMessageKind.Failure
+                        },
+                    ),
                     color = MaterialTheme.colorScheme.error,
                 )
             }
@@ -304,7 +324,7 @@ private fun MessageBubble(message: MarketplaceMessageBubblePresentation, onRetry
                             },
                         )
                     }
-                    if (message.showsRetry) TextButton(onRetry, Modifier.heightIn(min = 48.dp)) { Text("Retry") }
+                    if (message.showsRetry) TextButton(onRetry, Modifier.yardScapeInteractiveTarget()) { Text("Retry") }
                 }
             }
         }
@@ -319,7 +339,7 @@ private fun Composer(draft: String, isEnabled: Boolean, onDraftChanged: (String)
         OutlinedTextField(
             value = draft,
             onValueChange = onDraftChanged,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { contentDescription = "Message composer" },
+            modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget().semantics { contentDescription = "Message composer" },
             enabled = isEnabled,
             label = { Text("Write a message") },
             minLines = 1,
@@ -328,7 +348,7 @@ private fun Composer(draft: String, isEnabled: Boolean, onDraftChanged: (String)
         Button(
             onClick = onSend,
             enabled = isEnabled && draft.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { contentDescription = "Send message" },
+            modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget().semantics { contentDescription = "Send message" },
         ) { Text("Send message") }
     }
 }

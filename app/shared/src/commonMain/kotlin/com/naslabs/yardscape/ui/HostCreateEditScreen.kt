@@ -77,7 +77,7 @@ fun HostCreateEditScreen(
                         verticalArrangement = Arrangement.spacedBy(spacing.small),
                     ) {
                         TextButton(
-                            modifier = Modifier.heightIn(min = 48.dp),
+                            modifier = Modifier.yardScapeInteractiveTarget(),
                             onClick = onBack,
                         ) { Text("Back to your sales") }
                         Row(
@@ -98,7 +98,7 @@ fun HostCreateEditScreen(
                                 )
                             }
                             OutlinedButton(
-                                modifier = Modifier.heightIn(min = 48.dp),
+                                modifier = Modifier.yardScapeInteractiveTarget(),
                                 onClick = onNew,
                             ) { Text("New sale") }
                         }
@@ -129,6 +129,7 @@ fun HostCreateEditScreen(
             text = { Text(action.message) },
             confirmButton = {
                 Button(
+                    modifier = Modifier.yardScapeInteractiveTarget(),
                     onClick = {
                         when (action) {
                             HostConfirmationAction.Publish -> onPublish()
@@ -140,6 +141,7 @@ fun HostCreateEditScreen(
             },
             dismissButton = {
                 TextButton(
+                    modifier = Modifier.yardScapeInteractiveTarget(),
                     onClick = { onEditorStateChanged(editorState.dismissConfirmation()) },
                 ) { Text("Go back") }
             },
@@ -203,19 +205,19 @@ private fun HostEventForm(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.progress.previousStep?.let { previousStep ->
                     OutlinedButton(
-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        modifier = Modifier.weight(1f).yardScapeInteractiveTarget(),
                         onClick = { onStepSelected(previousStep) },
                     ) { Text("Back") }
                 }
                 if (state.step != HostEditorStep.Preview) {
                     Button(
-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        modifier = Modifier.weight(1f).yardScapeInteractiveTarget(),
                         onClick = { onStepSelected(HostEditorStep.entries[state.step.ordinal + 1]) },
                     ) { Text("Continue") }
                 }
             }
             if (state.step != HostEditorStep.Preview) {
-                TextButton(modifier = Modifier.heightIn(min = 48.dp), onClick = onSaveDraft) { Text("Save draft and leave later") }
+                TextButton(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onSaveDraft) { Text("Save draft and leave later") }
             }
         }
     }
@@ -249,7 +251,7 @@ private fun HostEditorProgressIndicator(
             HostEditorStep.entries.forEach { step ->
                 when {
                     step.ordinal < progress.activeStep.ordinal -> TextButton(
-                        modifier = Modifier.heightIn(min = 48.dp),
+                        modifier = Modifier.yardScapeInteractiveTarget(),
                         onClick = { onStepSelected(step) },
                     ) { Text(step.label) }
                     step == progress.activeStep -> Text(step.label, style = MaterialTheme.typography.labelLarge)
@@ -329,7 +331,7 @@ private fun HostPhotosStep(
     )
     availablePhotos.filter { candidate -> draft.photos.none { it.url == candidate.url } }.forEach { photo ->
         OutlinedButton(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(),
             onClick = { onDraftChanged(draft.copy(photos = draft.photos + photo)) },
         ) {
             Row(
@@ -363,17 +365,17 @@ private fun HostPhotosStep(
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     OutlinedButton(
-                        modifier = Modifier.heightIn(min = 48.dp),
+                        modifier = Modifier.yardScapeInteractiveTarget(),
                         enabled = index > 0,
                         onClick = { onDraftChanged(draft.copy(photos = draft.photos.move(index, index - 1))) },
                     ) { Text("Move up") }
                     OutlinedButton(
-                        modifier = Modifier.heightIn(min = 48.dp),
+                        modifier = Modifier.yardScapeInteractiveTarget(),
                         enabled = index < draft.photos.lastIndex,
                         onClick = { onDraftChanged(draft.copy(photos = draft.photos.move(index, index + 1))) },
                     ) { Text("Move down") }
                     TextButton(
-                        modifier = Modifier.heightIn(min = 48.dp),
+                        modifier = Modifier.yardScapeInteractiveTarget(),
                         onClick = { onDraftChanged(draft.copy(photos = draft.photos.filterIndexed { itemIndex, _ -> itemIndex != index })) },
                     ) { Text("Remove") }
                 }
@@ -410,12 +412,12 @@ private fun HostRsvpSettingsStep(
     HostRsvpApprovalMode.entries.forEach { mode ->
         if (mode == state.approvalMode) {
             Button(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(),
                 onClick = { onEditorStateChanged(state.copy(approvalMode = mode, validationErrors = emptyList())) },
             ) { Text(mode.label) }
         } else {
             OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(),
                 onClick = { onEditorStateChanged(state.copy(approvalMode = mode, validationErrors = emptyList())) },
             ) { Text(mode.label) }
         }
@@ -451,15 +453,15 @@ private fun HostPreviewStep(
         }
     }
     val actions: @Composable () -> Unit = {
-        Button(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = onSaveDraft) { Text("Save draft") }
+        Button(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = onSaveDraft) { Text("Save draft") }
         Button(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(),
             onClick = { onRequestConfirmation(HostConfirmationAction.Publish) },
             colors = ButtonDefaults.buttonColors(containerColor = Clay),
         ) { Text("Review and publish") }
         if (state.savedEventId != null) {
-            OutlinedButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = { onRequestConfirmation(HostConfirmationAction.Hide) }) { Text("Hide from search") }
-            OutlinedButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = { onRequestConfirmation(HostConfirmationAction.Cancel) }) { Text("Cancel event") }
+            OutlinedButton(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = { onRequestConfirmation(HostConfirmationAction.Hide) }) { Text("Hide from search") }
+            OutlinedButton(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = { onRequestConfirmation(HostConfirmationAction.Cancel) }) { Text("Cancel event") }
         }
     }
     if (isExpanded) {
@@ -565,7 +567,7 @@ private fun MapLocationSuggestionButton(
     onLocationSelected: (MapSelectedLocation) -> Unit,
 ) {
     OutlinedButton(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(),
         onClick = { onLocationSelected(location) },
     ) {
         Column(
@@ -599,7 +601,7 @@ private fun HostTimePickerField(
     var showPicker by remember { mutableStateOf(false) }
     val displayValue = value?.toHostClockTimeLabel() ?: "Select time"
     OutlinedButton(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(),
         onClick = { showPicker = true },
         shape = MaterialTheme.shapes.small,
     ) {
@@ -659,6 +661,7 @@ private fun HostTimePickerDialog(
         },
         confirmButton = {
             TextButton(
+                modifier = Modifier.yardScapeInteractiveTarget(),
                 onClick = {
                     onConfirm(timePickerState.hour, timePickerState.minute)
                 },
@@ -667,7 +670,7 @@ private fun HostTimePickerDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onDismiss) {
                 Text("Cancel")
             }
         },

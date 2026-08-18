@@ -236,6 +236,7 @@ object YardScapeTestTags {
     const val DiscoveryResultsSheet: String = "discovery-results-sheet"
 
     fun browseEventCard(eventId: String): String = "browse-event-card-$eventId"
+    fun mapResult(eventId: String): String = "discovery-map-result-$eventId"
     fun primaryDestination(destination: YardScapePrimaryDestination): String =
         "primary-destination-${destination.name.lowercase()}"
 }
