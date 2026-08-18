@@ -81,6 +81,28 @@ class ShopperDiscoveryStateTest {
     }
 
     @Test
+    fun browseAvailabilitySeparatesLoadingEmptyFilteredOfflineAndRecoverableStates() {
+        val populated = YardScapeAppState().discoveryState()
+        val noNearby = YardScapeAppState(
+            repository = SeededYardSaleEventRepository(events = emptyList(), rsvps = emptyList()),
+        ).discoveryState()
+        val filtered = YardScapeAppState().apply {
+            updateDiscoveryQuery("no such sale")
+        }.discoveryState()
+
+        assertEquals(ShopperBrowseAvailability.Loading, populated.browsePresentationFor(AppDataAvailability.Loading).availability)
+        assertEquals(ShopperBrowseAvailability.Results, populated.browsePresentationFor(AppDataAvailability.Available).availability)
+        assertEquals(ShopperBrowseAvailability.EmptyNearby, noNearby.browsePresentationFor(AppDataAvailability.Available).availability)
+        assertEquals(ShopperBrowseAvailability.FilteredEmpty, filtered.browsePresentationFor(AppDataAvailability.Available).availability)
+        assertEquals(ShopperBrowseAvailability.OfflineCached, populated.browsePresentationFor(AppDataAvailability.Offline).availability)
+        val recoverable = populated.browsePresentationFor(
+            AppDataAvailability.RecoverableError("Try again in a moment."),
+        )
+        assertEquals(ShopperBrowseAvailability.RecoverableError, recoverable.availability)
+        assertEquals("Retry", recoverable.actionLabel)
+    }
+
+    @Test
     fun savedEventsPersistAcrossFiltersModesAndRoutesForTheSession() {
         val state = YardScapeAppState()
         val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
@@ -204,6 +226,20 @@ class ShopperDiscoveryStateTest {
     }
 
     @Test
+    fun retryingARecoverableBrowseErrorRestoresDataAndRestartsMapLoading() {
+        val state = YardScapeAppState(
+            dataAvailability = AppDataAvailability.RecoverableError("Try again in a moment."),
+        )
+
+        assertTrue(state.retryBrowseData())
+
+        assertEquals(AppDataAvailability.Available, state.dataAvailability)
+        assertEquals(MapAvailability.Loading, state.mapDiscoveryState.mapAvailability)
+        assertEquals(2, state.discoveryState().items.size)
+        assertFalse(state.retryBrowseData())
+    }
+
+    @Test
     fun repeatedLocationRequestsAreRejectedWhileOneIsPending() {
         val state = YardScapeAppState()
 
@@ -224,7 +260,33 @@ class ShopperDiscoveryStateTest {
 
         state.searchMapCameraArea()
 
-        assertTrue(state.discoveryState().items.isEmpty())
+        val discovery = state.discoveryState()
+        val presentation = discovery.browsePresentationFor(AppDataAvailability.Available)
+        assertTrue(discovery.items.isEmpty())
+        assertEquals(2, discovery.totalEventCount)
+        assertFalse(discovery.filters.isActive)
         assertTrue(state.mapDiscoveryState.markers.isEmpty())
+        assertEquals("No sales in this map area", presentation.title)
+        assertEquals("Show all nearby sales", presentation.actionLabel)
+    }
+
+    @Test
+    fun showAllNearbySalesClearsACommittedEmptyMapArea() {
+        val state = YardScapeAppState()
+        state.updateMapCameraViewport(
+            MapViewport(
+                center = ViewportCenter(48.8, -123.8),
+                zoomLevel = 14.0,
+            ),
+        )
+        state.settleMapCameraViewport()
+        state.searchMapCameraArea()
+        assertTrue(state.discoveryState().items.isEmpty())
+
+        state.showAllNearbySales()
+
+        assertEquals(2, state.discoveryState().items.size)
+        assertEquals(2, state.mapDiscoveryState.markers.size)
+        assertEquals(null, state.mapDiscoveryState.searchedViewport)
     }
 }

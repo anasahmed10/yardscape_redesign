@@ -73,10 +73,12 @@ fun App(appState: YardScapeAppState) {
                         onCategoryToggled = appState::toggleDiscoveryCategory,
                         onDisplayModeChanged = appState::updateDiscoveryDisplayMode,
                         onResetFilters = appState::clearDiscoveryFilters,
+                        onRetryData = appState::retryBrowseData,
                         onSavedToggled = { appState.toggleSavedEvent(it) },
                         onMapViewportChanged = appState::updateMapCameraViewport,
                         onMapViewportSettled = appState::settleMapCameraViewport,
                         onSearchThisArea = appState::searchMapCameraArea,
+                        onShowAllNearbySales = appState::showAllNearbySales,
                         onMapEventSelected = appState::selectDiscoveryEvent,
                         onMapAvailabilityChanged = appState::updateMapAvailability,
                         onSheetPositionChanged = appState::updateMapResultsSheetPosition,
@@ -142,11 +144,13 @@ fun App(appState: YardScapeAppState) {
                         state = appState.selectedEventDetailState(),
                         onBack = { appState.navigateBack() },
                         onRsvp = { appState.openRsvp(currentRoute.eventId) },
+                        onDirections = { appState.requestDirections(currentRoute.eventId) },
                         onReport = { appState.openReport(currentRoute.eventId) },
                         onBlock = { appState.openBlock(currentRoute.eventId) },
                     )
 
                     is YardScapeRoute.Rsvp -> RsvpScreen(
+                        state = appState.rsvpScreenStateFor(currentRoute.eventId),
                         onConfirm = { appState.confirmRsvp(currentRoute.eventId) },
                         onBack = { appState.navigateBack() },
                     )

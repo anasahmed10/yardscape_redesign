@@ -46,6 +46,9 @@ class MockScenarioCatalogTest {
             MockScenarioCatalog.createAppState(MockScenarioId.PopulatedBrowse).browseItems().size,
         )
         assertTrue(MockScenarioCatalog.createAppState(MockScenarioId.NoNearbyEvents).browseItems().isEmpty())
+        assertIs<AppDataAvailability.Loading>(
+            MockScenarioCatalog.createAppState(MockScenarioId.Loading).dataAvailability,
+        )
         assertIs<AppDataAvailability.Offline>(
             MockScenarioCatalog.createAppState(MockScenarioId.Offline).dataAvailability,
         )

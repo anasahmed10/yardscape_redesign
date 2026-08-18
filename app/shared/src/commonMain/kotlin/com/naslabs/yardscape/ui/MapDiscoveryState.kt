@@ -149,4 +149,11 @@ data class MapDiscoveryState(
         } else {
             this
         }
+
+    fun clearSearchedArea(): MapDiscoveryState = copy(
+        cameraViewportDraft = null,
+        searchedViewport = null,
+        selectedEventId = null,
+        viewportSearchReadiness = ViewportSearchReadiness.Synchronized,
+    )
 }

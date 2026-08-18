@@ -25,6 +25,8 @@ import com.naslabs.yardscape.domain.MapViewport
 import com.naslabs.yardscape.domain.PublicEventPreview
 import com.naslabs.yardscape.domain.PublicEventMarker
 import com.naslabs.yardscape.domain.Rsvp
+import com.naslabs.yardscape.domain.RsvpEligibilityPolicy
+import com.naslabs.yardscape.domain.RsvpEligibilityStatus
 import com.naslabs.yardscape.domain.RsvpStatus
 import com.naslabs.yardscape.domain.ReportReason
 import com.naslabs.yardscape.domain.SafetyReportDraft
@@ -179,12 +181,12 @@ object YardScapeTestTags {
     const val BrowseScreen: String = "browse-screen"
     const val LocationAccessPanel: String = "event-detail-location-access"
     const val ExactLocationContent: String = "event-detail-exact-location"
+    const val DirectionsAction: String = "event-detail-directions-action"
     const val RsvpAction: String = "event-detail-rsvp-action"
     const val RsvpConfirmAction: String = "rsvp-confirm-action"
     const val AppShell: String = "app-shell"
     const val DiscoveryNoResults: String = "discovery-no-results"
     const val SavedScreen: String = "saved-screen"
-    const val MyRsvpsScreen: String = "my-rsvps-screen"
     const val MyFindsScreen: String = "my-finds-screen"
     const val MessagesScreen: String = "messages-screen"
     const val DiscoveryMap: String = "discovery-map"
@@ -193,6 +195,17 @@ object YardScapeTestTags {
     fun browseEventCard(eventId: String): String = "browse-event-card-$eventId"
     fun primaryDestination(destination: YardScapePrimaryDestination): String =
         "primary-destination-${destination.name.lowercase()}"
+}
+
+private data class RsvpRouteContext(
+    val origin: YardScapePrimaryDestination,
+    val myFindsSection: MyFindsSection,
+) {
+    fun detailRoute(eventId: String): YardScapeRoute.EventDetail =
+        YardScapeRoute.EventDetail(eventId, origin, myFindsSection)
+
+    fun rsvpRoute(eventId: String): YardScapeRoute.Rsvp =
+        YardScapeRoute.Rsvp(eventId, origin, myFindsSection)
 }
 
 class YardScapeAppState(
@@ -207,7 +220,7 @@ class YardScapeAppState(
     private val shopperId: String = SeededYardSaleData.SHOPPER_WITHOUT_ACCESS_ID,
     private val hostId: String = SeededYardSaleData.HOST_AVERY_ID,
     activeUserRole: UserRole = UserRole.SHOPPER,
-    val dataAvailability: AppDataAvailability = AppDataAvailability.Available,
+    dataAvailability: AppDataAvailability = AppDataAvailability.Available,
     private val eventCapacitySource: EventCapacitySource = EventCapacitySource.None,
     initialRoute: YardScapeRoute = YardScapeRoute.Browse,
 ) {
@@ -244,9 +257,13 @@ class YardScapeAppState(
     var discoveryDisplayMode: DiscoveryDisplayMode by mutableStateOf(DiscoveryDisplayMode.Map)
         private set
 
+    var dataAvailability: AppDataAvailability by mutableStateOf(dataAvailability)
+        private set
+
     var mapDiscoveryState: MapDiscoveryState by mutableStateOf(
         MapDiscoveryState(
             mapAvailability = when (dataAvailability) {
+                AppDataAvailability.Loading,
                 AppDataAvailability.Available -> MapAvailability.Loading
                 AppDataAvailability.Offline -> MapAvailability.Offline
                 is AppDataAvailability.RecoverableError -> MapAvailability.Failed(dataAvailability.message)
@@ -412,6 +429,7 @@ class YardScapeAppState(
             filters = discoveryFilters,
             displayMode = discoveryDisplayMode,
             savedEventIds = savedEventIds,
+            hasCommittedMapAreaSearch = mapDiscoveryState.searchedViewport != null,
         )
     }
 
@@ -472,6 +490,12 @@ class YardScapeAppState(
         synchronizeDiscoveryMapMarkers()
     }
 
+    fun showAllNearbySales() {
+        discoveryFilters = DiscoveryFilters()
+        mapDiscoveryState = mapDiscoveryState.clearSearchedArea()
+        synchronizeDiscoveryMapMarkers()
+    }
+
     fun selectDiscoveryEvent(eventId: String?): Boolean {
         val updated = mapDiscoveryState.selectEvent(eventId)
         mapDiscoveryState = updated
@@ -484,6 +508,14 @@ class YardScapeAppState(
 
     fun updateMapAvailability(availability: MapAvailability) {
         mapDiscoveryState = mapDiscoveryState.updateMapAvailability(availability)
+    }
+
+    fun retryBrowseData(): Boolean {
+        if (dataAvailability !is AppDataAvailability.RecoverableError) return false
+        dataAvailability = AppDataAvailability.Available
+        mapDiscoveryState = mapDiscoveryState.updateMapAvailability(MapAvailability.Loading)
+        synchronizeDiscoveryMapMarkers()
+        return true
     }
 
     fun requestApproximateLocation(): Boolean {
@@ -550,6 +582,7 @@ class YardScapeAppState(
                     },
                     reminderAdded = rsvp.eventId in reminderEventIds,
                     calendarExportPrepared = rsvp.eventId in calendarExportEventIds,
+                    photoReference = detail.photos.firstOrNull()?.url,
                 )
             }.sortedWith(compareBy({ it.group.ordinal }, { it.dateLabel }))
         }
@@ -570,7 +603,9 @@ class YardScapeAppState(
         pendingRsvpCancellationEventId = null
         val cancelled = repository.cancelRsvp(eventId, shopperId) ?: return false
         directionsEventId = null
-        return cancelled.status == RsvpStatus.CANCELLED
+        val cancellationCompleted = cancelled.status == RsvpStatus.CANCELLED
+        if (cancellationCompleted) exitMatchingRsvp(eventId)
+        return cancellationCompleted
     }
 
     fun addMockReminder(eventId: String): Boolean {
@@ -597,7 +632,9 @@ class YardScapeAppState(
     fun revokeRsvpAccess(eventId: String): Boolean {
         val updated = repository.revokeRsvpAccess(eventId, shopperId) ?: return false
         directionsEventId = null
-        return updated.locationVisibility == LocationVisibility.REVOKED
+        val revoked = updated.locationVisibility == LocationVisibility.REVOKED
+        if (revoked) exitMatchingRsvp(eventId)
+        return revoked
     }
 
     fun blockHostForEvent(eventId: String): Boolean =
@@ -612,7 +649,9 @@ class YardScapeAppState(
     fun expireRsvpAccess(eventId: String): Boolean {
         val updated = repository.expireRsvpAccess(eventId, shopperId) ?: return false
         directionsEventId = null
-        return updated.locationVisibility == LocationVisibility.EXPIRED
+        val expired = updated.locationVisibility == LocationVisibility.EXPIRED
+        if (expired) exitMatchingRsvp(eventId)
+        return expired
     }
 
     fun selectedEventDetailState(): EventDetailState? {
@@ -642,6 +681,7 @@ class YardScapeAppState(
                     rsvpStatus = rsvp?.status,
                     locationVisibility = rsvp?.locationVisibility,
                     exactAddress = exactAddress,
+                    eventHasEnded = detail.saleWindow.hasEnded(nowEpochMillis),
                 )
             },
         )
@@ -659,42 +699,84 @@ class YardScapeAppState(
     }
 
     fun openRsvp(eventId: String) {
-        val detailRoute = (route as? YardScapeRoute.EventDetail)?.takeIf { it.eventId == eventId }
-        val origin = detailRoute?.origin ?: YardScapePrimaryDestination.Browse
-        val myFindsSection = detailRoute?.myFindsSection ?: MyFindsSection.Saved
-        if (eventId in blockedEventIds) {
-            route = YardScapeRoute.EventDetail(eventId, origin, myFindsSection)
+        val context = rsvpRouteContext(eventId)
+        if (!canSubmitRsvp(eventId)) {
+            route = context.detailRoute(eventId)
             return
         }
         val gate = protectedActionDecision(ProtectedAction.Rsvp)
         if (gate is ProtectedActionDecision.SignInRequired) {
             pendingProtectedAction = PendingProtectedAction(
                 ProtectedAction.Rsvp,
-                YardScapeRoute.EventDetail(eventId, origin, myFindsSection),
+                context.detailRoute(eventId),
             )
             accountState = accountState.copy(signInReason = gate.message)
             route = YardScapeRoute.Account
             return
         }
-        route = YardScapeRoute.Rsvp(eventId, origin, myFindsSection)
+        route = context.rsvpRoute(eventId)
     }
 
     fun confirmRsvp(eventId: String) {
+        val context = rsvpRouteContext(eventId)
         if (!accountState.isSignedIn) {
             openRsvp(eventId)
             return
         }
-        val rsvpRoute = (route as? YardScapeRoute.Rsvp)?.takeIf { it.eventId == eventId }
-        val origin = rsvpRoute?.origin ?: route.primaryDestination.takeIf {
-            it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.MyFinds
-        } ?: YardScapePrimaryDestination.Browse
-        val myFindsSection = rsvpRoute?.myFindsSection ?: MyFindsSection.Saved
-        if (eventId in blockedEventIds) {
-            route = YardScapeRoute.EventDetail(eventId, origin, myFindsSection)
+        if (!canSubmitRsvp(eventId)) {
+            route = context.detailRoute(eventId)
             return
         }
         repository.submitRsvp(eventId, shopperId)
-        route = YardScapeRoute.EventDetail(eventId, origin, myFindsSection)
+        route = context.detailRoute(eventId)
+    }
+
+    fun rsvpScreenStateFor(eventId: String): RsvpScreenState =
+        rsvpEligibilityStatusFor(eventId).toRsvpScreenState()
+
+    private fun canSubmitRsvp(eventId: String): Boolean {
+        return rsvpEligibilityStatusFor(eventId) == RsvpEligibilityStatus.ELIGIBLE
+    }
+
+    private fun rsvpEligibilityStatusFor(eventId: String): RsvpEligibilityStatus {
+        val detail = repository.publicEventDetail(eventId) ?: return RsvpEligibilityStatus.EVENT_UNAVAILABLE
+        val currentRsvp = repository.rsvpFor(eventId, shopperId)
+        return RsvpEligibilityPolicy.statusFor(
+            eventStatus = detail.status,
+            saleWindow = detail.saleWindow,
+            currentRsvpStatus = currentRsvp?.status,
+            currentLocationVisibility = currentRsvp?.locationVisibility,
+            nowEpochMillis = nowEpochMillis,
+            isBlocked = eventId in blockedEventIds,
+            isAtCapacity = eventCapacitySource.isAtCapacity(eventId),
+        )
+    }
+
+    private fun rsvpRouteContext(eventId: String): RsvpRouteContext {
+        val childRoute = when (val currentRoute = route) {
+            is YardScapeRoute.EventDetail -> currentRoute.takeIf { it.eventId == eventId }
+            is YardScapeRoute.Rsvp -> currentRoute.takeIf { it.eventId == eventId }
+            else -> null
+        }
+        val origin = childRoute?.primaryDestination ?: route.primaryDestination.takeIf {
+            it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.MyFinds
+        } ?: YardScapePrimaryDestination.Browse
+        val myFindsSection = when (childRoute) {
+            is YardScapeRoute.EventDetail -> childRoute.myFindsSection
+            is YardScapeRoute.Rsvp -> childRoute.myFindsSection
+            else -> (route as? YardScapeRoute.MyFinds)?.section ?: MyFindsSection.Saved
+        }
+        return RsvpRouteContext(origin = origin, myFindsSection = myFindsSection)
+    }
+
+    private fun exitMatchingRsvp(eventId: String) {
+        val currentRoute = route as? YardScapeRoute.Rsvp ?: return
+        if (currentRoute.eventId != eventId) return
+        route = YardScapeRoute.EventDetail(
+            eventId = eventId,
+            origin = currentRoute.origin,
+            myFindsSection = currentRoute.myFindsSection,
+        )
     }
 
     fun openReport(eventId: String) {
@@ -840,6 +922,7 @@ class YardScapeAppState(
             blockedEventIds = blockedEventIds + update.affectedEventIds
             update.affectedEventIds.forEach { eventId ->
                 repository.revokeRsvpAccess(eventId, shopperId)
+                exitMatchingRsvp(eventId)
             }
             directionsEventId = null
             if (pendingRsvpCancellationEventId in update.affectedEventIds) {
@@ -1082,6 +1165,7 @@ data class BrowseEventItem(
     val categoryLabels: List<String>,
     val statusLabel: String,
     val photoDescription: String?,
+    val photoReference: String? = null,
 )
 
 data class HostEventItem(
@@ -1100,11 +1184,12 @@ data class EventDetailState(
     val shouldShowRsvpAction: Boolean =
         detail.status == EventStatus.PUBLISHED &&
             attendanceState == EventAttendanceState.Available &&
-            revealState !is LocationRevealState.Revealed &&
-            revealState !is LocationRevealState.Blocked
+            (revealState is LocationRevealState.NotRequested ||
+                revealState is LocationRevealState.Pending)
 }
 
 sealed interface AppDataAvailability {
+    data object Loading : AppDataAvailability
     data object Available : AppDataAvailability
     data object Offline : AppDataAvailability
     data class RecoverableError(val message: String) : AppDataAvailability
@@ -1137,6 +1222,30 @@ sealed interface LocationRevealState {
         override val title: String = "RSVP pending"
         override val message: String =
             "The host has not granted exact-location access yet."
+    }
+
+    data object Waitlisted : LocationRevealState {
+        override val title: String = "RSVP waitlisted"
+        override val message: String =
+            "This RSVP is waiting for space. Exact-location access has not been granted."
+    }
+
+    data object Declined : LocationRevealState {
+        override val title: String = "RSVP declined"
+        override val message: String =
+            "This RSVP was declined, so exact-location access remains private."
+    }
+
+    data object AtCapacity : LocationRevealState {
+        override val title: String = "Sale at capacity"
+        override val message: String =
+            "This RSVP could not be accepted because the sale reached its attendee limit."
+    }
+
+    data object AcceptedWithoutAccess : LocationRevealState {
+        override val title: String = "RSVP accepted"
+        override val message: String =
+            "Your RSVP is accepted, but exact-location access is not currently available."
     }
 
     data object Revoked : LocationRevealState {
@@ -1186,6 +1295,7 @@ fun PublicEventPreview.toBrowseEventItem(nowEpochMillis: Long): BrowseEventItem 
         categoryLabels = categories,
         statusLabel = status.name.lowercase().replaceFirstChar { it.uppercase() },
         photoDescription = photos.firstOrNull()?.description,
+        photoReference = photos.firstOrNull()?.url,
     )
 
 private fun BrowseEventItem.matches(filters: DiscoveryFilters, nowEpochMillis: Long): Boolean {
@@ -1288,9 +1398,13 @@ private fun PublicEventDetail.toLocationRevealState(
     rsvpStatus: RsvpStatus?,
     locationVisibility: LocationVisibility?,
     exactAddress: ExactAddress?,
+    eventHasEnded: Boolean,
 ): LocationRevealState {
     if (status == EventStatus.CANCELLED || status == EventStatus.COMPLETED) {
         return LocationRevealState.Cancelled
+    }
+    if (eventHasEnded) {
+        return LocationRevealState.Expired
     }
     if (exactAddress != null) {
         return LocationRevealState.Revealed(exactAddress)
@@ -1298,6 +1412,10 @@ private fun PublicEventDetail.toLocationRevealState(
     return when {
         locationVisibility == LocationVisibility.REVOKED -> LocationRevealState.Revoked
         locationVisibility == LocationVisibility.EXPIRED -> LocationRevealState.Expired
+        rsvpStatus == RsvpStatus.WAITLISTED -> LocationRevealState.Waitlisted
+        rsvpStatus == RsvpStatus.DECLINED -> LocationRevealState.Declined
+        rsvpStatus == RsvpStatus.FULL -> LocationRevealState.AtCapacity
+        rsvpStatus == RsvpStatus.ACCEPTED -> LocationRevealState.AcceptedWithoutAccess
         rsvpStatus == RsvpStatus.REQUESTED ||
             locationVisibility == LocationVisibility.RSVP_REQUESTED -> LocationRevealState.Pending
         else -> LocationRevealState.NotRequested

@@ -30,4 +30,17 @@ class MyFindsStateTest {
         assertTrue(myFinds.rsvpItems.isNotEmpty())
         assertFalse(myFinds.isEmpty)
     }
+
+    @Test
+    fun selectedSectionPresentationKeepsOnlyItsOwnEmptyState() {
+        val state = YardScapeAppState()
+        val saved = state.myFindsState(MyFindsSection.Saved).workspacePresentation()
+        val rsvps = state.myFindsState(MyFindsSection.Rsvps).workspacePresentation()
+
+        assertEquals(MyFindsSection.Saved, saved.selectedSection)
+        assertEquals("Nothing saved yet", saved.emptyState?.title)
+        assertEquals(MyFindsSection.Rsvps, rsvps.selectedSection)
+        assertFalse(rsvps.rsvpGroups.isEmpty())
+        assertEquals(null, rsvps.emptyState)
+    }
 }

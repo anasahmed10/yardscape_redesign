@@ -1,29 +1,28 @@
 package com.naslabs.yardscape.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip as MaterialFilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 
 @Composable
 internal fun DetailRow(label: String, value: String) {
@@ -138,74 +137,43 @@ internal fun FilterChip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val background = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
-    val content = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-    Text(
+    val presentation = filterControlPresentationFor(selected)
+    MaterialFilterChip(
         modifier = Modifier
-            .clip(MaterialTheme.shapes.extraSmall)
-            .background(background)
-            .border(
-                width = 1.dp,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                shape = MaterialTheme.shapes.extraSmall,
-            )
-            .clickable(onClick = onClick)
-            .widthIn(max = 160.dp)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        text = label,
-        style = MaterialTheme.typography.labelLarge,
-        color = content,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
-}
-
-@Composable
-internal fun EventPhotoPreview(
-    title: String,
-    description: String?,
-    seed: String,
-) {
-    val accent = when (seed.length % 3) {
-        0 -> PhotoLeaf
-        1 -> PhotoMarket
-        else -> PhotoClay
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(136.dp)
-            .clip(MaterialTheme.shapes.small)
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(accent, accent.copy(alpha = 0.52f), Linen),
-                ),
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.72f), MaterialTheme.shapes.small)
-            .padding(14.dp),
-        contentAlignment = Alignment.BottomStart,
-    ) {
-        Column(
-            modifier = Modifier.widthIn(max = 280.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
+            .heightIn(min = presentation.minimumHeight)
+            .widthIn(max = 160.dp),
+        selected = presentation.isSelected,
+        onClick = onClick,
+        label = {
             Text(
-                text = description ?: "Preview photo coming soon",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = ForestInk,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodySmall,
-                color = ForestInk.copy(alpha = 0.72f),
+                text = label,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        }
-    }
+        },
+        shape = MaterialTheme.shapes.extraSmall,
+    )
+}
+
+internal data class FilterControlPresentation(
+    val isSelected: Boolean,
+    val minimumHeight: Dp,
+)
+
+internal fun filterControlPresentationFor(selected: Boolean): FilterControlPresentation =
+    FilterControlPresentation(
+        isSelected = selected,
+        minimumHeight = 48.dp,
+    )
+
+@Composable
+internal fun EventPhotoPreview(
+    presentation: ShopperEventArtworkPresentation,
+) {
+    ShopperEventArtwork(
+        presentation = presentation,
+        height = 184.dp,
+    )
 }
 
 @Composable
