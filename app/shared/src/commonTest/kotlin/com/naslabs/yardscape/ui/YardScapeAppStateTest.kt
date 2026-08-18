@@ -11,6 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class YardScapeAppStateTest {
     @Test
@@ -84,6 +85,17 @@ class YardScapeAppStateTest {
 
         assertEquals(YardScapeRoute.MyFinds(MyFindsSection.Rsvps), state.route)
         assertEquals(eventId, state.directionsEventId)
+    }
+
+    @Test
+    fun returningFromAnRsvpDetailRestoresTheRsvpsSection() {
+        val state = YardScapeAppState()
+
+        state.openMyFinds(MyFindsSection.Rsvps)
+        state.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+
+        assertTrue(state.navigateBack())
+        assertEquals(YardScapeRoute.MyFinds(MyFindsSection.Rsvps), state.route)
     }
 
     @Test

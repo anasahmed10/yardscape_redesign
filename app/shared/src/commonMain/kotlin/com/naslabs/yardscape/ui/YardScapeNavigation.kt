@@ -86,6 +86,7 @@ sealed interface YardScapeRoute {
     data class EventDetail(
         val eventId: String,
         val origin: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse,
+        val myFindsSection: MyFindsSection = MyFindsSection.Saved,
     ) : YardScapeRoute {
         init {
             require(origin == YardScapePrimaryDestination.Browse || origin == YardScapePrimaryDestination.MyFinds)
@@ -338,7 +339,7 @@ class YardScapeAppState(
             YardScapeRoute.Account,
             -> YardScapeRoute.Browse
             is YardScapeRoute.EventDetail -> when (current.origin) {
-                YardScapePrimaryDestination.MyFinds -> YardScapeRoute.MyFinds()
+                YardScapePrimaryDestination.MyFinds -> YardScapeRoute.MyFinds(current.myFindsSection)
                 else -> YardScapeRoute.Browse
             }
             is YardScapeRoute.Rsvp -> YardScapeRoute.EventDetail(current.eventId, current.origin)
@@ -547,7 +548,8 @@ class YardScapeAppState(
         val origin = activePrimaryDestination.takeIf {
             it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.MyFinds
         } ?: YardScapePrimaryDestination.Browse
-        route = YardScapeRoute.EventDetail(eventId, origin)
+        val myFindsSection = (route as? YardScapeRoute.MyFinds)?.section ?: MyFindsSection.Saved
+        route = YardScapeRoute.EventDetail(eventId, origin, myFindsSection)
     }
 
     fun openRsvp(eventId: String) {
