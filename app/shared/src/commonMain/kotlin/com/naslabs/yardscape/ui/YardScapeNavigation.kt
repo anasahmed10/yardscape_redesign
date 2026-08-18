@@ -15,6 +15,7 @@ import com.naslabs.yardscape.data.MapLocationSearchRepository
 import com.naslabs.yardscape.data.MapSelectedLocation
 import com.naslabs.yardscape.data.MarketplaceMessagingAccessSource
 import com.naslabs.yardscape.data.MarketplaceMessagingRepository
+import com.naslabs.yardscape.data.MessagingRepositoryResult
 import com.naslabs.yardscape.data.SeededMapLocationSearchRepository
 import com.naslabs.yardscape.data.SeededHostPhotoPicker
 import com.naslabs.yardscape.data.SeededMarketplaceMessagingRepository
@@ -258,6 +259,7 @@ class YardScapeAppState(
     private val shopperSafetyRepository: ShopperSafetyRepository = SeededShopperSafetyRepository(),
     private val publicMapAreaSource: PublicMapAreaSource = SeededPublicMapAreaSource,
     messagingRepository: MarketplaceMessagingRepository? = null,
+    messagingRepositoryFactory: ((MarketplaceMessagingAccessSource) -> MarketplaceMessagingRepository)? = null,
     initialAccountStatus: MockSessionStatus = MockSessionStatus.SignedIn,
     val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
     private val shopperId: String = SeededYardSaleData.SHOPPER_WITHOUT_ACCESS_ID,
@@ -265,6 +267,7 @@ class YardScapeAppState(
     activeUserRole: UserRole = UserRole.SHOPPER,
     dataAvailability: AppDataAvailability = AppDataAvailability.Available,
     private val eventCapacitySource: EventCapacitySource = EventCapacitySource.None,
+    initialBlockedEventIds: Set<String> = emptySet(),
     initialRoute: YardScapeRoute = YardScapeRoute.Browse,
 ) {
     var activeUserRole: UserRole by mutableStateOf(activeUserRole)
@@ -309,7 +312,7 @@ class YardScapeAppState(
     var shopperSafetyState: ShopperSafetyUiState? by mutableStateOf(null)
         private set
 
-    var blockedEventIds: Set<String> by mutableStateOf(emptySet())
+    var blockedEventIds: Set<String> by mutableStateOf(initialBlockedEventIds)
         private set
 
     var discoveryFilters: DiscoveryFilters by mutableStateOf(DiscoveryFilters())
@@ -356,6 +359,7 @@ class YardScapeAppState(
             messagingAccessContextFor(key)
     }
     private val marketplaceMessagingRepository = messagingRepository
+        ?: messagingRepositoryFactory?.invoke(messagingAccessSource)
         ?: SeededMarketplaceMessagingRepository(messagingAccessSource)
     private val marketplaceMessagingState = MarketplaceMessagingState(
         repository = marketplaceMessagingRepository,
@@ -1243,14 +1247,39 @@ class YardScapeAppState(
                 state = uiState,
                 hasLocationAccess = uiState == HostAttendeeUiState.Accepted &&
                     repository.exactLocationFor(eventId, rsvp.shopperId, nowEpochMillis) != null,
+                canMessageAttendee = activeUserRole == UserRole.HOST &&
+                    currentMessagingComposerAccess(
+                        MarketplaceConversationKey(eventId, rsvp.shopperId),
+                        MessagingActor(hostId, UserRole.HOST),
+                    ) is MessagingComposerAccess.Open,
             )
         }.sortedWith(compareBy({ it.state.ordinal }, { it.displayName }))
         return HostAttendanceState(
             eventId = eventId,
             eventTitle = event.title,
+            eventPhoto = event.photos.firstOrNull(),
             policy = hostAttendancePolicies[eventId] ?: HostAttendancePolicy(),
             attendees = attendees,
         )
+    }
+
+    /** Resolves host messaging through the repository before committing an opaque thread route. */
+    suspend fun openHostAttendeeMessage(eventId: String, shopperId: String): Boolean {
+        if (!accountState.isSignedIn || activeUserRole != UserRole.HOST) return false
+        val event = repository.hostEvent(eventId) ?: return false
+        if (event.host.id != hostId) return false
+        val key = MarketplaceConversationKey(eventId, shopperId)
+        val actor = MessagingActor(hostId, UserRole.HOST)
+        if (currentMessagingComposerAccess(key, actor) !is MessagingComposerAccess.Open) return false
+
+        val result = marketplaceMessagingRepository.threadFor(key, actor)
+        val thread = (result as? MessagingRepositoryResult.Success)?.value ?: return false
+        if (thread.conversationKey != key || thread.composerAccess !is MessagingComposerAccess.Open) return false
+        val opaqueId = MarketplaceConversationId.parse(thread.conversationId) ?: return false
+        if (!marketplaceMessagingState.openAuthorizedThread(thread)) return false
+        pendingMessageThreadAuthorization = null
+        route = YardScapeRoute.MessageThread(opaqueId)
+        return true
     }
 
     fun requestHostAttendeeAction(

@@ -1,9 +1,12 @@
 package com.naslabs.yardscape.ui
 
 import com.naslabs.yardscape.data.SeededYardSaleData
+import com.naslabs.yardscape.domain.UserRole
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -20,6 +23,61 @@ class HostAttendanceStateTest {
         assertEquals(1, state.requestedCount)
         assertEquals(1, state.activeLocationAccessCount)
         assertTrue(state.isAtCapacity)
+    }
+
+    @Test
+    fun attendanceProjectionUsesFlatActionableRowsAndCompactSummaryMetrics() {
+        val state = assertNotNull(YardScapeAppState().hostAttendanceState(eventId))
+
+        assertEquals(
+            listOf(
+                HostAttendeeUiState.Requested,
+                HostAttendeeUiState.Accepted,
+                HostAttendeeUiState.Revoked,
+                HostAttendeeUiState.Waitlisted,
+                HostAttendeeUiState.Declined,
+                HostAttendeeUiState.Cancelled,
+                HostAttendeeUiState.Removed,
+                HostAttendeeUiState.Expired,
+            ),
+            state.attendeeRows.map { it.state },
+        )
+        assertEquals("2 / 2", state.capacityMetric.value)
+        assertEquals("1", state.exactAccessMetric.value)
+        assertTrue(state.summaryMetrics.all { it.value.isNotBlank() })
+    }
+
+    @Test
+    fun exactAccessLabelsAndMessageActionsFollowCurrentPolicy() {
+        val state = assertNotNull(YardScapeAppState(activeUserRole = UserRole.HOST).hostAttendanceState(eventId))
+        val accepted = state.attendeeRows.single { it.shopperId == SeededAttendeeIds.Accepted }
+        val revoked = state.attendeeRows.single { it.shopperId == SeededAttendeeIds.Revoked }
+        val requested = state.attendeeRows.single { it.state == HostAttendeeUiState.Requested }
+
+        assertEquals("Exact location active", accepted.exactAccessLabel)
+        assertTrue(accepted.canMessageAttendee)
+        assertEquals("Exact location hidden", revoked.exactAccessLabel)
+        assertFalse(revoked.canMessageAttendee)
+        assertEquals("Exact location not granted", requested.exactAccessLabel)
+        assertFalse(requested.canMessageAttendee)
+    }
+
+    @Test
+    fun everyNonActiveAttendanceTransitionHidesExactAccessAndHostMessaging() {
+        val rows = assertNotNull(
+            YardScapeAppState(activeUserRole = UserRole.HOST).hostAttendanceState(eventId),
+        ).attendeeRows
+
+        rows.forEach { attendee ->
+            if (attendee.state == HostAttendeeUiState.Accepted) {
+                assertTrue(attendee.hasLocationAccess)
+                assertTrue(attendee.canMessageAttendee)
+            } else {
+                assertFalse(attendee.hasLocationAccess)
+                assertFalse(attendee.canMessageAttendee)
+                assertFalse(attendee.exactAccessLabel == "Exact location active")
+            }
+        }
     }
 
     @Test
@@ -118,6 +176,31 @@ class HostAttendanceStateTest {
 
         assertNull(appState.hostAttendanceState(SeededYardSaleData.CANCELLED_EVENT_ID))
         assertFalse(appState.openHostAttendees(SeededYardSaleData.CANCELLED_EVENT_ID))
+    }
+
+    @Test
+    fun hostMessageEntryResolvesOnlyAnAuthorizedOpaqueConversation() = runTest {
+        val appState = YardScapeAppState(activeUserRole = UserRole.HOST)
+        val shopperId = SeededAttendeeIds.Accepted
+
+        assertTrue(appState.openHostAttendeeMessage(eventId, shopperId))
+
+        val route = assertIs<YardScapeRoute.MessageThread>(appState.route)
+        assertFalse(route.conversationId.value.contains(eventId))
+        assertFalse(route.conversationId.value.contains(shopperId))
+
+        assertTrue(appState.requestHostAttendeeAction(eventId, shopperId, HostAttendeeAction.Revoke))
+        assertTrue(appState.confirmHostAttendeeAction())
+        assertFalse(appState.openHostAttendeeMessage(eventId, shopperId))
+    }
+
+    @Test
+    fun signedOutHostHasNoMessageActionOrProtectedEntry() = runTest {
+        val appState = YardScapeAppState(activeUserRole = UserRole.HOST)
+        appState.signOutMock()
+
+        assertNull(appState.hostAttendanceState(eventId))
+        assertFalse(appState.openHostAttendeeMessage(eventId, SeededAttendeeIds.Accepted))
     }
 }
 

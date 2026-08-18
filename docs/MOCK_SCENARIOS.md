@@ -52,4 +52,28 @@ Do not replace a production entry point with a scenario launch. A future debug m
 | Offline | Browse reports offline state while privacy-safe seeded previews remain visible. |
 | Recoverable refresh error | Browse reports a recoverable error and retry guidance. |
 
+## Messaging catalog
+
+Messaging scenarios document the route reached after repository authorization, the active actor,
+composer state, absence of protected location data, and the recovery action. Route descriptions
+refer only to an authorized opaque conversation ID; they never include an event or shopper ID.
+
+| Scenario | Expected route | Actor | Composer | Protected data | Recovery action |
+| --- | --- | --- | --- | --- | --- |
+| Accepted unread messages | Messages / authorized thread | Shopper | Open | Absent | Mark the unread message read. |
+| Failed send with retry | Messages / authorized thread | Shopper | Open | Absent | Retry the failed message. |
+| Cancelled RSVP messages | Messages / closed thread | Shopper | Closed: RSVP not accepted | Absent | Return to Messages. |
+| Revoked access messages | Messages / closed thread | Shopper | Closed: location access revoked | Absent | Return to Messages. |
+| Expired access messages | Messages / closed thread | Shopper | Closed: location access expired | Absent | Return to Messages. |
+| Cancelled event messages | Messages / closed thread | Shopper | Closed: event cancelled | Absent | Return to Messages. |
+| Blocked messages | Messages | Shopper | Closed: blocked | Absent | Return to Messages. |
+| Signed-out messages | Account | Signed out | Sign-in required | Absent | Sign in to load Messages. |
+| Host-owned messages | Host attendees → Messages / authorized thread | Owning host | Open | Absent | Use Message attendee. |
+
 Scenario metadata contains no protected fixture values. Protected locations remain behind the repository interface, and app-visible detail state contains an exact address only for an accepted, active mock session (or the signed-in owning host editor). A successful block is an overriding local deny for every event from that host; unblocking restores discovery only and never revives the previous RSVP or reveal grant. Pending-attendee counts are also gated to the signed-in event owner.
+
+The host attendee screen is a host-only workspace. It uses a public event photo/title projection,
+host-only RSVP state, and a policy-derived exact-access label. `Message attendee` is shown only
+when the active host has open conversation access; selection resolves the conversation through the
+repository and routes solely with the returned opaque ID. It cannot expose the exact address,
+coordinates, units, private instructions, or attendee information through shopper/public models.

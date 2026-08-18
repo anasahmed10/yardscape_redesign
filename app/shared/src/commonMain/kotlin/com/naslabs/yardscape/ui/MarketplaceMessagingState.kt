@@ -194,6 +194,21 @@ class MarketplaceMessagingState(
         }
     }
 
+    /**
+     * Displays a thread whose opaque identity and access were just resolved by the repository.
+     * This intentionally accepts a complete repository thread rather than an event/shopper key so
+     * callers cannot build a route from participant identifiers.
+     */
+    fun openAuthorizedThread(thread: MarketplaceMessageThread): Boolean {
+        val actor = actorSource()
+        if (thread.composerAccess !is MessagingComposerAccess.Open ||
+            composerAccessFor(thread.conversationKey, actor) !is MessagingComposerAccess.Open
+        ) return false
+        beginRequest(thread.conversationId)
+        threadState = MessagingThreadUiState.Loaded(MessagingThreadPresentation(thread))
+        return true
+    }
+
     fun updateDraft(draft: String) {
         val loaded = threadState as? MessagingThreadUiState.Loaded ?: return
         if (!loaded.presentation.canCompose) return

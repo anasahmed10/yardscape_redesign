@@ -26,16 +26,51 @@ data class SeededMessagingBehavior(
     val deliveryOutcomes: List<SeededMessageOutcome> = emptyList(),
 )
 
+/** Test-only local conversation content. It must contain no protected location data. */
+data class SeededMessagingConversation(
+    val conversationKey: MarketplaceConversationKey,
+    val messages: List<SeededMessagingMessage>,
+)
+
+data class SeededMessagingMessage(
+    val senderId: String,
+    val body: String,
+    val sentAtEpochMillis: Long,
+    val deliveryState: MessageDeliveryState = MessageDeliveryState.SENT,
+)
+
 class SeededMarketplaceMessagingRepository(
     private val accessSource: MarketplaceMessagingAccessSource,
     eventPreviews: List<PublicEventPreview> = SeededYardSaleData.events.map { it.toPublicPreview() },
     private val behavior: SeededMessagingBehavior = SeededMessagingBehavior(),
+    initialConversations: List<SeededMessagingConversation> = emptyList(),
 ) : MarketplaceMessagingRepository {
     private val eventPreviewsById = eventPreviews.associateBy { it.id }
     private val conversationsByKey = linkedMapOf<MarketplaceConversationKey, ConversationRecord>()
     private var nextConversationNumber = 1
     private var nextMessageNumber = 1
     private var nextDeliveryOutcomeIndex = 0
+
+    init {
+        initialConversations.forEach { seed ->
+            val record = createConversation(seed.conversationKey)
+            accessSource.accessContextFor(seed.conversationKey)?.let { context ->
+                record.authorizeParticipants(context)
+            }
+            seed.messages.forEach { message ->
+                val stored = MarketplaceMessage(
+                    id = nextOpaqueId(prefix = "message", number = nextMessageNumber++),
+                    conversationId = record.conversationId,
+                    senderId = message.senderId,
+                    body = message.body,
+                    sentAtEpochMillis = message.sentAtEpochMillis,
+                    deliveryState = message.deliveryState,
+                )
+                record.messages += stored
+                record.readByMessageId.getOrPut(stored.id, ::mutableSetOf) += message.senderId
+            }
+        }
+    }
 
     override suspend fun inboxFor(
         actor: MessagingActor,

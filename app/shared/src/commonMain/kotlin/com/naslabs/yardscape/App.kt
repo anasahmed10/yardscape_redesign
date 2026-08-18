@@ -197,6 +197,7 @@ fun App(appState: YardScapeAppState) {
                         pendingAction = appState.pendingHostAttendeeAction,
                         onBack = { appState.navigateBack() },
                         onRequestAction = appState::requestHostAttendeeAction,
+                        onMessageAttendee = appState::openHostAttendeeMessage,
                         onDismissAction = appState::dismissHostAttendeeAction,
                         onConfirmAction = appState::confirmHostAttendeeAction,
                     )
