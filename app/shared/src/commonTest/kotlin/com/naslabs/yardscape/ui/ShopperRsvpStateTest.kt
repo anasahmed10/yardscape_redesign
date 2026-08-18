@@ -510,6 +510,7 @@ class ShopperRsvpStateTest {
         assertEquals(ShopperRsvpUiState.Cancelled, cancelled.state)
         assertNull(cancelled.exactAddress)
         assertNull(state.directionsEventId)
+        assertEquals(listOf(ShopperRsvpAction.OpenEvent), cancelled.visibleActions)
     }
 
     @Test

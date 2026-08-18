@@ -1,25 +1,36 @@
 package com.naslabs.yardscape.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.naslabs.yardscape.domain.ExactAddress
 
 @Composable
@@ -38,59 +49,61 @@ fun MyFindsScreen(
     onDirections: (String) -> ExactAddress?,
 ) {
     val spacing = YardScapeDesign.spacing
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag(YardScapeTestTags.MyFindsScreen)
-            .padding(horizontal = spacing.large),
-        verticalArrangement = Arrangement.spacedBy(spacing.medium),
-    ) {
-        item {
-            Column(
-                modifier = Modifier.padding(top = spacing.large),
-                verticalArrangement = Arrangement.spacedBy(spacing.small),
-            ) {
-                Text("My Finds", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text(
-                    "Keep saved public previews and your RSVP plans together.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing.small)) {
-                    MyFindsSection.entries.forEach { section ->
-                        val selected = state.section == section
-                        if (selected) {
-                            Button(
+    val presentation = state.workspacePresentation()
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val layout = myFindsWorkspaceLayoutFor(maxWidth.value.toInt())
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 1120.dp)
+                .align(Alignment.TopCenter)
+                .testTag(YardScapeTestTags.MyFindsScreen)
+                .padding(horizontal = spacing.large),
+            verticalArrangement = Arrangement.spacedBy(spacing.medium),
+        ) {
+            item {
+                Column(
+                    modifier = Modifier.padding(top = spacing.large),
+                    verticalArrangement = Arrangement.spacedBy(spacing.small),
+                ) {
+                    Text("My Finds", style = MaterialTheme.typography.headlineMedium)
+                    Text(
+                        "Save public previews, track RSVP status, and use protected directions only when access is active.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(spacing.small)) {
+                        presentation.segments.forEach { segment ->
+                            MyFindsSectionButton(
+                                segment = segment,
+                                onClick = { onSectionSelected(segment.section) },
                                 modifier = Modifier.weight(1f),
-                                onClick = { onSectionSelected(section) },
-                            ) { Text(section.label) }
-                        } else {
-                            OutlinedButton(
-                                modifier = Modifier.weight(1f),
-                                onClick = { onSectionSelected(section) },
-                            ) { Text(section.label) }
+                            )
                         }
                     }
                 }
             }
-        }
-
-        when (state.section) {
-            MyFindsSection.Saved -> savedItems(
-                events = state.savedItems,
-                spacing = spacing,
-                onEventSelected = onEventSelected,
-                onUnsave = onUnsave,
-                onBrowse = onBrowse,
-            )
-            MyFindsSection.Rsvps -> rsvpItems(
-                items = state.rsvpItems,
-                spacing = spacing,
-                onEventSelected = onEventSelected,
-                onRequestCancellation = onRequestCancellation,
-                onAddReminder = onAddReminder,
-                onExportCalendar = onExportCalendar,
-                onDirections = onDirections,
-            )
+            when (presentation.selectedSection) {
+                MyFindsSection.Saved -> savedContent(
+                    events = state.savedItems,
+                    emptyState = presentation.emptyState,
+                    layout = layout,
+                    onEventSelected = onEventSelected,
+                    onUnsave = onUnsave,
+                    onBrowse = onBrowse,
+                )
+                MyFindsSection.Rsvps -> rsvpContent(
+                    groups = presentation.rsvpGroups,
+                    emptyState = presentation.emptyState,
+                    layout = layout,
+                    onEventSelected = onEventSelected,
+                    onRequestCancellation = onRequestCancellation,
+                    onAddReminder = onAddReminder,
+                    onExportCalendar = onExportCalendar,
+                    onDirections = onDirections,
+                    onBrowse = onBrowse,
+                )
+            }
         }
     }
 
@@ -98,138 +111,232 @@ fun MyFindsScreen(
         AlertDialog(
             onDismissRequest = onDismissCancellation,
             title = { Text("Cancel this RSVP?") },
-            text = { Text("Your protected exact-location access will be removed immediately.") },
+            text = { Text("Protected exact-location access and directions will be removed immediately.") },
             confirmButton = {
-                Button(onClick = { onConfirmCancellation() }) { Text("Cancel RSVP") }
+                Button(
+                    modifier = Modifier.heightIn(min = 48.dp),
+                    onClick = { onConfirmCancellation() },
+                ) { Text("Cancel RSVP") }
             },
             dismissButton = {
-                TextButton(onClick = onDismissCancellation) { Text("Keep RSVP") }
+                TextButton(
+                    modifier = Modifier.heightIn(min = 48.dp),
+                    onClick = onDismissCancellation,
+                ) { Text("Keep RSVP") }
             },
         )
     }
 }
 
-private val MyFindsSection.label: String
-    get() = when (this) {
-        MyFindsSection.Saved -> "Saved"
-        MyFindsSection.Rsvps -> "RSVPs"
+@Composable
+private fun MyFindsSectionButton(
+    segment: MyFindsSegmentPresentation,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val semantics = modifier.heightIn(min = 48.dp).semantics {
+        contentDescription = "${segment.label}${if (segment.isSelected) ", selected" else ""}"
+        selected = segment.isSelected
     }
+    if (segment.isSelected) {
+        Button(modifier = semantics, onClick = onClick) { Text(segment.label) }
+    } else {
+        OutlinedButton(modifier = semantics, onClick = onClick) { Text(segment.label) }
+    }
+}
 
-private fun androidx.compose.foundation.lazy.LazyListScope.savedItems(
+private fun LazyListScope.savedContent(
     events: List<BrowseEventItem>,
-    spacing: YardScapeSpacing,
+    emptyState: MyFindsEmptyPresentation?,
+    layout: MyFindsWorkspaceLayout,
     onEventSelected: (String) -> Unit,
     onUnsave: (String) -> Unit,
     onBrowse: () -> Unit,
 ) {
-    item { Text("Saved sales", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-    if (events.isEmpty()) {
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(spacing.extraLarge),
-                    verticalArrangement = Arrangement.spacedBy(spacing.small),
-                ) {
-                    Text("Nothing saved yet", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("Browse nearby sales and save the ones you want to revisit.")
-                    Button(onClick = onBrowse) { Text("Browse sales") }
-                }
-            }
-        }
-    } else {
-        items(events, key = { it.id }) { event ->
-            EventPreviewCard(
-                event = event,
-                isSaved = true,
-                onClick = { onEventSelected(event.id) },
-                onSavedToggle = { onUnsave(event.id) },
+    item { ShopperSectionHeader("Saved sales", "Public previews you can revisit anytime.") }
+    emptyState?.let { state ->
+        item { ShopperStatePanel(state.title, state.message, state.actionLabel, onBrowse) }
+    }
+    items(events, key = { it.id }) { event ->
+        MyFindsSavedEventRow(event, layout, { onEventSelected(event.id) }, { onUnsave(event.id) })
+    }
+}
+
+private fun LazyListScope.rsvpContent(
+    groups: List<MyFindsRsvpGroupPresentation>,
+    emptyState: MyFindsEmptyPresentation?,
+    layout: MyFindsWorkspaceLayout,
+    onEventSelected: (String) -> Unit,
+    onRequestCancellation: (String) -> Boolean,
+    onAddReminder: (String) -> Boolean,
+    onExportCalendar: (String) -> Boolean,
+    onDirections: (String) -> ExactAddress?,
+    onBrowse: () -> Unit,
+) {
+    item {
+        ShopperSectionHeader(
+            "RSVP plans",
+            "Your exact location remains protected until an RSVP is actively accepted.",
+        )
+    }
+    emptyState?.let { state ->
+        item { ShopperStatePanel(state.title, state.message, state.actionLabel, onBrowse) }
+    }
+    groups.forEach { group ->
+        item { Text(group.group.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+        items(group.items, key = { it.eventId }) { item ->
+            MyFindsRsvpRow(
+                item = item,
+                layout = layout,
+                onEventSelected = { onEventSelected(item.eventId) },
+                onRequestCancellation = { onRequestCancellation(item.eventId) },
+                onAddReminder = { onAddReminder(item.eventId) },
+                onExportCalendar = { onExportCalendar(item.eventId) },
+                onDirections = { onDirections(item.eventId) },
             )
         }
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.rsvpItems(
-    items: List<ShopperRsvpItem>,
-    spacing: YardScapeSpacing,
-    onEventSelected: (String) -> Unit,
-    onRequestCancellation: (String) -> Boolean,
-    onAddReminder: (String) -> Boolean,
-    onExportCalendar: (String) -> Boolean,
-    onDirections: (String) -> ExactAddress?,
+@Composable
+private fun MyFindsSavedEventRow(
+    event: BrowseEventItem,
+    layout: MyFindsWorkspaceLayout,
+    onEventSelected: () -> Unit,
+    onUnsave: () -> Unit,
+) = MyFindsEventRow(
+    eventId = event.id,
+    title = event.title,
+    dateLabel = event.dateLabel,
+    locationLabel = event.locationLabel,
+    statusLabel = event.statusLabel,
+    description = event.description,
+    photoReference = event.photoReference,
+    layout = layout,
 ) {
-    item { Text("RSVPs", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-    if (items.isEmpty()) {
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    "No RSVPs yet. Open a sale to request attendance.",
-                    modifier = Modifier.padding(spacing.extraLarge),
-                )
-            }
-        }
-    } else {
-        RsvpGroup.entries.forEach { group ->
-            val groupItems = items.filter { it.group == group }
-            if (groupItems.isNotEmpty()) {
-                item { Text(group.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
-                items(groupItems, key = { it.eventId }) { item ->
-                    MyFindsRsvpCard(
-                        item = item,
-                        spacing = spacing,
-                        onEventSelected = onEventSelected,
-                        onRequestCancellation = onRequestCancellation,
-                        onAddReminder = onAddReminder,
-                        onExportCalendar = onExportCalendar,
-                        onDirections = onDirections,
-                    )
-                }
-            }
+    MyFindsActionButton(ShopperRsvpAction.OpenEvent, primary = true, onClick = onEventSelected)
+    MyFindsActionButton(ShopperRsvpAction.CancelRsvp, label = "Remove saved", onClick = onUnsave)
+}
+
+@Composable
+private fun MyFindsRsvpRow(
+    item: ShopperRsvpItem,
+    layout: MyFindsWorkspaceLayout,
+    onEventSelected: () -> Unit,
+    onRequestCancellation: () -> Unit,
+    onAddReminder: () -> Unit,
+    onExportCalendar: () -> Unit,
+    onDirections: () -> Unit,
+) = MyFindsEventRow(
+    eventId = item.eventId,
+    title = item.title,
+    dateLabel = item.dateLabel,
+    locationLabel = item.approximateLocationLabel,
+    statusLabel = item.state.label,
+    description = item.state.nextAction,
+    photoReference = null,
+    layout = layout,
+) {
+    if (ShopperRsvpAction.Directions in item.visibleActions) {
+        PrivacyNote("Protected location is available for this active accepted RSVP.")
+    }
+    item.visibleActions.forEach { action ->
+        when (action) {
+            ShopperRsvpAction.OpenEvent -> MyFindsActionButton(action, primary = true, onClick = onEventSelected)
+            ShopperRsvpAction.Directions -> MyFindsActionButton(action, primary = true, onClick = onDirections)
+            ShopperRsvpAction.AddReminder -> MyFindsActionButton(
+                action,
+                label = if (item.reminderAdded) "Reminder added" else action.label,
+                onClick = onAddReminder,
+            )
+            ShopperRsvpAction.ExportCalendar -> MyFindsActionButton(
+                action,
+                label = if (item.calendarExportPrepared) "Calendar ready" else action.label,
+                onClick = onExportCalendar,
+            )
+            ShopperRsvpAction.CancelRsvp -> MyFindsActionButton(action, onClick = onRequestCancellation)
         }
     }
 }
 
 @Composable
-private fun MyFindsRsvpCard(
-    item: ShopperRsvpItem,
-    spacing: YardScapeSpacing,
-    onEventSelected: (String) -> Unit,
-    onRequestCancellation: (String) -> Boolean,
-    onAddReminder: (String) -> Boolean,
-    onExportCalendar: (String) -> Boolean,
-    onDirections: (String) -> ExactAddress?,
+private fun MyFindsEventRow(
+    eventId: String,
+    title: String,
+    dateLabel: String,
+    locationLabel: String,
+    statusLabel: String,
+    description: String,
+    photoReference: String?,
+    layout: MyFindsWorkspaceLayout,
+    actions: @Composable () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(spacing.large),
-            verticalArrangement = Arrangement.spacedBy(spacing.small),
-        ) {
-            Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(item.dateLabel)
-            Text(item.approximateLocationLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(item.state.label, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-            Text(item.state.nextAction)
-            if (item.canOpenDirections) {
-                PrivacyNote("Protected location is available for this accepted RSVP.")
+    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
+        if (layout == MyFindsWorkspaceLayout.Expanded) {
+            Row(
+                modifier = Modifier.padding(vertical = YardScapeDesign.spacing.medium),
+                horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.large),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ShopperEventArtwork(
+                    ShopperEventArtworkPresentation(eventId, photoReference),
+                    modifier = Modifier.weight(0.8f),
+                    height = 196.dp,
+                )
+                MyFindsEventDetails(title, dateLabel, locationLabel, statusLabel, description, actions, Modifier.weight(1.2f))
             }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.small)) {
-                OutlinedButton(onClick = { onEventSelected(item.eventId) }) { Text("Open event") }
-                if (item.canOpenDirections) {
-                    Button(onClick = { onDirections(item.eventId) }) { Text("Directions") }
-                }
-                if (item.canAddReminder) {
-                    OutlinedButton(onClick = { onAddReminder(item.eventId) }) {
-                        Text(if (item.reminderAdded) "Reminder added" else "Add reminder")
-                    }
-                }
-                if (item.canExportCalendar) {
-                    OutlinedButton(onClick = { onExportCalendar(item.eventId) }) {
-                        Text(if (item.calendarExportPrepared) "Calendar ready" else "Export calendar")
-                    }
-                }
-            }
-            if (item.canCancel) {
-                TextButton(onClick = { onRequestCancellation(item.eventId) }) { Text("Cancel RSVP") }
+        } else {
+            Column(
+                modifier = Modifier.padding(vertical = YardScapeDesign.spacing.medium),
+                verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
+            ) {
+                ShopperEventArtwork(ShopperEventArtworkPresentation(eventId, photoReference), height = 184.dp)
+                MyFindsEventDetails(title, dateLabel, locationLabel, statusLabel, description, actions)
             }
         }
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+@Composable
+private fun MyFindsEventDetails(
+    title: String,
+    dateLabel: String,
+    locationLabel: String,
+    statusLabel: String,
+    description: String,
+    actions: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
+        Text(title, style = MaterialTheme.typography.headlineSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+        ) {
+            StatusLabel(statusLabel)
+            InfoChip(dateLabel)
+        }
+        Text(locationLabel, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+        ) { actions() }
+    }
+}
+
+@Composable
+private fun MyFindsActionButton(
+    action: ShopperRsvpAction,
+    label: String = action.label,
+    primary: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = label }
+    if (primary) {
+        Button(modifier = modifier, onClick = onClick) { Text(label) }
+    } else {
+        OutlinedButton(modifier = modifier, onClick = onClick) { Text(label) }
     }
 }
