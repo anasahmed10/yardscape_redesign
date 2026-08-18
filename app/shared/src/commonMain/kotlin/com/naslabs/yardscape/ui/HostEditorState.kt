@@ -44,7 +44,14 @@ data class HostPublicPreview(
     val approximateLocationLabel: String,
     val categories: List<String>,
     val photoCaptions: List<String>,
+    val photoReferences: List<String>,
     val rsvpSummary: String,
+)
+
+data class HostEditorProgress(
+    val activeStep: HostEditorStep,
+    val currentStep: Int,
+    val totalSteps: Int,
 )
 
 data class HostEditorState(
@@ -56,6 +63,13 @@ data class HostEditorState(
     val approvalMode: HostRsvpApprovalMode = HostRsvpApprovalMode.AutoAccept,
     val pendingConfirmation: HostConfirmationAction? = null,
 ) {
+    val progress: HostEditorProgress
+        get() = HostEditorProgress(
+            activeStep = step,
+            currentStep = step.ordinal + 1,
+            totalSteps = HostEditorStep.entries.size,
+        )
+
     val attendeeCap: Int?
         get() = attendeeCapInput.toIntOrNull()
 
@@ -101,6 +115,7 @@ data class HostEditorState(
         ).filter { it.isNotBlank() }.joinToString(" - "),
         categories = draft.categories,
         photoCaptions = draft.photos.mapNotNull { it.description },
+        photoReferences = draft.photos.map { it.url },
         rsvpSummary = buildString {
             append(approvalMode.label)
             attendeeCap?.let { append(" · Up to $it attendees") }

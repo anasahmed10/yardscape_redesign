@@ -111,6 +111,7 @@ class HostEditorFlowTest {
         assertTrue(published.validationErrors.isEmpty())
         assertEquals(photos, published.draft.photos)
         assertEquals(listOf("Second caption", "First caption"), published.publicPreview().photoCaptions)
+        assertEquals(listOf("mock://photo/second", "mock://photo/first"), published.publicPreview().photoReferences)
     }
 
     @Test

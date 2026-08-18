@@ -89,6 +89,10 @@ internal fun BrowseEventItem.toShopperEventArtworkPresentation(): ShopperEventAr
 internal fun PublicEventDetail.toShopperEventArtworkPresentation(): ShopperEventArtworkPresentation =
     ShopperEventArtworkPresentation(eventId = id, photoReference = photos.firstOrNull()?.url)
 
+/** Uses the same local artwork mapping as a shopper-facing event before publishing. */
+internal fun HostPublicPreview.toShopperEventArtworkPresentation(eventId: String): ShopperEventArtworkPresentation =
+    ShopperEventArtworkPresentation(eventId = eventId, photoReference = photoReferences.firstOrNull())
+
 /**
  * Resolves public event photo references to bundled artwork. No remote media is loaded from this
  * component, so an event's public surface never makes a network request or exposes its source URL.

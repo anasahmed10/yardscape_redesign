@@ -1288,7 +1288,16 @@ class YardScapeAppState(
 
     fun hostEventItems(): List<HostEventItem> =
         if (accountState.isSignedIn) {
-            repository.hostEvents(hostId).map { it.toHostEventItem(nowEpochMillis) }
+            repository.hostEvents(hostId).map { event ->
+                val rsvps = repository.rsvpsForEvent(event.id)
+                val policy = hostAttendancePolicies[event.id] ?: HostAttendancePolicy()
+                event.toHostEventItem(
+                    nowEpochMillis = nowEpochMillis,
+                    acceptedRsvpCount = rsvps.count { it.status == RsvpStatus.ACCEPTED },
+                    pendingRsvpCount = rsvps.count { it.status == RsvpStatus.REQUESTED },
+                    attendeeCap = policy.attendeeCap,
+                )
+            }
         } else {
             emptyList()
         }
@@ -1472,6 +1481,10 @@ data class HostEventItem(
     val statusLabel: String,
     val dateLabel: String,
     val publicLocationLabel: String,
+    val photoReference: String? = null,
+    val acceptedRsvpCount: Int = 0,
+    val pendingRsvpCount: Int = 0,
+    val attendeeCap: Int? = null,
 )
 
 data class EventDetailState(
@@ -1626,7 +1639,12 @@ private fun Long.isWeekendDay(): Boolean {
     return isoDayOfWeek == 6L || isoDayOfWeek == 7L
 }
 
-fun YardSaleEvent.toHostEventItem(nowEpochMillis: Long): HostEventItem =
+fun YardSaleEvent.toHostEventItem(
+    nowEpochMillis: Long,
+    acceptedRsvpCount: Int = 0,
+    pendingRsvpCount: Int = 0,
+    attendeeCap: Int? = null,
+): HostEventItem =
     HostEventItem(
         id = id,
         title = title,
@@ -1636,6 +1654,10 @@ fun YardSaleEvent.toHostEventItem(nowEpochMillis: Long): HostEventItem =
             location.publicLocation.neighborhood,
             location.publicLocation.city,
         ).filter { it.isNotBlank() }.joinToString(" - "),
+        photoReference = photos.firstOrNull()?.url,
+        acceptedRsvpCount = acceptedRsvpCount,
+        pendingRsvpCount = pendingRsvpCount,
+        attendeeCap = attendeeCap,
     )
 
 fun YardSaleEvent.toHostEventDraft(): HostEventDraft =
