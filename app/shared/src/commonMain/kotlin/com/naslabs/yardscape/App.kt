@@ -129,7 +129,28 @@ fun App(appState: YardScapeAppState) {
                         onEditEvent = appState::openHostCreateEdit,
                         onManageAttendees = { appState.openHostAttendees(it) },
                     )
-                    YardScapeRoute.Messages -> MessagesScreen()
+                    YardScapeRoute.Messages,
+                    is YardScapeRoute.MessageThread,
+                    -> MessagesScreen(
+                        inboxState = appState.messagingInboxState,
+                        threadState = appState.messagingThreadState,
+                        isThreadRoute = currentRoute is YardScapeRoute.MessageThread,
+                        pendingAuthorizationSignal = appState.pendingMessageThreadAuthorizationSignal,
+                        hasPendingAuthorization = appState.hasPendingMessageThreadAuthorization,
+                        actor = appState.currentMessagingActor,
+                        onLoadInbox = appState::loadMessagingInbox,
+                        onResumePendingThread = appState::resumePendingMessageThread,
+                        onOpenThread = appState::openMessageThread,
+                        onMarkRead = appState::markCurrentMessageThreadRead,
+                        onDraftChanged = appState::updateMessageDraft,
+                        onSend = appState::sendMessageDraft,
+                        onRetry = appState::retryMessage,
+                        onOpenEvent = appState::openEvent,
+                        onReport = appState::openMessageThreadReport,
+                        onBlock = appState::openMessageThreadBlock,
+                        onBack = { appState.navigateBack() },
+                        onBrowse = { appState.navigateTo(YardScapePrimaryDestination.Browse) },
+                    )
                     YardScapeRoute.Account -> AccountScreen(
                         state = appState.accountState,
                         onSignIn = appState::signInMock,
@@ -176,6 +197,7 @@ fun App(appState: YardScapeAppState) {
                         pendingAction = appState.pendingHostAttendeeAction,
                         onBack = { appState.navigateBack() },
                         onRequestAction = appState::requestHostAttendeeAction,
+                        onMessageAttendee = appState::openHostAttendeeMessage,
                         onDismissAction = appState::dismissHostAttendeeAction,
                         onConfirmAction = appState::confirmHostAttendeeAction,
                     )
@@ -187,12 +209,13 @@ fun App(appState: YardScapeAppState) {
 
 @Composable
 private fun HostEditorRoute(appState: YardScapeAppState, route: YardScapeRoute.HostCreateEdit) {
-    var editorState by remember(appState, route.eventId) {
+    val sessionSignal = appState.hostEditorSessionSignal
+    var editorState by remember(appState, route.eventId, sessionSignal) {
         mutableStateOf(appState.hostEditorState(route.eventId))
     }
     HostCreateEditScreen(
-        hostEvents = appState.hostEventItems(),
         editorState = editorState,
+        nowEpochMillis = appState.nowEpochMillis,
         availablePhotos = appState.availableHostPhotos(),
         onAddressSearch = appState::searchHostLocations,
         onEditorStateChanged = { updated ->
@@ -200,7 +223,6 @@ private fun HostEditorRoute(appState: YardScapeAppState, route: YardScapeRoute.H
         },
         onStepSelected = { step -> editorState = appState.moveHostEditor(editorState, step) },
         onNew = { appState.openHostCreateEdit() },
-        onEdit = appState::openHostCreateEdit,
         onSaveDraft = { editorState = appState.saveHostDraft(editorState) },
         onPublish = { editorState = appState.publishHostEvent(editorState) },
         onCancelEvent = {

@@ -1,22 +1,25 @@
 package com.naslabs.yardscape.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -44,14 +47,13 @@ import com.naslabs.yardscape.domain.EventPhoto
 
 @Composable
 fun HostCreateEditScreen(
-    hostEvents: List<HostEventItem>,
     editorState: HostEditorState,
+    nowEpochMillis: Long,
     availablePhotos: List<EventPhoto>,
     onAddressSearch: (String) -> List<MapSelectedLocation>,
     onEditorStateChanged: (HostEditorState) -> Unit,
     onStepSelected: (HostEditorStep) -> Unit,
     onNew: () -> Unit,
-    onEdit: (String) -> Unit,
     onSaveDraft: () -> Unit,
     onPublish: () -> Unit,
     onCancelEvent: () -> Unit,
@@ -59,86 +61,59 @@ fun HostCreateEditScreen(
     onBack: () -> Unit,
 ) {
     val spacing = YardScapeDesign.spacing
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = spacing.large),
-        verticalArrangement = Arrangement.spacedBy(spacing.medium),
-    ) {
-        item {
-            Column(
-                modifier = Modifier.padding(top = 18.dp),
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isExpanded = hostMarketplaceLayoutFor(maxWidth) == HostMarketplaceLayout.Expanded
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            LazyColumn(
+                modifier = Modifier
+                    .widthIn(max = 1120.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.large),
                 verticalArrangement = Arrangement.spacedBy(spacing.medium),
             ) {
-                TextButton(onClick = onBack) {
-                    Text("Back")
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                item {
                     Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.padding(top = spacing.large),
+                        verticalArrangement = Arrangement.spacedBy(spacing.small),
                     ) {
-                        Text(
-                            text = "Host events",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = "Draft, publish, and protect location access.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    OutlinedButton(onClick = onNew) {
-                        Text("New")
+                        TextButton(
+                            modifier = Modifier.heightIn(min = 48.dp),
+                            onClick = onBack,
+                        ) { Text("Back to your sales") }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = if (editorState.savedEventId == null) "Create a sale" else "Edit sale",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = "Build the public preview, then keep exact location access protected.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            OutlinedButton(
+                                modifier = Modifier.heightIn(min = 48.dp),
+                                onClick = onNew,
+                            ) { Text("New sale") }
+                        }
                     }
                 }
-            }
-        }
-
-        item {
-            HostEventForm(
-                state = editorState,
-                availablePhotos = availablePhotos,
-                onAddressSearch = onAddressSearch,
-                onEditorStateChanged = onEditorStateChanged,
-                onStepSelected = onStepSelected,
-                onSaveDraft = onSaveDraft,
-            )
-        }
-
-        item {
-            FormSectionLabel("Your listings")
-        }
-
-        items(hostEvents, key = { it.id }) { event ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onEdit(event.id) },
-                shape = MaterialTheme.shapes.small,
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(event.title, fontWeight = FontWeight.SemiBold)
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        StatusLabel(text = event.statusLabel)
-                        InfoChip(text = event.dateLabel)
-                    }
-                    Text(
-                        text = event.publicLocationLabel,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                item {
+                    HostEventForm(
+                        state = editorState,
+                        availablePhotos = availablePhotos,
+                        onAddressSearch = onAddressSearch,
+                        onEditorStateChanged = onEditorStateChanged,
+                        onStepSelected = onStepSelected,
+                        onSaveDraft = onSaveDraft,
+                        isExpanded = isExpanded,
+                        nowEpochMillis = nowEpochMillis,
                     )
                 }
             }
@@ -180,6 +155,8 @@ private fun HostEventForm(
     onEditorStateChanged: (HostEditorState) -> Unit,
     onStepSelected: (HostEditorStep) -> Unit,
     onSaveDraft: () -> Unit,
+    isExpanded: Boolean,
+    nowEpochMillis: Long,
 ) {
     val draft = state.draft
     fun updateDraft(updated: HostEventDraft) {
@@ -187,33 +164,14 @@ private fun HostEventForm(
     }
     Column(
         modifier = Modifier.padding(bottom = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
     ) {
-        Text(
-            text = "${state.step.ordinal + 1} of ${HostEditorStep.entries.size}: ${state.step.label}",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = ForestInk,
-        )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            HostEditorStep.entries.forEach { step ->
-                if (step == state.step) {
-                    Button(onClick = { onStepSelected(step) }) { Text(step.label) }
-                } else {
-                    OutlinedButton(onClick = { onStepSelected(step) }) { Text(step.label) }
-                }
-            }
-        }
+        HostEditorProgressIndicator(state.progress, onStepSelected)
         if (state.validationErrors.isNotEmpty()) {
-            Card(
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.small,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                ),
+                color = MaterialTheme.colorScheme.errorContainer,
             ) {
                 Column(
                     modifier = Modifier.padding(12.dp),
@@ -230,72 +188,131 @@ private fun HostEventForm(
             }
         }
 
-        when (state.step) {
-            HostEditorStep.Basics -> {
-                HostTextField("Title", draft.title) { updateDraft(draft.copy(title = it)) }
-                HostTextField("Description", draft.description) { updateDraft(draft.copy(description = it)) }
-            }
-            HostEditorStep.Schedule -> {
-                HostTimePickerField(
-                    "Start time",
-                    draft.startsAtEpochMillis,
-                    draft.endsAtEpochMillis ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS,
-                ) { updateDraft(draft.copy(startsAtEpochMillis = it)) }
-                HostTimePickerField(
-                    "End time",
-                    draft.endsAtEpochMillis,
-                    draft.startsAtEpochMillis ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS,
-                ) { selectedEnd ->
-                    val start = draft.startsAtEpochMillis
-                    updateDraft(draft.copy(endsAtEpochMillis = if (start != null && selectedEnd <= start) selectedEnd + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS else selectedEnd))
+        HostEditorStepContent(
+            state = state,
+            availablePhotos = availablePhotos,
+            onAddressSearch = onAddressSearch,
+            onDraftChanged = ::updateDraft,
+            onEditorStateChanged = onEditorStateChanged,
+            onSaveDraft = onSaveDraft,
+            isExpanded = isExpanded,
+            nowEpochMillis = nowEpochMillis,
+        )
+
+        if (state.progress.previousStep != null || state.step != HostEditorStep.Preview) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                state.progress.previousStep?.let { previousStep ->
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        onClick = { onStepSelected(previousStep) },
+                    ) { Text("Back") }
+                }
+                if (state.step != HostEditorStep.Preview) {
+                    Button(
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        onClick = { onStepSelected(HostEditorStep.entries[state.step.ordinal + 1]) },
+                    ) { Text("Continue") }
                 }
             }
-            HostEditorStep.Location -> {
-                MapLocationPicker(
-                    selectedLocation = draft.selectedMapLocation,
-                    onAddressSearch = onAddressSearch,
-                    onLocationSelected = { updateDraft(draft.withMapSelectedLocation(it)) },
-                )
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Protected location details", fontWeight = FontWeight.Bold)
-                        Text("These fields never appear in the public preview.")
-                        Text(draft.exactStreetAddress.ifBlank { "Select a map address" })
-                        HostTextField("Private access instructions", draft.accessInstructions.orEmpty()) {
-                            updateDraft(draft.copy(accessInstructions = it.ifBlank { null }))
-                        }
+            if (state.step != HostEditorStep.Preview) {
+                TextButton(modifier = Modifier.heightIn(min = 48.dp), onClick = onSaveDraft) { Text("Save draft and leave later") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HostEditorProgressIndicator(
+    progress: HostEditorProgress,
+    onStepSelected: (HostEditorStep) -> Unit,
+) {
+    Column(
+        modifier = Modifier.semantics {
+            contentDescription = "Step ${progress.currentStep} of ${progress.totalSteps}: ${progress.activeStep.label}"
+        },
+        verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.extraSmall),
+    ) {
+        Text(
+            text = "Step ${progress.currentStep} of ${progress.totalSteps}",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(progress.activeStep.label, style = MaterialTheme.typography.titleLarge, color = ForestInk)
+        LinearProgressIndicator(
+            progress = { progress.currentStep.toFloat() / progress.totalSteps },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.extraSmall),
+            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.extraSmall),
+        ) {
+            HostEditorStep.entries.forEach { step ->
+                when {
+                    step.ordinal < progress.activeStep.ordinal -> TextButton(
+                        modifier = Modifier.heightIn(min = 48.dp),
+                        onClick = { onStepSelected(step) },
+                    ) { Text(step.label) }
+                    step == progress.activeStep -> Text(step.label, style = MaterialTheme.typography.labelLarge)
+                    else -> Text(step.label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HostEditorStepContent(
+    state: HostEditorState,
+    availablePhotos: List<EventPhoto>,
+    onAddressSearch: (String) -> List<MapSelectedLocation>,
+    onDraftChanged: (HostEventDraft) -> Unit,
+    onEditorStateChanged: (HostEditorState) -> Unit,
+    onSaveDraft: () -> Unit,
+    isExpanded: Boolean,
+    nowEpochMillis: Long,
+) {
+    val draft = state.draft
+    when (state.step) {
+        HostEditorStep.Basics -> {
+            HostTextField("Title", draft.title) { onDraftChanged(draft.copy(title = it)) }
+            HostTextField("Description", draft.description) { onDraftChanged(draft.copy(description = it)) }
+        }
+        HostEditorStep.Schedule -> {
+            HostTimePickerField("Start time", draft.startsAtEpochMillis, draft.endsAtEpochMillis ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS) {
+                onDraftChanged(draft.copy(startsAtEpochMillis = it))
+            }
+            HostTimePickerField("End time", draft.endsAtEpochMillis, draft.startsAtEpochMillis ?: SeededYardSaleData.BASE_NOW_EPOCH_MILLIS + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS) { selectedEnd ->
+                val start = draft.startsAtEpochMillis
+                onDraftChanged(draft.copy(endsAtEpochMillis = if (start != null && selectedEnd <= start) selectedEnd + HOST_FORM_DEFAULT_DAY_OFFSET_MILLIS else selectedEnd))
+            }
+        }
+        HostEditorStep.Location -> {
+            MapLocationPicker(draft.selectedMapLocation, onAddressSearch) { onDraftChanged(draft.withMapSelectedLocation(it)) }
+            Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Protected location details", style = MaterialTheme.typography.titleMedium)
+                    Text("Only you and accepted attendees can use these details. They never appear in the shopper preview.")
+                    Text(draft.exactStreetAddress.ifBlank { "Select a map address" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    HostTextField("Private access instructions", draft.accessInstructions.orEmpty()) {
+                        onDraftChanged(draft.copy(accessInstructions = it.ifBlank { null }))
                     }
                 }
             }
-            HostEditorStep.SaleDetails -> {
-                HostTextField("Categories", draft.categories.joinToString(", ")) { updateDraft(draft.copy(categories = it.toCsvList())) }
-                HostTextField("Payment notes", draft.acceptedPaymentTypes.joinToString(", ")) { updateDraft(draft.copy(acceptedPaymentTypes = it.toCsvList())) }
-                HostTextField("Accessibility notes", draft.accessibilityNotes.joinToString(", ")) { updateDraft(draft.copy(accessibilityNotes = it.toCsvList())) }
-            }
-            HostEditorStep.Photos -> HostPhotosStep(draft, availablePhotos, ::updateDraft)
-            HostEditorStep.RsvpSettings -> HostRsvpSettingsStep(state, onEditorStateChanged)
-            HostEditorStep.Preview -> HostPreviewStep(
-                state = state,
-                onSaveDraft = onSaveDraft,
-                onRequestConfirmation = { onEditorStateChanged(state.requestConfirmation(it)) },
-            )
         }
-
-        if (state.step != HostEditorStep.Preview) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state.step.ordinal > 0) {
-                    OutlinedButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = { onStepSelected(HostEditorStep.entries[state.step.ordinal - 1]) },
-                    ) { Text("Back") }
-                }
-                Button(
-                    modifier = Modifier.weight(1f),
-                    onClick = { onStepSelected(HostEditorStep.entries[state.step.ordinal + 1]) },
-                ) { Text("Continue") }
-            }
-            TextButton(onClick = onSaveDraft) { Text("Save draft and leave later") }
+        HostEditorStep.SaleDetails -> {
+            HostTextField("Categories", draft.categories.joinToString(", ")) { onDraftChanged(draft.copy(categories = it.toCsvList())) }
+            HostTextField("Payment notes", draft.acceptedPaymentTypes.joinToString(", ")) { onDraftChanged(draft.copy(acceptedPaymentTypes = it.toCsvList())) }
+            HostTextField("Accessibility notes", draft.accessibilityNotes.joinToString(", ")) { onDraftChanged(draft.copy(accessibilityNotes = it.toCsvList())) }
         }
+        HostEditorStep.Photos -> HostPhotosStep(draft, availablePhotos, onDraftChanged)
+        HostEditorStep.RsvpSettings -> HostRsvpSettingsStep(state, onEditorStateChanged)
+        HostEditorStep.Preview -> HostPreviewStep(
+            state = state,
+            onSaveDraft = onSaveDraft,
+            onRequestConfirmation = { onEditorStateChanged(state.requestConfirmation(it)) },
+            isExpanded = isExpanded,
+            nowEpochMillis = nowEpochMillis,
+        )
     }
 }
 
@@ -305,39 +322,74 @@ private fun HostPhotosStep(
     availablePhotos: List<EventPhoto>,
     onDraftChanged: (HostEventDraft) -> Unit,
 ) {
-    FormSectionLabel("Mock photo picker")
+    FormSectionLabel("Sale photos")
     Text(
-        "Choose seeded photos now; a platform photo service can replace this picker later.",
+        "Choose the public photos shoppers will see. The first photo becomes the listing cover.",
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     availablePhotos.filter { candidate -> draft.photos.none { it.url == candidate.url } }.forEach { photo ->
         OutlinedButton(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
             onClick = { onDraftChanged(draft.copy(photos = draft.photos + photo)) },
-        ) { Text("Add ${photo.description ?: "photo"}") }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HostPhotoArtwork(photo = photo, draftId = draft.id, size = 56.dp)
+                Text("Add ${photo.description ?: "photo"}")
+            }
+        }
+    }
+    if (draft.photos.isEmpty()) {
+        ShopperStatePanel(
+            title = "Add a cover photo",
+            message = "A clear photo helps shoppers recognize the sale preview.",
+        )
     }
     draft.photos.forEachIndexed { index, photo ->
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Surface(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Photo ${index + 1}", fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small), verticalAlignment = Alignment.CenterVertically) {
+                    HostPhotoArtwork(photo = photo, draftId = draft.id, size = 72.dp)
+                    Column {
+                        Text(if (index == 0) "Cover photo" else "Photo ${index + 1}", style = MaterialTheme.typography.titleMedium)
+                        Text("Shown in the public shopper preview", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 HostTextField("Caption", photo.description.orEmpty()) { caption ->
                     onDraftChanged(draft.copy(photos = draft.photos.replaceAt(index, photo.copy(description = caption.ifBlank { null }))))
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     OutlinedButton(
+                        modifier = Modifier.heightIn(min = 48.dp),
                         enabled = index > 0,
                         onClick = { onDraftChanged(draft.copy(photos = draft.photos.move(index, index - 1))) },
                     ) { Text("Move up") }
                     OutlinedButton(
+                        modifier = Modifier.heightIn(min = 48.dp),
                         enabled = index < draft.photos.lastIndex,
                         onClick = { onDraftChanged(draft.copy(photos = draft.photos.move(index, index + 1))) },
                     ) { Text("Move down") }
                     TextButton(
+                        modifier = Modifier.heightIn(min = 48.dp),
                         onClick = { onDraftChanged(draft.copy(photos = draft.photos.filterIndexed { itemIndex, _ -> itemIndex != index })) },
                     ) { Text("Remove") }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HostPhotoArtwork(photo: EventPhoto, draftId: String?, size: androidx.compose.ui.unit.Dp) {
+    Box(modifier = Modifier.width(size).height(size)) {
+        ShopperEventArtwork(
+            presentation = hostArtworkPresentationFor(draftId = draftId, photoReference = photo.url),
+            modifier = Modifier.fillMaxSize(),
+            height = size,
+        )
     }
 }
 
@@ -376,36 +428,52 @@ private fun HostPreviewStep(
     state: HostEditorState,
     onSaveDraft: () -> Unit,
     onRequestConfirmation: (HostConfirmationAction) -> Unit,
+    isExpanded: Boolean,
+    nowEpochMillis: Long,
 ) {
-    val preview = state.publicPreview()
+    val preview = state.publicPreview(nowEpochMillis)
     FormSectionLabel("Public shopper preview")
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val previewContent: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ShopperEventArtwork(
+                presentation = preview.toShopperEventArtworkPresentation(state.draft.id ?: "new-host-draft"),
+                modifier = Modifier.fillMaxWidth(),
+                height = 224.dp,
+            )
             Text(preview.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(preview.description)
-            Text(preview.scheduleLabel)
-            Text(preview.approximateLocationLabel)
-            if (preview.categories.isNotEmpty()) Text(preview.categories.joinToString(" · "))
-            preview.photoCaptions.forEach { Text("Photo: $it") }
-            Text(preview.rsvpSummary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            preview.shopperDetailSections().forEach { (label, value) ->
+                if (value.isNotBlank()) {
+                    Text("$label · $value", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             PrivacyNote("Preview contains approximate location only. Protected address and access instructions are omitted.")
         }
     }
-    Button(modifier = Modifier.fillMaxWidth(), onClick = onSaveDraft) { Text("Save draft") }
-    Button(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = { onRequestConfirmation(HostConfirmationAction.Publish) },
-        colors = ButtonDefaults.buttonColors(containerColor = Clay),
-    ) { Text("Review and publish") }
-    if (state.savedEventId != null) {
-        OutlinedButton(
+    val actions: @Composable () -> Unit = {
+        Button(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = onSaveDraft) { Text("Save draft") }
+        Button(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            onClick = { onRequestConfirmation(HostConfirmationAction.Publish) },
+            colors = ButtonDefaults.buttonColors(containerColor = Clay),
+        ) { Text("Review and publish") }
+        if (state.savedEventId != null) {
+            OutlinedButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = { onRequestConfirmation(HostConfirmationAction.Hide) }) { Text("Hide from search") }
+            OutlinedButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = { onRequestConfirmation(HostConfirmationAction.Cancel) }) { Text("Cancel event") }
+        }
+    }
+    if (isExpanded) {
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            onClick = { onRequestConfirmation(HostConfirmationAction.Hide) },
-        ) { Text("Hide from search") }
-        OutlinedButton(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = { onRequestConfirmation(HostConfirmationAction.Cancel) },
-        ) { Text("Cancel event") }
+            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.extraLarge),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1.45f), verticalArrangement = Arrangement.spacedBy(8.dp)) { previewContent() }
+            Column(modifier = Modifier.weight(0.8f), verticalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
+        }
+    } else {
+        previewContent()
+        actions()
     }
 }
 

@@ -18,6 +18,7 @@ enum class ProtectedAction(val label: String) {
     Rsvp("RSVP and request a protected location"),
     RevealLocation("View a protected exact location"),
     HostManagement("Manage a hosted event"),
+    Messaging("Use event messages"),
     Report("Report unsafe content"),
     Block("Block a marketplace member"),
 }

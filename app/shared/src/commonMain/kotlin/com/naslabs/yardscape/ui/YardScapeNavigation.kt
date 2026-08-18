@@ -13,8 +13,12 @@ import com.naslabs.yardscape.data.HostEventSaveResult
 import com.naslabs.yardscape.data.HostPhotoPicker
 import com.naslabs.yardscape.data.MapLocationSearchRepository
 import com.naslabs.yardscape.data.MapSelectedLocation
+import com.naslabs.yardscape.data.MarketplaceMessagingAccessSource
+import com.naslabs.yardscape.data.MarketplaceMessagingRepository
+import com.naslabs.yardscape.data.MessagingRepositoryResult
 import com.naslabs.yardscape.data.SeededMapLocationSearchRepository
 import com.naslabs.yardscape.data.SeededHostPhotoPicker
+import com.naslabs.yardscape.data.SeededMarketplaceMessagingRepository
 import com.naslabs.yardscape.data.SeededShopperSafetyRepository
 import com.naslabs.yardscape.data.SafetyRepositoryResult
 import com.naslabs.yardscape.data.ShopperSafetyRepository
@@ -22,6 +26,12 @@ import com.naslabs.yardscape.domain.EventStatus
 import com.naslabs.yardscape.domain.ExactAddress
 import com.naslabs.yardscape.domain.LocationVisibility
 import com.naslabs.yardscape.domain.MapViewport
+import com.naslabs.yardscape.domain.MarketplaceConversationKey
+import com.naslabs.yardscape.domain.MarketplaceMessagingPolicy
+import com.naslabs.yardscape.domain.MessagingAccessContext
+import com.naslabs.yardscape.domain.MessagingActor
+import com.naslabs.yardscape.domain.MessagingClosedReason
+import com.naslabs.yardscape.domain.MessagingComposerAccess
 import com.naslabs.yardscape.domain.PublicEventPreview
 import com.naslabs.yardscape.domain.PublicEventMarker
 import com.naslabs.yardscape.domain.Rsvp
@@ -48,6 +58,22 @@ enum class YardScapePrimaryDestination(
 enum class ShopperSafetyAction(val pathSegment: String, val label: String) {
     Report(pathSegment = "report", label = "Report sale"),
     Block(pathSegment = "block", label = "Block host"),
+}
+
+class MarketplaceConversationId private constructor(val value: String) {
+    override fun equals(other: Any?): Boolean = other is MarketplaceConversationId && value == other.value
+    override fun hashCode(): Int = value.hashCode()
+    override fun toString(): String = "MarketplaceConversationId(redacted)"
+
+    companion object {
+        private val canonicalPattern = Regex("conversation-[0-9a-f]{8,64}")
+
+        fun parse(value: String): MarketplaceConversationId? =
+            value.takeIf(canonicalPattern::matches)?.let(::MarketplaceConversationId)
+
+        fun require(value: String): MarketplaceConversationId =
+            requireNotNull(parse(value)) { "Conversation ID must be a canonical opaque identifier." }
+    }
 }
 
 sealed interface YardScapeRoute {
@@ -79,6 +105,14 @@ sealed interface YardScapeRoute {
     data object Messages : YardScapeRoute {
         override val path: String = "/messages"
         override val destinationLabel: String = "Messages"
+        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Messages
+    }
+
+    data class MessageThread(val conversationId: MarketplaceConversationId) : YardScapeRoute {
+        constructor(conversationId: String) : this(MarketplaceConversationId.require(conversationId))
+
+        override val path: String = "/messages/${conversationId.value}"
+        override val destinationLabel: String = "Message thread"
         override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Messages
     }
 
@@ -121,9 +155,15 @@ sealed interface YardScapeRoute {
         val action: ShopperSafetyAction,
         val origin: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse,
         val myFindsSection: MyFindsSection = MyFindsSection.Saved,
+        val messageThreadId: MarketplaceConversationId? = null,
     ) : YardScapeRoute {
         init {
-            require(origin == YardScapePrimaryDestination.Browse || origin == YardScapePrimaryDestination.MyFinds)
+            require(
+                origin == YardScapePrimaryDestination.Browse ||
+                    origin == YardScapePrimaryDestination.MyFinds ||
+                    origin == YardScapePrimaryDestination.Messages,
+            )
+            require(origin != YardScapePrimaryDestination.Messages || messageThreadId != null)
         }
 
         override val path: String = "/events/$eventId/safety/${action.pathSegment}"
@@ -145,6 +185,7 @@ sealed interface YardScapeRoute {
 
     companion object {
         fun fromPath(path: String): YardScapeRoute? {
+            if (path.trim().trimStart('/').startsWith("messages/") && ('?' in path || '#' in path)) return null
             val segments = path.substringBefore('?').substringBefore('#')
                 .trim()
                 .trim('/')
@@ -158,6 +199,8 @@ sealed interface YardScapeRoute {
                 segments == listOf("rsvps") -> MyFinds(MyFindsSection.Rsvps)
                 segments == listOf("host") -> Host
                 segments == listOf("messages") -> Messages
+                segments.size == 2 && segments[0] == "messages" ->
+                    MarketplaceConversationId.parse(segments[1])?.let(::MessageThread)
                 segments == listOf("account") -> Account
                 segments.size == 2 && segments[0] == "events" -> EventDetail(segments[1])
                 segments.size == 3 && segments[0] == "events" && segments[2] == "rsvp" -> Rsvp(segments[1])
@@ -215,26 +258,33 @@ class YardScapeAppState(
     private val accountSessionController: AccountSessionController = SeededAccountSessionController(),
     private val shopperSafetyRepository: ShopperSafetyRepository = SeededShopperSafetyRepository(),
     private val publicMapAreaSource: PublicMapAreaSource = SeededPublicMapAreaSource,
+    messagingRepository: MarketplaceMessagingRepository? = null,
+    messagingRepositoryFactory: ((MarketplaceMessagingAccessSource) -> MarketplaceMessagingRepository)? = null,
     initialAccountStatus: MockSessionStatus = MockSessionStatus.SignedIn,
-    private val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
+    val nowEpochMillis: Long = SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
     private val shopperId: String = SeededYardSaleData.SHOPPER_WITHOUT_ACCESS_ID,
     private val hostId: String = SeededYardSaleData.HOST_AVERY_ID,
     activeUserRole: UserRole = UserRole.SHOPPER,
     dataAvailability: AppDataAvailability = AppDataAvailability.Available,
     private val eventCapacitySource: EventCapacitySource = EventCapacitySource.None,
+    initialBlockedEventIds: Set<String> = emptySet(),
     initialRoute: YardScapeRoute = YardScapeRoute.Browse,
 ) {
     var activeUserRole: UserRole by mutableStateOf(activeUserRole)
         private set
 
     private val hostEditorSessions = mutableMapOf<String, HostEditorState>()
+    var hostEditorSessionSignal: Long by mutableStateOf(0L)
+        private set
     private val hostAttendancePolicies = mutableMapOf(
         SeededYardSaleData.FAMILY_GARAGE_EVENT_ID to HostAttendancePolicy(
             attendeeCap = 2,
             approvalMode = HostRsvpApprovalMode.ManualReview,
         ),
     )
-    var route: YardScapeRoute by mutableStateOf(initialRoute)
+    var route: YardScapeRoute by mutableStateOf(
+        if (initialRoute is YardScapeRoute.MessageThread) YardScapeRoute.Messages else initialRoute,
+    )
         private set
 
     var accountState: MockAccountState by mutableStateOf(
@@ -245,10 +295,24 @@ class YardScapeAppState(
     var pendingProtectedAction: PendingProtectedAction? by mutableStateOf(null)
         private set
 
+    private var pendingMessageThreadAuthorization: MarketplaceConversationId? by mutableStateOf(
+        (initialRoute as? YardScapeRoute.MessageThread)?.conversationId,
+    )
+    var pendingMessageThreadAuthorizationSignal: Long by mutableStateOf(
+        if (initialRoute is YardScapeRoute.MessageThread) 1L else 0L,
+    )
+        private set
+    val hasPendingMessageThreadAuthorization: Boolean
+        get() = pendingMessageThreadAuthorization != null
+    val currentMessagingActor: MessagingActor
+        get() = messagingActor()
+    private var messagingSessionVersion: Long = 0L
+    private var messagingNavigationVersion: Long = 0L
+
     var shopperSafetyState: ShopperSafetyUiState? by mutableStateOf(null)
         private set
 
-    var blockedEventIds: Set<String> by mutableStateOf(emptySet())
+    var blockedEventIds: Set<String> by mutableStateOf(initialBlockedEventIds)
         private set
 
     var discoveryFilters: DiscoveryFilters by mutableStateOf(DiscoveryFilters())
@@ -290,17 +354,46 @@ class YardScapeAppState(
     var pendingHostAttendeeAction: PendingHostAttendeeAction? by mutableStateOf(null)
         private set
 
+    private val messagingAccessSource = object : MarketplaceMessagingAccessSource {
+        override fun accessContextFor(key: MarketplaceConversationKey): MessagingAccessContext? =
+            messagingAccessContextFor(key)
+    }
+    private val marketplaceMessagingRepository = messagingRepository
+        ?: messagingRepositoryFactory?.invoke(messagingAccessSource)
+        ?: SeededMarketplaceMessagingRepository(messagingAccessSource)
+    private val marketplaceMessagingState = MarketplaceMessagingState(
+        repository = marketplaceMessagingRepository,
+        actorSource = ::messagingActor,
+        composerAccessFor = ::currentMessagingComposerAccess,
+        sessionVersionSource = { messagingSessionVersion },
+    )
+
+    val messagingInboxState: MessagingInboxUiState
+        get() = marketplaceMessagingState.inboxState
+
+    val messagingThreadState: MessagingThreadUiState
+        get() = marketplaceMessagingState.threadState
+
     init {
         synchronizeDiscoveryMapMarkers()
         (initialRoute as? YardScapeRoute.EventSafety)?.let { safetyRoute ->
-            openShopperSafety(safetyRoute.eventId, safetyRoute.action, safetyRoute.origin)
+            openShopperSafety(
+                safetyRoute.eventId,
+                safetyRoute.action,
+                safetyRoute.origin,
+                safetyRoute.messageThreadId,
+            )
         }
+        (initialRoute as? YardScapeRoute.MessageThread)?.let(::openMessageThreadRoute)
+        if (initialRoute == YardScapeRoute.Messages) openMessagesRoute()
     }
 
     val activePrimaryDestination: YardScapePrimaryDestination
         get() = route.primaryDestination
 
     fun navigateTo(destination: YardScapePrimaryDestination) {
+        invalidateMessagingNavigation()
+        if (destination != YardScapePrimaryDestination.Messages) pendingMessageThreadAuthorization = null
         route = when (destination) {
             YardScapePrimaryDestination.Browse -> YardScapeRoute.Browse
             YardScapePrimaryDestination.MyFinds -> YardScapeRoute.MyFinds(
@@ -313,7 +406,10 @@ class YardScapeAppState(
                 },
             )
             YardScapePrimaryDestination.Host -> YardScapeRoute.Host
-            YardScapePrimaryDestination.Messages -> YardScapeRoute.Messages
+            YardScapePrimaryDestination.Messages -> {
+                openMessagesRoute()
+                route
+            }
             YardScapePrimaryDestination.Account -> YardScapeRoute.Account
         }
     }
@@ -323,19 +419,29 @@ class YardScapeAppState(
 
     fun signInMock(role: UserRole) {
         val pending = pendingProtectedAction
+        marketplaceMessagingState.resetForNewSession()
+        messagingSessionVersion++
         activeUserRole = role
         accountState = accountSessionController.signIn(role, accountState.notificationPreferences)
         pendingProtectedAction = null
-        route = pending?.resumeRoute ?: YardScapeRoute.Account
+        val pendingRoute = pending?.resumeRoute
+        if (pendingRoute is YardScapeRoute.MessageThread) {
+            queuePendingMessageThreadAuthorization(pendingRoute.conversationId)
+            route = YardScapeRoute.Messages
+        } else {
+            route = pendingRoute ?: YardScapeRoute.Account
+        }
     }
 
     fun signOutMock() {
+        messagingSessionVersion++
         accountState = accountSessionController.stateFor(MockSessionStatus.SignedOut, activeUserRole)
         clearProtectedSessionState()
         route = YardScapeRoute.Account
     }
 
     fun expireMockSession() {
+        messagingSessionVersion++
         accountState = accountSessionController.stateFor(MockSessionStatus.Expired, activeUserRole)
         clearProtectedSessionState()
         route = YardScapeRoute.Account
@@ -358,23 +464,31 @@ class YardScapeAppState(
         pendingRsvpCancellationEventId = null
         pendingHostAttendeeAction = null
         pendingProtectedAction = null
+        pendingMessageThreadAuthorization = null
         shopperSafetyState = null
+        marketplaceMessagingState.closeAndClear(MessagingClosedReason.CONVERSATION_UNAVAILABLE)
     }
 
     fun navigateToPath(path: String): Boolean {
         val target = YardScapeRoute.fromPath(path) ?: return false
+        invalidateMessagingNavigation()
+        if (target !is YardScapeRoute.MessageThread) pendingMessageThreadAuthorization = null
         when (target) {
             is YardScapeRoute.MyFinds -> openMyFinds(target.section)
             is YardScapeRoute.Rsvp -> openRsvp(target.eventId)
             is YardScapeRoute.EventSafety -> openShopperSafety(target.eventId, target.action, target.origin)
             is YardScapeRoute.HostCreateEdit -> openHostCreateEdit(target.eventId)
             is YardScapeRoute.HostAttendees -> openHostAttendees(target.eventId)
+            is YardScapeRoute.MessageThread -> openMessageThreadRoute(target)
+            YardScapeRoute.Messages -> openMessagesRoute()
             else -> route = target
         }
         return true
     }
 
     fun navigateBack(): Boolean {
+        invalidateMessagingNavigation()
+        pendingMessageThreadAuthorization = null
         route = when (val current = route) {
             YardScapeRoute.Browse -> return false
             is YardScapeRoute.MyFinds,
@@ -382,6 +496,7 @@ class YardScapeAppState(
             YardScapeRoute.Messages,
             YardScapeRoute.Account,
             -> YardScapeRoute.Browse
+            is YardScapeRoute.MessageThread -> YardScapeRoute.Messages
             is YardScapeRoute.EventDetail -> when (current.origin) {
                 YardScapePrimaryDestination.MyFinds -> YardScapeRoute.MyFinds(current.myFindsSection)
                 else -> YardScapeRoute.Browse
@@ -391,16 +506,116 @@ class YardScapeAppState(
                 current.origin,
                 current.myFindsSection,
             )
-            is YardScapeRoute.EventSafety -> YardScapeRoute.EventDetail(
-                current.eventId,
-                current.origin,
-                current.myFindsSection,
-            )
+            is YardScapeRoute.EventSafety -> when (current.origin) {
+                YardScapePrimaryDestination.Messages ->
+                    YardScapeRoute.MessageThread(requireNotNull(current.messageThreadId))
+                else -> YardScapeRoute.EventDetail(
+                    current.eventId,
+                    current.origin,
+                    current.myFindsSection,
+                )
+            }
             is YardScapeRoute.HostCreateEdit -> YardScapeRoute.Host
             is YardScapeRoute.HostAttendees -> YardScapeRoute.Host
         }
         return true
     }
+
+    private fun openMessageThreadRoute(target: YardScapeRoute.MessageThread): Boolean {
+        when (val gate = protectedActionDecision(ProtectedAction.Messaging)) {
+            ProtectedActionDecision.Allowed -> {
+                queuePendingMessageThreadAuthorization(target.conversationId)
+                route = YardScapeRoute.Messages
+                return false
+            }
+            is ProtectedActionDecision.SignInRequired -> {
+                pendingProtectedAction = PendingProtectedAction(ProtectedAction.Messaging, target)
+                accountState = accountState.copy(signInReason = gate.message)
+                route = YardScapeRoute.Account
+                return false
+            }
+        }
+        return true
+    }
+
+    private fun queuePendingMessageThreadAuthorization(conversationId: MarketplaceConversationId) {
+        pendingMessageThreadAuthorization = conversationId
+        pendingMessageThreadAuthorizationSignal++
+    }
+
+    private fun openMessagesRoute(): Boolean {
+        return when (val gate = protectedActionDecision(ProtectedAction.Messaging)) {
+            ProtectedActionDecision.Allowed -> {
+                route = YardScapeRoute.Messages
+                true
+            }
+            is ProtectedActionDecision.SignInRequired -> {
+                pendingProtectedAction = PendingProtectedAction(
+                    ProtectedAction.Messaging,
+                    YardScapeRoute.Messages,
+                )
+                accountState = accountState.copy(signInReason = gate.message)
+                route = YardScapeRoute.Account
+                false
+            }
+        }
+    }
+
+    suspend fun loadMessagingInbox(): Boolean {
+        val target = YardScapeRoute.Messages
+        return when (val gate = protectedActionDecision(ProtectedAction.Messaging)) {
+            ProtectedActionDecision.Allowed -> marketplaceMessagingState.loadInbox()
+            is ProtectedActionDecision.SignInRequired -> {
+                pendingProtectedAction = PendingProtectedAction(ProtectedAction.Messaging, target)
+                accountState = accountState.copy(signInReason = gate.message)
+                route = YardScapeRoute.Account
+                false
+            }
+        }
+    }
+
+    suspend fun openMessageThread(conversationId: String): Boolean {
+        val opaqueId = MarketplaceConversationId.parse(conversationId) ?: return false
+        val target = YardScapeRoute.MessageThread(opaqueId)
+        when (val gate = protectedActionDecision(ProtectedAction.Messaging)) {
+            is ProtectedActionDecision.SignInRequired -> {
+                pendingProtectedAction = PendingProtectedAction(ProtectedAction.Messaging, target)
+                accountState = accountState.copy(signInReason = gate.message)
+                route = YardScapeRoute.Account
+                return false
+            }
+            ProtectedActionDecision.Allowed -> Unit
+        }
+        val origin = route
+        val navigationVersion = messagingNavigationVersion
+        val opened = marketplaceMessagingState.openThread(opaqueId.value)
+        if (route != origin || messagingNavigationVersion != navigationVersion) return false
+        route = if (opened) target else YardScapeRoute.Messages
+        return opened
+    }
+
+    suspend fun resumePendingMessageThread(): Boolean {
+        val pending = pendingMessageThreadAuthorization ?: return false
+        pendingMessageThreadAuthorization = null
+        return openMessageThread(pending.value)
+    }
+
+    fun updateMessageDraft(draft: String) {
+        marketplaceMessagingState.updateDraft(draft)
+    }
+
+    suspend fun markCurrentMessageThreadRead(): Boolean =
+        marketplaceMessagingState.markCurrentThreadRead()
+
+    suspend fun sendMessageDraft(sentAtEpochMillis: Long): Boolean =
+        marketplaceMessagingState.sendDraft(sentAtEpochMillis)
+
+    suspend fun sendMessageDraft(): Boolean = sendMessageDraft(nowEpochMillis)
+
+    suspend fun retryMessage(messageId: String, attemptedAtEpochMillis: Long): Boolean =
+        marketplaceMessagingState.retryMessage(messageId, attemptedAtEpochMillis)
+
+    suspend fun retryMessage(messageId: String): Boolean = retryMessage(messageId, nowEpochMillis)
 
     fun browseItems(): List<BrowseEventItem> =
         repository.publicPreviews(nowEpochMillis)
@@ -604,7 +819,10 @@ class YardScapeAppState(
         val cancelled = repository.cancelRsvp(eventId, shopperId) ?: return false
         directionsEventId = null
         val cancellationCompleted = cancelled.status == RsvpStatus.CANCELLED
-        if (cancellationCompleted) exitMatchingRsvp(eventId)
+        if (cancellationCompleted) {
+            exitMatchingRsvp(eventId)
+            synchronizeMessagingComposer()
+        }
         return cancellationCompleted
     }
 
@@ -633,7 +851,10 @@ class YardScapeAppState(
         val updated = repository.revokeRsvpAccess(eventId, shopperId) ?: return false
         directionsEventId = null
         val revoked = updated.locationVisibility == LocationVisibility.REVOKED
-        if (revoked) exitMatchingRsvp(eventId)
+        if (revoked) {
+            exitMatchingRsvp(eventId)
+            synchronizeMessagingComposer()
+        }
         return revoked
     }
 
@@ -650,7 +871,10 @@ class YardScapeAppState(
         val updated = repository.expireRsvpAccess(eventId, shopperId) ?: return false
         directionsEventId = null
         val expired = updated.locationVisibility == LocationVisibility.EXPIRED
-        if (expired) exitMatchingRsvp(eventId)
+        if (expired) {
+            exitMatchingRsvp(eventId)
+            synchronizeMessagingComposer()
+        }
         return expired
     }
 
@@ -688,6 +912,7 @@ class YardScapeAppState(
     }
 
     fun openEvent(eventId: String) {
+        invalidateMessagingNavigation()
         val origin = activePrimaryDestination.takeIf {
             it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.MyFinds
         } ?: YardScapePrimaryDestination.Browse
@@ -787,21 +1012,49 @@ class YardScapeAppState(
         openShopperSafety(eventId, ShopperSafetyAction.Block)
     }
 
+    fun openMessageThreadReport() {
+        openMessageThreadSafety(ShopperSafetyAction.Report)
+    }
+
+    fun openMessageThreadBlock() {
+        openMessageThreadSafety(ShopperSafetyAction.Block)
+    }
+
+    private fun openMessageThreadSafety(action: ShopperSafetyAction) {
+        val messageRoute = route as? YardScapeRoute.MessageThread ?: return
+        val loaded = messagingThreadState as? MessagingThreadUiState.Loaded ?: return
+        if (loaded.presentation.conversationId != messageRoute.conversationId.value) return
+        val actor = messagingActor()
+        if (!accountState.isSignedIn || actor.role != UserRole.SHOPPER) return
+        if (actor.userId != loaded.presentation.thread.conversationKey.shopperId) return
+        invalidateMessagingNavigation()
+        openShopperSafety(
+            eventId = loaded.presentation.thread.conversationKey.eventId,
+            action = action,
+            requestedOrigin = YardScapePrimaryDestination.Messages,
+            returnMessageThreadId = messageRoute.conversationId,
+        )
+    }
+
     private fun openShopperSafety(
         eventId: String,
         action: ShopperSafetyAction,
         requestedOrigin: YardScapePrimaryDestination? = null,
+        returnMessageThreadId: MarketplaceConversationId? = null,
     ) {
         val detail = repository.publicEventDetail(eventId) ?: return
         val detailRoute = route as? YardScapeRoute.EventDetail
         val origin = requestedOrigin ?: route.primaryDestination.takeIf {
-            it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.MyFinds
+            it == YardScapePrimaryDestination.Browse ||
+                it == YardScapePrimaryDestination.MyFinds ||
+                (it == YardScapePrimaryDestination.Messages && returnMessageThreadId != null)
         } ?: YardScapePrimaryDestination.Browse
         val target = YardScapeRoute.EventSafety(
             eventId,
             action,
             origin,
             detailRoute?.myFindsSection ?: MyFindsSection.Saved,
+            returnMessageThreadId,
         )
         shopperSafetyState = shopperSafetyState
             ?.takeIf { it.eventId == eventId && it.action == action }
@@ -928,9 +1181,16 @@ class YardScapeAppState(
             if (pendingRsvpCancellationEventId in update.affectedEventIds) {
                 pendingRsvpCancellationEventId = null
             }
+            val safetyRoute = route as? YardScapeRoute.EventSafety
+            if (safetyRoute?.origin == YardScapePrimaryDestination.Messages &&
+                safetyRoute.eventId in update.affectedEventIds
+            ) {
+                route = YardScapeRoute.Messages
+            }
         } else {
             blockedEventIds = blockedEventIds - update.affectedEventIds
         }
+        synchronizeMessagingComposer()
         synchronizeDiscoveryMapMarkers()
     }
 
@@ -943,7 +1203,10 @@ class YardScapeAppState(
             route = YardScapeRoute.Account
             return
         }
-        if (eventId == null) hostEditorSessions.remove(NEW_HOST_SESSION_KEY)
+        if (eventId == null) {
+            hostEditorSessions.remove(NEW_HOST_SESSION_KEY)
+            hostEditorSessionSignal++
+        }
         route = target
     }
 
@@ -984,14 +1247,52 @@ class YardScapeAppState(
                 state = uiState,
                 hasLocationAccess = uiState == HostAttendeeUiState.Accepted &&
                     repository.exactLocationFor(eventId, rsvp.shopperId, nowEpochMillis) != null,
+                canMessageAttendee = activeUserRole == UserRole.HOST &&
+                    currentMessagingComposerAccess(
+                        MarketplaceConversationKey(eventId, rsvp.shopperId),
+                        MessagingActor(hostId, UserRole.HOST),
+                    ) is MessagingComposerAccess.Open,
             )
         }.sortedWith(compareBy({ it.state.ordinal }, { it.displayName }))
         return HostAttendanceState(
             eventId = eventId,
             eventTitle = event.title,
+            eventPhoto = event.photos.firstOrNull(),
             policy = hostAttendancePolicies[eventId] ?: HostAttendancePolicy(),
             attendees = attendees,
         )
+    }
+
+    /** Resolves host messaging through the repository before committing an opaque thread route. */
+    suspend fun openHostAttendeeMessage(eventId: String, shopperId: String): Boolean {
+        if (!accountState.isSignedIn || activeUserRole != UserRole.HOST) return false
+        val event = repository.hostEvent(eventId) ?: return false
+        if (event.host.id != hostId) return false
+        val key = MarketplaceConversationKey(eventId, shopperId)
+        val actor = MessagingActor(hostId, UserRole.HOST)
+        if (currentMessagingComposerAccess(key, actor) !is MessagingComposerAccess.Open) return false
+        val origin = route
+        val navigationVersion = messagingNavigationVersion
+        val sessionVersion = messagingSessionVersion
+
+        val result = marketplaceMessagingRepository.threadFor(key, actor)
+        if (route != origin ||
+            messagingNavigationVersion != navigationVersion ||
+            messagingActor() != actor ||
+            messagingSessionVersion != sessionVersion ||
+            !accountState.isSignedIn ||
+            activeUserRole != UserRole.HOST
+        ) return false
+        val currentEvent = repository.hostEvent(eventId) ?: return false
+        if (currentEvent.host.id != hostId) return false
+        if (currentMessagingComposerAccess(key, actor) !is MessagingComposerAccess.Open) return false
+        val thread = (result as? MessagingRepositoryResult.Success)?.value ?: return false
+        if (thread.conversationKey != key || thread.composerAccess !is MessagingComposerAccess.Open) return false
+        val opaqueId = MarketplaceConversationId.parse(thread.conversationId) ?: return false
+        if (!marketplaceMessagingState.openAuthorizedThread(thread)) return false
+        pendingMessageThreadAuthorization = null
+        route = YardScapeRoute.MessageThread(opaqueId)
+        return true
     }
 
     fun requestHostAttendeeAction(
@@ -1024,6 +1325,7 @@ class YardScapeAppState(
             HostAttendeeAction.Revoke -> repository.revokeRsvpAccess(pending.eventId, pending.shopperId)
         }
         directionsEventId = null
+        if (updated != null) synchronizeMessagingComposer()
         return updated != null
     }
 
@@ -1033,7 +1335,15 @@ class YardScapeAppState(
 
     fun hostEventItems(): List<HostEventItem> =
         if (accountState.isSignedIn) {
-            repository.hostEvents(hostId).map { it.toHostEventItem(nowEpochMillis) }
+            repository.hostEvents(hostId).map { event ->
+                val attendance = hostAttendanceState(event.id)
+                event.toHostEventItem(
+                    nowEpochMillis = nowEpochMillis,
+                    acceptedRsvpCount = attendance?.acceptedCount ?: 0,
+                    pendingRsvpCount = attendance?.requestedCount ?: 0,
+                    attendeeCap = attendance?.policy?.attendeeCap,
+                )
+            }
         } else {
             emptyList()
         }
@@ -1054,10 +1364,16 @@ class YardScapeAppState(
     fun hostEditorState(eventId: String?): HostEditorState {
         val sessionKey = eventId ?: NEW_HOST_SESSION_KEY
         return hostEditorSessions.getOrPut(sessionKey) {
+            val event = repository.hostEvent(eventId.orEmpty())
+            val policy = eventId?.let { hostAttendancePolicies[it] } ?: HostAttendancePolicy()
             HostEditorState(
-                draft = repository.hostEvent(eventId.orEmpty())?.toHostEventDraft()
+                draft = event?.toHostEventDraft()
                     ?: blankHostEventDraft(),
                 validationErrors = emptyList(),
+                attendeeCapInput = policy.attendeeCap?.toString().orEmpty(),
+                approvalMode = policy.approvalMode,
+                hostDisplayName = event?.host?.displayName ?: "YardScape host",
+                hostTrustSignals = event?.host?.trustSignals.orEmpty(),
             )
         }
     }
@@ -1110,15 +1426,58 @@ class YardScapeAppState(
         publishHostEvent(HostEditorState(draft = draft, validationErrors = emptyList()))
 
     fun cancelHostEvent(eventId: String) {
-        repository.cancelHostEvent(eventId)
+        if (repository.cancelHostEvent(eventId)) synchronizeMessagingComposer()
         synchronizeDiscoveryMapMarkers()
         route = YardScapeRoute.HostCreateEdit(eventId)
     }
 
     fun hideHostEvent(eventId: String) {
-        repository.hideHostEvent(eventId)
+        if (repository.hideHostEvent(eventId)) synchronizeMessagingComposer()
         synchronizeDiscoveryMapMarkers()
         route = YardScapeRoute.HostCreateEdit(eventId)
+    }
+
+    private fun messagingActor(): MessagingActor = MessagingActor(
+        userId = when (activeUserRole) {
+            UserRole.SHOPPER -> shopperId
+            UserRole.HOST -> hostId
+        },
+        role = activeUserRole,
+    )
+
+    private fun messagingAccessContextFor(key: MarketplaceConversationKey): MessagingAccessContext? {
+        val event = repository.hostEvent(key.eventId) ?: return null
+        val rsvp = repository.rsvpFor(key.eventId, key.shopperId)
+        return MessagingAccessContext(
+            conversationKey = key,
+            hostId = event.host.id,
+            eventStatus = event.status,
+            eventHasEnded = event.saleWindow.hasEnded(nowEpochMillis),
+            rsvpStatus = rsvp?.status,
+            locationVisibility = rsvp?.locationVisibility,
+            isBlocked = key.eventId in blockedEventIds,
+        )
+    }
+
+    private fun currentMessagingComposerAccess(
+        key: MarketplaceConversationKey,
+        actor: MessagingActor,
+    ): MessagingComposerAccess {
+        if (!accountState.isSignedIn) {
+            return MessagingComposerAccess.Closed(MessagingClosedReason.CONVERSATION_UNAVAILABLE)
+        }
+        val context = messagingAccessContextFor(key)
+            ?: return MessagingComposerAccess.Closed(MessagingClosedReason.CONVERSATION_UNAVAILABLE)
+        return MarketplaceMessagingPolicy.composerAccess(context, actor)
+    }
+
+    private fun synchronizeMessagingComposer() {
+        marketplaceMessagingState.synchronizeComposerAccess()
+    }
+
+    private fun invalidateMessagingNavigation() {
+        messagingNavigationVersion++
+        marketplaceMessagingState.invalidatePendingWork()
     }
 
     private fun blankHostEventDraft(): HostEventDraft =
@@ -1174,6 +1533,10 @@ data class HostEventItem(
     val statusLabel: String,
     val dateLabel: String,
     val publicLocationLabel: String,
+    val photoReference: String? = null,
+    val acceptedRsvpCount: Int = 0,
+    val pendingRsvpCount: Int = 0,
+    val attendeeCap: Int? = null,
 )
 
 data class EventDetailState(
@@ -1328,7 +1691,12 @@ private fun Long.isWeekendDay(): Boolean {
     return isoDayOfWeek == 6L || isoDayOfWeek == 7L
 }
 
-fun YardSaleEvent.toHostEventItem(nowEpochMillis: Long): HostEventItem =
+fun YardSaleEvent.toHostEventItem(
+    nowEpochMillis: Long,
+    acceptedRsvpCount: Int = 0,
+    pendingRsvpCount: Int = 0,
+    attendeeCap: Int? = null,
+): HostEventItem =
     HostEventItem(
         id = id,
         title = title,
@@ -1338,6 +1706,10 @@ fun YardSaleEvent.toHostEventItem(nowEpochMillis: Long): HostEventItem =
             location.publicLocation.neighborhood,
             location.publicLocation.city,
         ).filter { it.isNotBlank() }.joinToString(" - "),
+        photoReference = photos.firstOrNull()?.url,
+        acceptedRsvpCount = acceptedRsvpCount,
+        pendingRsvpCount = pendingRsvpCount,
+        attendeeCap = attendeeCap,
     )
 
 fun YardSaleEvent.toHostEventDraft(): HostEventDraft =
@@ -1381,18 +1753,23 @@ fun YardSaleEvent.toHostEventDraft(): HostEventDraft =
     )
 
 fun PublicEventDetail.toDetailSections(nowEpochMillis: Long): List<Pair<String, String>> =
-    listOf(
-        "When" to saleWindow.toBrowseDateLabel(nowEpochMillis),
-        "Area" to listOfNotNull(
-            publicLocation.neighborhood,
-            publicLocation.city,
-            publicLocation.distanceLabel ?: publicLocation.areaDescription,
-        ).joinToString(" - "),
-        "Categories" to categories.joinToString(", "),
-        "Payments" to acceptedPaymentTypes.joinToString(", "),
-        "Accessibility" to accessibilityNotes.joinToString(", "),
-        "Host" to listOf(hostDisplayName, hostTrustSignals.firstOrNull()).joinToString(" - "),
-    )
+    shopperScheduleAndArea(
+        saleWindow = saleWindow,
+        publicNeighborhood = publicLocation.neighborhood,
+        publicCity = publicLocation.city,
+        publicDistanceLabel = publicLocation.distanceLabel,
+        publicAreaDescription = publicLocation.areaDescription,
+        nowEpochMillis = nowEpochMillis,
+    ).run {
+        shopperDetailSections(
+            scheduleLabel = scheduleLabel,
+            approximateLocationLabel = approximateLocationLabel,
+            categories = categories,
+            acceptedPaymentTypes = acceptedPaymentTypes,
+            accessibilityNotes = accessibilityNotes,
+            hostContext = listOf(hostDisplayName, hostTrustSignals.firstOrNull()).filterNotNull().joinToString(" - "),
+        )
+    }
 
 private fun PublicEventDetail.toLocationRevealState(
     rsvpStatus: RsvpStatus?,
@@ -1517,7 +1894,7 @@ fun String.toClockMinutesSinceMidnight(): Int? {
     return hour24 * 60 + minute
 }
 
-private fun com.naslabs.yardscape.domain.SaleWindow.toBrowseDateLabel(
+internal fun com.naslabs.yardscape.domain.SaleWindow.toBrowseDateLabel(
     nowEpochMillis: Long,
 ): String {
     val dayOffset = (startsAtEpochMillis - nowEpochMillis).floorDiv(MILLIS_PER_DAY)

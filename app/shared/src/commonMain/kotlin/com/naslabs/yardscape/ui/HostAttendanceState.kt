@@ -1,6 +1,7 @@
 package com.naslabs.yardscape.ui
 
 import com.naslabs.yardscape.domain.EventStatus
+import com.naslabs.yardscape.domain.EventPhoto
 import com.naslabs.yardscape.domain.LocationVisibility
 import com.naslabs.yardscape.domain.Rsvp
 import com.naslabs.yardscape.domain.RsvpStatus
@@ -44,6 +45,7 @@ data class HostAttendeeItem(
     val displayName: String,
     val state: HostAttendeeUiState,
     val hasLocationAccess: Boolean,
+    val canMessageAttendee: Boolean = false,
 ) {
     val availableActions: Set<HostAttendeeAction> = when (state) {
         HostAttendeeUiState.Requested,
@@ -53,11 +55,31 @@ data class HostAttendeeItem(
         HostAttendeeUiState.Revoked -> setOf(HostAttendeeAction.Remove)
         else -> emptySet()
     }
+
+    val exactAccessLabel: String = when (state) {
+        HostAttendeeUiState.Accepted -> if (hasLocationAccess) {
+            "Exact location active"
+        } else {
+            "Exact location unavailable"
+        }
+        HostAttendeeUiState.Revoked -> "Exact location hidden"
+        HostAttendeeUiState.Expired -> "Exact location expired"
+        HostAttendeeUiState.Cancelled,
+        HostAttendeeUiState.Removed,
+        -> "Exact location removed"
+        else -> "Exact location not granted"
+    }
 }
+
+data class HostAttendanceMetric(
+    val label: String,
+    val value: String,
+)
 
 data class HostAttendanceState(
     val eventId: String,
     val eventTitle: String,
+    val eventPhoto: EventPhoto?,
     val policy: HostAttendancePolicy,
     val attendees: List<HostAttendeeItem>,
 ) {
@@ -67,7 +89,35 @@ data class HostAttendanceState(
     val requestedCount: Int = attendees.count { it.state == HostAttendeeUiState.Requested }
     val activeLocationAccessCount: Int = attendees.count { it.hasLocationAccess }
     val isAtCapacity: Boolean = policy.attendeeCap?.let { acceptedCount >= it } ?: false
+    val attendeeRows: List<HostAttendeeItem> = attendees.sortedWith(
+        compareBy<HostAttendeeItem>({ it.state.attendanceRowOrder }, { it.displayName }),
+    )
+    val capacityMetric: HostAttendanceMetric = HostAttendanceMetric(
+        label = "Capacity",
+        value = policy.attendeeCap?.let { "$acceptedCount / $it" } ?: "$acceptedCount attending",
+    )
+    val exactAccessMetric: HostAttendanceMetric = HostAttendanceMetric(
+        label = "Exact access",
+        value = activeLocationAccessCount.toString(),
+    )
+    val summaryMetrics: List<HostAttendanceMetric> = listOf(
+        capacityMetric,
+        HostAttendanceMetric("Waiting", requestedCount.toString()),
+        exactAccessMetric,
+    )
 }
+
+private val HostAttendeeUiState.attendanceRowOrder: Int
+    get() = when (this) {
+        HostAttendeeUiState.Requested -> 0
+        HostAttendeeUiState.Accepted -> 1
+        HostAttendeeUiState.Revoked -> 2
+        HostAttendeeUiState.Waitlisted -> 3
+        HostAttendeeUiState.Declined -> 4
+        HostAttendeeUiState.Cancelled -> 5
+        HostAttendeeUiState.Removed -> 6
+        HostAttendeeUiState.Expired -> 7
+    }
 
 fun Rsvp.toHostAttendeeUiState(eventStatus: EventStatus, eventHasEnded: Boolean): HostAttendeeUiState = when {
     status == RsvpStatus.REMOVED -> HostAttendeeUiState.Removed

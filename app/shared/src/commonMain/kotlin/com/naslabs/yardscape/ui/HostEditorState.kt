@@ -3,6 +3,7 @@ package com.naslabs.yardscape.ui
 import com.naslabs.yardscape.data.HostEventDraft
 import com.naslabs.yardscape.data.validateFor
 import com.naslabs.yardscape.domain.EventStatus
+import com.naslabs.yardscape.domain.SaleWindow
 
 enum class HostEditorStep(val label: String) {
     Basics("Basics"),
@@ -44,8 +45,67 @@ data class HostPublicPreview(
     val approximateLocationLabel: String,
     val categories: List<String>,
     val photoCaptions: List<String>,
-    val rsvpSummary: String,
+    val photoReferences: List<String>,
+    val acceptedPaymentTypes: List<String>,
+    val accessibilityNotes: List<String>,
+    val hostContext: String,
 )
+
+internal fun shopperDetailSections(
+    scheduleLabel: String,
+    approximateLocationLabel: String,
+    categories: List<String>,
+    acceptedPaymentTypes: List<String>,
+    accessibilityNotes: List<String>,
+    hostContext: String,
+): List<Pair<String, String>> = listOf(
+    "When" to scheduleLabel,
+    "Area" to approximateLocationLabel,
+    "Categories" to categories.joinToString(", "),
+    "Payments" to acceptedPaymentTypes.joinToString(", "),
+    "Accessibility" to accessibilityNotes.joinToString(", "),
+    "Host" to hostContext,
+)
+
+internal fun HostPublicPreview.shopperDetailSections(): List<Pair<String, String>> =
+    shopperDetailSections(
+        scheduleLabel = scheduleLabel,
+        approximateLocationLabel = approximateLocationLabel,
+        categories = categories,
+        acceptedPaymentTypes = acceptedPaymentTypes,
+        accessibilityNotes = accessibilityNotes,
+        hostContext = hostContext,
+    )
+
+internal data class ShopperScheduleAndArea(
+    val scheduleLabel: String,
+    val approximateLocationLabel: String,
+)
+
+internal fun shopperScheduleAndArea(
+    saleWindow: SaleWindow?,
+    publicNeighborhood: String,
+    publicCity: String,
+    publicDistanceLabel: String?,
+    publicAreaDescription: String,
+    nowEpochMillis: Long,
+): ShopperScheduleAndArea = ShopperScheduleAndArea(
+    scheduleLabel = saleWindow?.toBrowseDateLabel(nowEpochMillis).orEmpty(),
+    approximateLocationLabel = listOfNotNull(
+        publicNeighborhood.takeIf { it.isNotBlank() },
+        publicCity.takeIf { it.isNotBlank() },
+        (publicDistanceLabel ?: publicAreaDescription).takeIf { it.isNotBlank() },
+    ).joinToString(" - "),
+)
+
+data class HostEditorProgress(
+    val activeStep: HostEditorStep,
+    val currentStep: Int,
+    val totalSteps: Int,
+) {
+    val previousStep: HostEditorStep?
+        get() = HostEditorStep.entries.getOrNull(currentStep - 2)
+}
 
 data class HostEditorState(
     val draft: HostEventDraft,
@@ -54,8 +114,17 @@ data class HostEditorState(
     val step: HostEditorStep = HostEditorStep.Basics,
     val attendeeCapInput: String = "",
     val approvalMode: HostRsvpApprovalMode = HostRsvpApprovalMode.AutoAccept,
+    val hostDisplayName: String = "YardScape host",
+    val hostTrustSignals: List<String> = emptyList(),
     val pendingConfirmation: HostConfirmationAction? = null,
 ) {
+    val progress: HostEditorProgress
+        get() = HostEditorProgress(
+            activeStep = step,
+            currentStep = step.ordinal + 1,
+            totalSteps = HostEditorStep.entries.size,
+        )
+
     val attendeeCap: Int?
         get() = attendeeCapInput.toIntOrNull()
 
@@ -87,25 +156,30 @@ data class HostEditorState(
         -> emptyList()
     }
 
-    fun publicPreview(): HostPublicPreview = HostPublicPreview(
-        title = draft.title.ifBlank { "Untitled yard sale" },
-        description = draft.description,
-        scheduleLabel = listOfNotNull(
-            draft.startsAtEpochMillis?.toHostClockTimeLabel(),
-            draft.endsAtEpochMillis?.toHostClockTimeLabel(),
-        ).joinToString(" - "),
-        approximateLocationLabel = listOf(
-            draft.publicNeighborhood,
-            draft.publicCity,
-            draft.publicAreaDescription,
-        ).filter { it.isNotBlank() }.joinToString(" - "),
-        categories = draft.categories,
-        photoCaptions = draft.photos.mapNotNull { it.description },
-        rsvpSummary = buildString {
-            append(approvalMode.label)
-            attendeeCap?.let { append(" · Up to $it attendees") }
-        },
-    )
+    fun publicPreview(nowEpochMillis: Long): HostPublicPreview {
+        val scheduleAndArea = shopperScheduleAndArea(
+            saleWindow = draft.startsAtEpochMillis?.let { startsAt ->
+                draft.endsAtEpochMillis?.let { endsAt -> SaleWindow(startsAt, endsAt) }
+            },
+            publicNeighborhood = draft.publicNeighborhood,
+            publicCity = draft.publicCity,
+            publicDistanceLabel = draft.publicDistanceLabel,
+            publicAreaDescription = draft.publicAreaDescription,
+            nowEpochMillis = nowEpochMillis,
+        )
+        return HostPublicPreview(
+            title = draft.title.ifBlank { "Untitled yard sale" },
+            description = draft.description,
+            scheduleLabel = scheduleAndArea.scheduleLabel,
+            approximateLocationLabel = scheduleAndArea.approximateLocationLabel,
+            categories = draft.categories,
+            photoCaptions = draft.photos.mapNotNull { it.description },
+            photoReferences = draft.photos.map { it.url },
+            acceptedPaymentTypes = draft.acceptedPaymentTypes,
+            accessibilityNotes = draft.accessibilityNotes,
+            hostContext = listOf(hostDisplayName, hostTrustSignals.firstOrNull()).filterNotNull().joinToString(" - "),
+        )
+    }
 
     fun publishErrors(): List<String> =
         draft.validateFor(EventStatus.PUBLISHED) + errorsFor(HostEditorStep.RsvpSettings)

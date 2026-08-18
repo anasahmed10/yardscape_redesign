@@ -86,7 +86,7 @@ class HostEditorFlowTest {
         val seeded = appState.hostEditorState(SeededYardSaleData.DRAFT_EVENT_ID)
         val previewText = seeded.copy(
             draft = seeded.draft.copy(accessInstructions = "Use private gate 2468"),
-        ).publicPreview().toString()
+        ).publicPreview(SeededYardSaleData.BASE_NOW_EPOCH_MILLIS).toString()
 
         assertFalse(previewText.contains(seeded.draft.exactStreetAddress))
         assertFalse(previewText.contains("private gate 2468"))
@@ -110,7 +110,8 @@ class HostEditorFlowTest {
 
         assertTrue(published.validationErrors.isEmpty())
         assertEquals(photos, published.draft.photos)
-        assertEquals(listOf("Second caption", "First caption"), published.publicPreview().photoCaptions)
+        assertEquals(listOf("Second caption", "First caption"), published.publicPreview(SeededYardSaleData.BASE_NOW_EPOCH_MILLIS).photoCaptions)
+        assertEquals(listOf("mock://photo/second", "mock://photo/first"), published.publicPreview(SeededYardSaleData.BASE_NOW_EPOCH_MILLIS).photoReferences)
     }
 
     @Test
@@ -134,5 +135,38 @@ class HostEditorFlowTest {
                 assertTrue(action.message.contains("revok"))
             }
         }
+    }
+
+    @Test
+    fun previewCanReturnToAnEarlierStepAndExistingEventRestoresItsAttendancePolicy() {
+        val appState = YardScapeAppState()
+        assertTrue(
+            appState.updateHostAttendancePolicy(
+                SeededYardSaleData.FAMILY_GARAGE_EVENT_ID,
+                HostAttendancePolicy(attendeeCap = 7, approvalMode = HostRsvpApprovalMode.ManualReview),
+            ),
+        )
+        val editor = appState.hostEditorState(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID).copy(step = HostEditorStep.Preview)
+
+        assertEquals("7", editor.attendeeCapInput)
+        assertEquals(HostRsvpApprovalMode.ManualReview, editor.approvalMode)
+        assertEquals(HostEditorStep.Basics, appState.moveHostEditor(editor, HostEditorStep.Basics).step)
+
+        appState.publishHostEvent(editor)
+        assertEquals(7, appState.hostAttendanceState(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)?.policy?.attendeeCap)
+        assertEquals(HostRsvpApprovalMode.ManualReview, appState.hostAttendanceState(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)?.policy?.approvalMode)
+    }
+
+    @Test
+    fun newSaleReplacesTheSameRouteEditorSessionWithABlankDraft() {
+        val appState = YardScapeAppState()
+        val edited = appState.hostEditorState(null).copy(draft = appState.hostEditorState(null).draft.copy(title = "Stale draft"))
+        appState.rememberHostEditorState(edited)
+        val beforeReset = appState.hostEditorSessionSignal
+
+        appState.openHostCreateEdit()
+
+        assertTrue(appState.hostEditorSessionSignal > beforeReset)
+        assertEquals("", appState.hostEditorState(null).draft.title)
     }
 }

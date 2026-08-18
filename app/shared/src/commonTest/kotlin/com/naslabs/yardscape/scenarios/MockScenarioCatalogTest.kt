@@ -10,10 +10,16 @@ import com.naslabs.yardscape.ui.BlockMutationState
 import com.naslabs.yardscape.ui.ReportSubmissionState
 import com.naslabs.yardscape.ui.SafetyFailureKind
 import com.naslabs.yardscape.ui.YardScapeRoute
+import com.naslabs.yardscape.ui.MessagingInboxUiState
+import com.naslabs.yardscape.ui.MessagingThreadUiState
+import com.naslabs.yardscape.domain.MessageDeliveryState
+import com.naslabs.yardscape.domain.MessagingComposerAccess
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
 import kotlin.test.assertTrue
 
@@ -145,6 +151,104 @@ class MockScenarioCatalogTest {
             assertIs<BlockMutationState.Failed>(failedBlock.shopperSafetyState?.blockState).kind,
         )
         assertTrue(failedBlock.blockedEventIds.isEmpty())
+    }
+
+    @Test
+    fun messagingScenariosDocumentRouteActorComposerPrivacyAndRecovery() {
+        val required = setOf(
+            MockScenarioId.AcceptedUnreadMessages,
+            MockScenarioId.FailedSendRetryMessages,
+            MockScenarioId.CancelledMessages,
+            MockScenarioId.RevokedMessages,
+            MockScenarioId.ExpiredMessages,
+            MockScenarioId.EventCancelledMessages,
+            MockScenarioId.BlockedMessages,
+            MockScenarioId.SignedOutMessages,
+            MockScenarioId.HostOwnedMessages,
+        )
+
+        required.forEach { id ->
+            val scenario = MockScenarioCatalog.scenario(id)
+            val messaging = assertIs<MockMessagingScenario>(scenario.messaging)
+            assertTrue(messaging.expectedRoute.isNotBlank())
+            assertTrue(messaging.actor.isNotBlank())
+            assertTrue(messaging.composerState.isNotBlank())
+            assertTrue(messaging.recoveryAction.isNotBlank())
+            assertTrue(messaging.protectedDataAbsent)
+            assertFalse(messaging.toString().contains("123 Cedar Street"))
+            assertFalse(messaging.toString().contains("side gate"))
+        }
+    }
+
+    @Test
+    fun messagingScenariosSeedOnlyPolicyAuthorizedThreadState() = runTest {
+        val accepted = MockScenarioCatalog.createAppState(MockScenarioId.AcceptedUnreadMessages)
+        assertTrue(accepted.loadMessagingInbox())
+        val acceptedThread = assertIs<MessagingInboxUiState.Loaded>(accepted.messagingInboxState).threads.single()
+        assertEquals(1, acceptedThread.unreadCount)
+        assertTrue(accepted.openMessageThread(acceptedThread.conversationId))
+        assertIs<MessagingComposerAccess.Open>(
+            assertIs<MessagingThreadUiState.Loaded>(accepted.messagingThreadState).presentation.composerAccess,
+        )
+
+        val failed = MockScenarioCatalog.createAppState(MockScenarioId.FailedSendRetryMessages)
+        assertTrue(failed.loadMessagingInbox())
+        val failedThread = assertIs<MessagingInboxUiState.Loaded>(failed.messagingInboxState).threads.single()
+        assertTrue(failed.openMessageThread(failedThread.conversationId))
+        val failedMessage = assertIs<MessagingThreadUiState.Loaded>(failed.messagingThreadState).presentation.messages.single()
+        assertEquals(
+            MessageDeliveryState.FAILED,
+            failedMessage.deliveryState,
+        )
+        assertTrue(failed.retryMessage(failedMessage.id))
+        assertEquals(
+            MessageDeliveryState.SENT,
+            assertIs<MessagingThreadUiState.Loaded>(failed.messagingThreadState).presentation.messages.single().deliveryState,
+        )
+
+        listOf(
+            MockScenarioId.CancelledMessages,
+            MockScenarioId.RevokedMessages,
+            MockScenarioId.ExpiredMessages,
+            MockScenarioId.EventCancelledMessages,
+            MockScenarioId.BlockedMessages,
+        ).forEach { id ->
+            val closed = MockScenarioCatalog.createAppState(id)
+            assertTrue(closed.loadMessagingInbox())
+            val summary = assertIs<MessagingInboxUiState.Loaded>(closed.messagingInboxState).threads.single()
+            listOf("123 Cedar Street", "Private Unit 7B", "side gate by the blue planter").forEach { protectedText ->
+                assertFalse(summary.lastMessagePreview.orEmpty().contains(protectedText), id.name)
+            }
+            assertTrue(closed.openMessageThread(summary.conversationId))
+            val presentation = assertIs<MessagingThreadUiState.Loaded>(closed.messagingThreadState).presentation
+            assertIs<MessagingComposerAccess.Closed>(presentation.composerAccess)
+            assertEquals(
+                "Message content hidden because this conversation is closed.",
+                presentation.messages.single().body,
+                id.name,
+            )
+            val hostId = SeededYardSaleData.events.single {
+                it.id == presentation.thread.conversationKey.eventId
+            }.host.id
+            assertTrue(
+                presentation.messages.all { message ->
+                    message.senderId == hostId || message.senderId == presentation.thread.conversationKey.shopperId
+                },
+                id.name,
+            )
+        }
+
+        val signedOut = MockScenarioCatalog.createAppState(MockScenarioId.SignedOutMessages)
+        assertEquals(YardScapeRoute.Account, signedOut.route)
+
+        val host = MockScenarioCatalog.createAppState(MockScenarioId.HostOwnedMessages)
+        val attendee = assertNotNull(
+            host.hostAttendanceState(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID),
+        ).attendeeRows.first { it.canMessageAttendee }
+        assertTrue(host.openHostAttendeeMessage(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID, attendee.shopperId))
+        val hostRoute = assertIs<YardScapeRoute.MessageThread>(host.route)
+        assertFalse(hostRoute.conversationId.value.contains(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID))
+        assertFalse(hostRoute.conversationId.value.contains(attendee.shopperId))
     }
 
     private fun detailState(id: MockScenarioId) =
