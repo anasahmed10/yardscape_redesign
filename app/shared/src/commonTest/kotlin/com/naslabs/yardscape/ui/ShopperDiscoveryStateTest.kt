@@ -76,9 +76,9 @@ class ShopperDiscoveryStateTest {
         assertTrue(state.toggleSavedEvent(eventId))
         state.updateDiscoveryQuery("vinyl")
         state.updateDiscoveryDisplayMode(DiscoveryDisplayMode.Map)
-        state.navigateTo(YardScapePrimaryDestination.Saved)
+        state.navigateTo(YardScapePrimaryDestination.MyFinds)
 
-        assertEquals(YardScapeRoute.Saved, state.route)
+        assertEquals(YardScapeRoute.MyFinds(), state.route)
         assertEquals(DiscoveryDisplayMode.Map, state.discoveryState().displayMode)
         assertEquals(listOf(eventId), state.savedItems().map { it.id })
 
@@ -91,16 +91,16 @@ class ShopperDiscoveryStateTest {
         val state = YardScapeAppState()
         val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
         state.toggleSavedEvent(eventId)
-        state.navigateTo(YardScapePrimaryDestination.Saved)
+        state.navigateTo(YardScapePrimaryDestination.MyFinds)
 
         state.openEvent(eventId)
-        assertEquals(YardScapePrimaryDestination.Saved, state.activePrimaryDestination)
+        assertEquals(YardScapePrimaryDestination.MyFinds, state.activePrimaryDestination)
         state.openRsvp(eventId)
-        assertEquals(YardScapePrimaryDestination.Saved, state.activePrimaryDestination)
+        assertEquals(YardScapePrimaryDestination.MyFinds, state.activePrimaryDestination)
         assertTrue(state.navigateBack())
-        assertEquals(YardScapeRoute.EventDetail(eventId, YardScapePrimaryDestination.Saved), state.route)
+        assertEquals(YardScapeRoute.EventDetail(eventId, YardScapePrimaryDestination.MyFinds), state.route)
         assertTrue(state.navigateBack())
-        assertEquals(YardScapeRoute.Saved, state.route)
+        assertEquals(YardScapeRoute.MyFinds(), state.route)
     }
 
     @Test

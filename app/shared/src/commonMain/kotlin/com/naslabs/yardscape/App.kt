@@ -18,6 +18,7 @@ import com.naslabs.yardscape.ui.HostDashboardScreen
 import com.naslabs.yardscape.ui.HostCreateEditScreen
 import com.naslabs.yardscape.ui.HostAttendanceScreen
 import com.naslabs.yardscape.ui.MyRsvpsScreen
+import com.naslabs.yardscape.ui.MyFindsSection
 import com.naslabs.yardscape.ui.PublicEventDetailScreen
 import com.naslabs.yardscape.ui.RsvpScreen
 import com.naslabs.yardscape.ui.SavedDestinationScreen
@@ -66,31 +67,35 @@ fun App(appState: YardScapeAppState) {
                         onSavedToggled = { appState.toggleSavedEvent(it) },
                     )
 
-                    YardScapeRoute.Saved -> SavedDestinationScreen(
-                        events = appState.savedItems(),
-                        onEventSelected = appState::openEvent,
-                        onUnsave = { appState.toggleSavedEvent(it) },
-                        onBrowse = { appState.navigateTo(YardScapePrimaryDestination.Browse) },
-                        onMyRsvps = appState::openMyRsvps,
-                    )
-                    YardScapeRoute.MyRsvps -> MyRsvpsScreen(
-                        items = appState.myRsvpItems(),
-                        pendingCancellationEventId = appState.pendingRsvpCancellationEventId,
-                        onBack = { appState.navigateBack() },
-                        onEventSelected = appState::openEvent,
-                        onRequestCancellation = appState::requestRsvpCancellation,
-                        onDismissCancellation = appState::dismissRsvpCancellation,
-                        onConfirmCancellation = appState::confirmRsvpCancellation,
-                        onAddReminder = appState::addMockReminder,
-                        onExportCalendar = appState::prepareMockCalendarExport,
-                        onDirections = { appState.requestDirections(it) },
-                    )
+                    is YardScapeRoute.MyFinds -> when (currentRoute.section) {
+                        MyFindsSection.Saved -> SavedDestinationScreen(
+                            events = appState.savedItems(),
+                            onEventSelected = appState::openEvent,
+                            onUnsave = { appState.toggleSavedEvent(it) },
+                            onBrowse = { appState.navigateTo(YardScapePrimaryDestination.Browse) },
+                            onMyRsvps = { appState.openMyFinds(MyFindsSection.Rsvps) },
+                        )
+
+                        MyFindsSection.Rsvps -> MyRsvpsScreen(
+                            items = appState.myRsvpItems(),
+                            pendingCancellationEventId = appState.pendingRsvpCancellationEventId,
+                            onBack = { appState.navigateBack() },
+                            onEventSelected = appState::openEvent,
+                            onRequestCancellation = appState::requestRsvpCancellation,
+                            onDismissCancellation = appState::dismissRsvpCancellation,
+                            onConfirmCancellation = appState::confirmRsvpCancellation,
+                            onAddReminder = appState::addMockReminder,
+                            onExportCalendar = appState::prepareMockCalendarExport,
+                            onDirections = { appState.requestDirections(it) },
+                        )
+                    }
                     YardScapeRoute.Host -> HostDashboardScreen(
                         events = appState.hostEventItems(),
                         onCreateEvent = { appState.openHostCreateEdit() },
                         onEditEvent = appState::openHostCreateEdit,
                         onManageAttendees = { appState.openHostAttendees(it) },
                     )
+                    YardScapeRoute.Messages -> Unit
                     YardScapeRoute.Account -> AccountScreen(
                         state = appState.accountState,
                         onSignIn = appState::signInMock,

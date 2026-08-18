@@ -21,7 +21,7 @@ class ShopperSafetyFlowTest {
     @Test
     fun signedOutSafetyActionsResumeTheExactEventAndOriginAfterSignIn() {
         val reportState = YardScapeAppState(initialAccountStatus = MockSessionStatus.SignedOut)
-        reportState.navigateTo(YardScapePrimaryDestination.Saved)
+        reportState.navigateTo(YardScapePrimaryDestination.MyFinds)
         reportState.openEvent(familyEventId)
 
         reportState.openReport(familyEventId)
@@ -33,7 +33,7 @@ class ShopperSafetyFlowTest {
             YardScapeRoute.EventSafety(
                 familyEventId,
                 ShopperSafetyAction.Report,
-                YardScapePrimaryDestination.Saved,
+                YardScapePrimaryDestination.MyFinds,
             ),
             reportState.route,
         )

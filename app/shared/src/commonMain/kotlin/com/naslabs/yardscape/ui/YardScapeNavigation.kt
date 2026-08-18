@@ -34,8 +34,9 @@ enum class YardScapePrimaryDestination(
     val contextLabel: String,
 ) {
     Browse(label = "Browse", contextLabel = "Shopper workspace"),
-    Saved(label = "Saved", contextLabel = "Shopper workspace"),
+    MyFinds(label = "My Finds", contextLabel = "Shopper workspace"),
     Host(label = "Host", contextLabel = "Host workspace"),
+    Messages(label = "Messages", contextLabel = "Shopper workspace"),
     Account(label = "Account", contextLabel = "Account workspace"),
 }
 
@@ -55,22 +56,25 @@ sealed interface YardScapeRoute {
         override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse
     }
 
-    data object Saved : YardScapeRoute {
-        override val path: String = "/saved"
-        override val destinationLabel: String = "Saved sales"
-        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Saved
-    }
-
-    data object MyRsvps : YardScapeRoute {
-        override val path: String = "/rsvps"
-        override val destinationLabel: String = "My RSVPs"
-        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Saved
+    data class MyFinds(val section: MyFindsSection = MyFindsSection.Saved) : YardScapeRoute {
+        override val path: String = when (section) {
+            MyFindsSection.Saved -> "/finds"
+            MyFindsSection.Rsvps -> "/finds/rsvps"
+        }
+        override val destinationLabel: String = "My Finds"
+        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.MyFinds
     }
 
     data object Host : YardScapeRoute {
         override val path: String = "/host"
         override val destinationLabel: String = "Host tools"
         override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Host
+    }
+
+    data object Messages : YardScapeRoute {
+        override val path: String = "/messages"
+        override val destinationLabel: String = "Messages"
+        override val primaryDestination: YardScapePrimaryDestination = YardScapePrimaryDestination.Messages
     }
 
     data object Account : YardScapeRoute {
@@ -84,7 +88,7 @@ sealed interface YardScapeRoute {
         val origin: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse,
     ) : YardScapeRoute {
         init {
-            require(origin == YardScapePrimaryDestination.Browse || origin == YardScapePrimaryDestination.Saved)
+            require(origin == YardScapePrimaryDestination.Browse || origin == YardScapePrimaryDestination.MyFinds)
         }
 
         override val path: String = "/events/$eventId"
@@ -97,7 +101,7 @@ sealed interface YardScapeRoute {
         val origin: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse,
     ) : YardScapeRoute {
         init {
-            require(origin == YardScapePrimaryDestination.Browse || origin == YardScapePrimaryDestination.Saved)
+            require(origin == YardScapePrimaryDestination.Browse || origin == YardScapePrimaryDestination.MyFinds)
         }
 
         override val path: String = "/events/$eventId/rsvp"
@@ -111,7 +115,7 @@ sealed interface YardScapeRoute {
         val origin: YardScapePrimaryDestination = YardScapePrimaryDestination.Browse,
     ) : YardScapeRoute {
         init {
-            require(origin == YardScapePrimaryDestination.Browse || origin == YardScapePrimaryDestination.Saved)
+            require(origin == YardScapePrimaryDestination.Browse || origin == YardScapePrimaryDestination.MyFinds)
         }
 
         override val path: String = "/events/$eventId/safety/${action.pathSegment}"
@@ -140,9 +144,12 @@ sealed interface YardScapeRoute {
                 .filter { it.isNotBlank() }
             return when {
                 segments == listOf("browse") || segments.isEmpty() -> Browse
-                segments == listOf("saved") -> Saved
-                segments == listOf("rsvps") -> MyRsvps
+                segments == listOf("finds") -> MyFinds()
+                segments == listOf("finds", "rsvps") -> MyFinds(MyFindsSection.Rsvps)
+                segments == listOf("saved") -> MyFinds(MyFindsSection.Saved)
+                segments == listOf("rsvps") -> MyFinds(MyFindsSection.Rsvps)
                 segments == listOf("host") -> Host
+                segments == listOf("messages") -> Messages
                 segments == listOf("account") -> Account
                 segments.size == 2 && segments[0] == "events" -> EventDetail(segments[1])
                 segments.size == 3 && segments[0] == "events" && segments[2] == "rsvp" -> Rsvp(segments[1])
@@ -256,8 +263,9 @@ class YardScapeAppState(
     fun navigateTo(destination: YardScapePrimaryDestination) {
         route = when (destination) {
             YardScapePrimaryDestination.Browse -> YardScapeRoute.Browse
-            YardScapePrimaryDestination.Saved -> YardScapeRoute.Saved
+            YardScapePrimaryDestination.MyFinds -> YardScapeRoute.MyFinds()
             YardScapePrimaryDestination.Host -> YardScapeRoute.Host
+            YardScapePrimaryDestination.Messages -> YardScapeRoute.Messages
             YardScapePrimaryDestination.Account -> YardScapeRoute.Account
         }
     }
@@ -308,7 +316,7 @@ class YardScapeAppState(
     fun navigateToPath(path: String): Boolean {
         val target = YardScapeRoute.fromPath(path) ?: return false
         when (target) {
-            YardScapeRoute.MyRsvps -> openMyRsvps()
+            is YardScapeRoute.MyFinds -> openMyFinds(target.section)
             is YardScapeRoute.Rsvp -> openRsvp(target.eventId)
             is YardScapeRoute.EventSafety -> openShopperSafety(target.eventId, target.action, target.origin)
             is YardScapeRoute.HostCreateEdit -> openHostCreateEdit(target.eventId)
@@ -321,13 +329,13 @@ class YardScapeAppState(
     fun navigateBack(): Boolean {
         route = when (val current = route) {
             YardScapeRoute.Browse -> return false
-            YardScapeRoute.Saved,
-            YardScapeRoute.MyRsvps,
+            is YardScapeRoute.MyFinds,
             YardScapeRoute.Host,
+            YardScapeRoute.Messages,
             YardScapeRoute.Account,
-            -> if (current == YardScapeRoute.MyRsvps) YardScapeRoute.Saved else YardScapeRoute.Browse
+            -> YardScapeRoute.Browse
             is YardScapeRoute.EventDetail -> when (current.origin) {
-                YardScapePrimaryDestination.Saved -> YardScapeRoute.Saved
+                YardScapePrimaryDestination.MyFinds -> YardScapeRoute.MyFinds()
                 else -> YardScapeRoute.Browse
             }
             is YardScapeRoute.Rsvp -> YardScapeRoute.EventDetail(current.eventId, current.origin)
@@ -390,15 +398,26 @@ class YardScapeAppState(
     fun savedItems(): List<BrowseEventItem> =
         browseItems().filter { it.id in savedEventIds }
 
-    fun openMyRsvps() {
-        val gate = protectedActionDecision(ProtectedAction.RevealLocation)
-        if (gate is ProtectedActionDecision.SignInRequired) {
-            pendingProtectedAction = PendingProtectedAction(ProtectedAction.RevealLocation, YardScapeRoute.MyRsvps)
-            accountState = accountState.copy(signInReason = gate.message)
-            route = YardScapeRoute.Account
-            return
+    fun myFindsState(section: MyFindsSection): MyFindsState = MyFindsState(
+        section = section,
+        savedItems = savedItems(),
+        rsvpItems = myRsvpItems(),
+    )
+
+    fun openMyFinds(section: MyFindsSection = MyFindsSection.Saved) {
+        if (section == MyFindsSection.Rsvps) {
+            val gate = protectedActionDecision(ProtectedAction.RevealLocation)
+            if (gate is ProtectedActionDecision.SignInRequired) {
+                pendingProtectedAction = PendingProtectedAction(
+                    ProtectedAction.RevealLocation,
+                    YardScapeRoute.MyFinds(section),
+                )
+                accountState = accountState.copy(signInReason = gate.message)
+                route = YardScapeRoute.Account
+                return
+            }
         }
-        route = YardScapeRoute.MyRsvps
+        route = YardScapeRoute.MyFinds(section)
     }
 
     fun myRsvpItems(): List<ShopperRsvpItem> =
@@ -523,7 +542,7 @@ class YardScapeAppState(
 
     fun openEvent(eventId: String) {
         val origin = activePrimaryDestination.takeIf {
-            it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.Saved
+            it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.MyFinds
         } ?: YardScapePrimaryDestination.Browse
         route = YardScapeRoute.EventDetail(eventId, origin)
     }
@@ -557,7 +576,7 @@ class YardScapeAppState(
         }
         if (eventId in blockedEventIds) {
             val origin = route.primaryDestination.takeIf {
-                it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.Saved
+                it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.MyFinds
             } ?: YardScapePrimaryDestination.Browse
             route = YardScapeRoute.EventDetail(eventId, origin)
             return
@@ -585,7 +604,7 @@ class YardScapeAppState(
     ) {
         val detail = repository.publicEventDetail(eventId) ?: return
         val origin = requestedOrigin ?: route.primaryDestination.takeIf {
-            it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.Saved
+            it == YardScapePrimaryDestination.Browse || it == YardScapePrimaryDestination.MyFinds
         } ?: YardScapePrimaryDestination.Browse
         val target = YardScapeRoute.EventSafety(eventId, action, origin)
         shopperSafetyState = shopperSafetyState

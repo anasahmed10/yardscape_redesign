@@ -117,7 +117,7 @@ class AccountStateTest {
         val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
 
         listOf(
-            YardScapeRoute.MyRsvps.path,
+            YardScapeRoute.MyFinds(MyFindsSection.Rsvps).path,
             YardScapeRoute.Rsvp(eventId).path,
             YardScapeRoute.HostCreateEdit(eventId).path,
             YardScapeRoute.HostAttendees(eventId).path,

@@ -54,9 +54,10 @@ class YardScapeNavigationTest {
     fun routePathsRoundTripForDeepLinkShapedState() {
         val routes = listOf(
             YardScapeRoute.Browse,
-            YardScapeRoute.Saved,
-            YardScapeRoute.MyRsvps,
+            YardScapeRoute.MyFinds(),
+            YardScapeRoute.MyFinds(MyFindsSection.Rsvps),
             YardScapeRoute.Host,
+            YardScapeRoute.Messages,
             YardScapeRoute.Account,
             YardScapeRoute.EventDetail("event-123"),
             YardScapeRoute.Rsvp("event-123"),
@@ -87,22 +88,23 @@ class YardScapeNavigationTest {
     }
 
     @Test
-    fun myRsvpsIsNestedUnderSavedAndBackReturnsThere() {
+    fun myRsvpsIsNestedUnderMyFindsAndBackReturnsToBrowse() {
         val state = YardScapeAppState()
 
-        state.openMyRsvps()
+        state.openMyFinds(MyFindsSection.Rsvps)
 
-        assertEquals(YardScapeRoute.MyRsvps, state.route)
-        assertEquals(YardScapePrimaryDestination.Saved, state.activePrimaryDestination)
+        assertEquals(YardScapeRoute.MyFinds(MyFindsSection.Rsvps), state.route)
+        assertEquals(YardScapePrimaryDestination.MyFinds, state.activePrimaryDestination)
         assertTrue(state.navigateBack())
-        assertEquals(YardScapeRoute.Saved, state.route)
+        assertEquals(YardScapeRoute.Browse, state.route)
     }
 
     @Test
     fun navigationLabelsNeverContainProtectedLocationData() {
         val routes = listOf(
             YardScapeRoute.Browse,
-            YardScapeRoute.Saved,
+            YardScapeRoute.MyFinds(),
+            YardScapeRoute.Messages,
             YardScapeRoute.Host,
             YardScapeRoute.Account,
             YardScapeRoute.EventDetail(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID),

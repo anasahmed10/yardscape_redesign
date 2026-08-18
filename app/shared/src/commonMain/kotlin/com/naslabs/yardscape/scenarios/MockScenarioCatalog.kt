@@ -15,6 +15,7 @@ import com.naslabs.yardscape.ui.AppDataAvailability
 import com.naslabs.yardscape.ui.EventCapacitySource
 import com.naslabs.yardscape.ui.MockSessionStatus
 import com.naslabs.yardscape.ui.YardScapeAppState
+import com.naslabs.yardscape.ui.MyFindsSection
 import com.naslabs.yardscape.ui.YardScapeRoute
 import com.naslabs.yardscape.ui.ShopperSafetyAction
 
@@ -115,7 +116,7 @@ object MockScenarioCatalog {
             name = "Waitlisted RSVP",
             assertions = listOf("My RSVPs reports waitlisted", "Exact location remains hidden"),
             shopperId = WAITLISTED_SHOPPER_ID,
-            initialRoute = YardScapeRoute.MyRsvps,
+            initialRoute = YardScapeRoute.MyFinds(MyFindsSection.Rsvps),
             repositoryFactory = {
                 seeded(rsvps = listOf(rsvp(WAITLISTED_SHOPPER_ID, RsvpStatus.WAITLISTED)))
             },
@@ -125,7 +126,7 @@ object MockScenarioCatalog {
             name = "Declined RSVP",
             assertions = listOf("My RSVPs reports declined", "Exact location remains hidden"),
             shopperId = DECLINED_SHOPPER_ID,
-            initialRoute = YardScapeRoute.MyRsvps,
+            initialRoute = YardScapeRoute.MyFinds(MyFindsSection.Rsvps),
             repositoryFactory = {
                 seeded(rsvps = listOf(rsvp(DECLINED_SHOPPER_ID, RsvpStatus.DECLINED)))
             },
@@ -135,7 +136,7 @@ object MockScenarioCatalog {
             name = "Cancelled RSVP",
             assertions = listOf("My RSVPs reports shopper cancellation", "Exact location is cleared"),
             shopperId = CANCELLED_SHOPPER_ID,
-            initialRoute = YardScapeRoute.MyRsvps,
+            initialRoute = YardScapeRoute.MyFinds(MyFindsSection.Rsvps),
             repositoryFactory = {
                 seeded(rsvps = listOf(rsvp(CANCELLED_SHOPPER_ID, RsvpStatus.CANCELLED)))
             },
