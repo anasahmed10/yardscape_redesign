@@ -296,7 +296,12 @@ private fun MessageBubble(message: MarketplaceMessageBubblePresentation, onRetry
                             it,
                             modifier = Modifier.padding(start = spacing.small),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
+                            color = when (message.deliveryTone) {
+                                MarketplaceMessageDeliveryTone.Error -> MaterialTheme.colorScheme.error
+                                MarketplaceMessageDeliveryTone.Normal,
+                                null,
+                                -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                         )
                     }
                     if (message.showsRetry) TextButton(onRetry, Modifier.heightIn(min = 48.dp)) { Text("Retry") }

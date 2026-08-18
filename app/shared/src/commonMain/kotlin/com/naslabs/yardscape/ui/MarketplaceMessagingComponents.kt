@@ -74,12 +74,18 @@ internal data class MarketplaceMessageBubblePresentation(
     val isOutgoing: Boolean,
     val timeLabel: String,
     val deliveryLabel: String?,
+    val deliveryTone: MarketplaceMessageDeliveryTone?,
     val showsRetry: Boolean,
     val isRetryEnabled: Boolean,
 ) {
     override fun toString(): String =
         "MarketplaceMessageBubblePresentation(id=$id, bodyLength=${body.length}, " +
             "isOutgoing=$isOutgoing, deliveryFailed=$showsRetry)"
+}
+
+internal enum class MarketplaceMessageDeliveryTone {
+    Normal,
+    Error,
 }
 
 internal data class MarketplaceClosedBannerPresentation(val title: String, val message: String)
@@ -171,7 +177,7 @@ internal fun marketplaceThreadPresentation(
         ),
         messages = presentation.messages
             .sortedWith(compareBy<MarketplaceMessage> { it.sentAtEpochMillis }.thenBy { it.id })
-            .map { message -> message.toBubblePresentation(currentActorId, canRetry) },
+            .map { message -> message.toBubblePresentation(currentActorId, canRetry, isClosed != null) },
         composer = MarketplaceComposerPresentation(
             isVisible = isClosed == null,
             isEnabled = presentation.canCompose,
@@ -185,21 +191,31 @@ internal fun marketplaceThreadPresentation(
 private fun MarketplaceMessage.toBubblePresentation(
     currentActorId: String,
     canRetry: Boolean,
+    isConversationClosed: Boolean,
 ): MarketplaceMessageBubblePresentation {
     val outgoing = senderId == currentActorId
     val failed = outgoing && deliveryState == MessageDeliveryState.FAILED
+    val showsRetry = failed && canRetry
+    val isClosed = failed && isConversationClosed
     return MarketplaceMessageBubblePresentation(
         id = id,
         body = body,
         isOutgoing = outgoing,
         timeLabel = marketplaceMessageTimeLabel(sentAtEpochMillis),
         deliveryLabel = when {
-            failed -> "Delivery failed. Retry"
+            showsRetry -> "Delivery failed. Retry"
+            isClosed -> "Delivery failed. Messaging is closed."
+            failed -> "Delivery failed"
             outgoing -> "Sent"
             else -> null
         },
-        showsRetry = failed && canRetry,
-        isRetryEnabled = failed && canRetry,
+        deliveryTone = when {
+            failed -> MarketplaceMessageDeliveryTone.Error
+            outgoing -> MarketplaceMessageDeliveryTone.Normal
+            else -> null
+        },
+        showsRetry = showsRetry,
+        isRetryEnabled = showsRetry,
     )
 }
 

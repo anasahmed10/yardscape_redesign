@@ -160,6 +160,41 @@ class MarketplaceMessagingPresentationTest {
         assertFalse(closed.messages.single().isRetryEnabled)
     }
 
+    @Test
+    fun deliveryStatusCopyAndToneReflectTheVisibleMessageActions() {
+        val sent = marketplaceThreadPresentation(
+            MessagingThreadPresentation(
+                thread = thread(messages = listOf(message("message-0000002a", SHOPPER_ID, "On my way", 2_000L))),
+            ),
+            currentActorId = SHOPPER_ID,
+        ).messages.single()
+        val failedWhileBusy = marketplaceThreadPresentation(
+            MessagingThreadPresentation(
+                thread = thread(
+                    messages = listOf(message("message-0000002b", SHOPPER_ID, "Try again", 2_000L, MessageDeliveryState.FAILED)),
+                ),
+                operation = MessagingOperationState.InProgress(),
+            ),
+            currentActorId = SHOPPER_ID,
+        ).messages.single()
+        val failedWhenClosed = marketplaceThreadPresentation(
+            MessagingThreadPresentation(
+                thread = thread(
+                    messages = listOf(message("message-0000002c", SHOPPER_ID, "Try again", 2_000L, MessageDeliveryState.FAILED)),
+                    composerAccess = MessagingComposerAccess.Closed(MessagingClosedReason.EVENT_CANCELLED),
+                ),
+            ),
+            currentActorId = SHOPPER_ID,
+        ).messages.single()
+
+        assertEquals("Sent", sent.deliveryLabel)
+        assertEquals(MarketplaceMessageDeliveryTone.Normal, sent.deliveryTone)
+        assertEquals("Delivery failed", failedWhileBusy.deliveryLabel)
+        assertEquals(MarketplaceMessageDeliveryTone.Error, failedWhileBusy.deliveryTone)
+        assertEquals("Delivery failed. Messaging is closed.", failedWhenClosed.deliveryLabel)
+        assertEquals(MarketplaceMessageDeliveryTone.Error, failedWhenClosed.deliveryTone)
+    }
+
     private fun thread(
         messages: List<MarketplaceMessage> = emptyList(),
         composerAccess: MessagingComposerAccess = MessagingComposerAccess.Open,
