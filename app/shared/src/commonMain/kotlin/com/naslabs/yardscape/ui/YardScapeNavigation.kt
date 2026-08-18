@@ -1412,12 +1412,12 @@ private fun PublicEventDetail.toLocationRevealState(
     return when {
         locationVisibility == LocationVisibility.REVOKED -> LocationRevealState.Revoked
         locationVisibility == LocationVisibility.EXPIRED -> LocationRevealState.Expired
-        rsvpStatus == RsvpStatus.REQUESTED ||
-            locationVisibility == LocationVisibility.RSVP_REQUESTED -> LocationRevealState.Pending
         rsvpStatus == RsvpStatus.WAITLISTED -> LocationRevealState.Waitlisted
         rsvpStatus == RsvpStatus.DECLINED -> LocationRevealState.Declined
         rsvpStatus == RsvpStatus.FULL -> LocationRevealState.AtCapacity
         rsvpStatus == RsvpStatus.ACCEPTED -> LocationRevealState.AcceptedWithoutAccess
+        rsvpStatus == RsvpStatus.REQUESTED ||
+            locationVisibility == LocationVisibility.RSVP_REQUESTED -> LocationRevealState.Pending
         else -> LocationRevealState.NotRequested
     }
 }

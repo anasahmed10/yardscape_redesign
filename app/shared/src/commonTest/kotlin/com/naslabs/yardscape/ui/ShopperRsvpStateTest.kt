@@ -236,6 +236,77 @@ class ShopperRsvpStateTest {
     }
 
     @Test
+    fun seededWaitlistedRsvpUsesWaitlistedDetailWithoutAnotherRsvpAction() {
+        val seededWaitlisted = SeededYardSaleData.rsvps.single { rsvp ->
+            rsvp.status == RsvpStatus.WAITLISTED &&
+                rsvp.locationVisibility == LocationVisibility.RSVP_REQUESTED
+        }
+        val repository = SeededYardSaleEventRepository()
+        val state = YardScapeAppState(
+            repository = repository,
+            shopperId = seededWaitlisted.shopperId,
+        )
+
+        val detail = assertNotNull(state.detailStateFor(seededWaitlisted.eventId))
+
+        assertEquals(LocationRevealState.Waitlisted, detail.revealState)
+        assertFalse(detail.shouldShowRsvpAction)
+        assertEquals(
+            RsvpEligibilityStatus.WAITLISTED,
+            state.rsvpScreenStateFor(seededWaitlisted.eventId).status,
+        )
+        assertNull(
+            repository.exactLocationFor(
+                seededWaitlisted.eventId,
+                seededWaitlisted.shopperId,
+                SeededYardSaleData.BASE_NOW_EPOCH_MILLIS,
+            ),
+        )
+    }
+
+    @Test
+    fun rsvpStatusOutranksRequestedVisibilityButNotRevocationOrExpiry() {
+        val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
+        val event = SeededYardSaleData.events.first { it.id == eventId }
+        val cases = listOf(
+            Triple(RsvpStatus.WAITLISTED, LocationVisibility.RSVP_REQUESTED, LocationRevealState.Waitlisted),
+            Triple(RsvpStatus.DECLINED, LocationVisibility.RSVP_REQUESTED, LocationRevealState.Declined),
+            Triple(RsvpStatus.FULL, LocationVisibility.RSVP_REQUESTED, LocationRevealState.AtCapacity),
+            Triple(RsvpStatus.ACCEPTED, LocationVisibility.RSVP_REQUESTED, LocationRevealState.AcceptedWithoutAccess),
+            Triple(RsvpStatus.WAITLISTED, LocationVisibility.REVOKED, LocationRevealState.Revoked),
+            Triple(RsvpStatus.DECLINED, LocationVisibility.EXPIRED, LocationRevealState.Expired),
+            Triple(RsvpStatus.REQUESTED, LocationVisibility.RSVP_REQUESTED, LocationRevealState.Pending),
+        )
+
+        cases.forEachIndexed { index, (status, visibility, expectedReveal) ->
+            val shopperId = "mixed-visibility-$index"
+            val repository = SeededYardSaleEventRepository(
+                events = listOf(event),
+                rsvps = listOf(
+                    Rsvp(
+                        id = "mixed-rsvp-$index",
+                        eventId = eventId,
+                        shopperId = shopperId,
+                        status = status,
+                        locationVisibility = visibility,
+                    ),
+                ),
+            )
+            val state = YardScapeAppState(repository = repository, shopperId = shopperId)
+
+            val detail = assertNotNull(state.detailStateFor(eventId))
+
+            assertEquals(expectedReveal, detail.revealState, "$status with $visibility")
+            assertEquals(
+                expectedReveal == LocationRevealState.Pending,
+                detail.shouldShowRsvpAction,
+                "$status with $visibility",
+            )
+            assertNull(repository.exactLocationFor(eventId, shopperId, SeededYardSaleData.BASE_NOW_EPOCH_MILLIS))
+        }
+    }
+
+    @Test
     fun revocationAndExpiryExitOpenRsvpToItsDetailContext() {
         val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
         val event = SeededYardSaleData.events.first { it.id == eventId }
