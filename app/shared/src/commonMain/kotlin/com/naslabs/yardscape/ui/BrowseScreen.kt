@@ -21,11 +21,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -75,6 +77,7 @@ fun BrowseScreen(
     onSheetPositionChanged: (MapResultsSheetPosition) -> Unit,
 ) {
     val spacing = YardScapeDesign.spacing
+    val presentation = state.browsePresentationFor(dataAvailability)
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -89,18 +92,16 @@ fun BrowseScreen(
             )
         }
 
-        when (dataAvailability) {
-            AppDataAvailability.Available -> Unit
-            AppDataAvailability.Offline -> item {
-                BrowseAvailabilityCard(
-                    title = "You're offline",
-                    message = "Reconnect to refresh nearby sales. Previously loaded mock data stays visible.",
-                )
-            }
-            is AppDataAvailability.RecoverableError -> item {
-                BrowseAvailabilityCard(
-                    title = "Couldn't refresh sales",
-                    message = dataAvailability.message,
+        if (presentation.availability in setOf(
+                ShopperBrowseAvailability.Loading,
+                ShopperBrowseAvailability.OfflineCached,
+                ShopperBrowseAvailability.RecoverableError,
+            )
+        ) {
+            item {
+                ShopperStatePanel(
+                    title = presentation.title,
+                    message = presentation.message,
                 )
             }
         }
@@ -118,18 +119,14 @@ fun BrowseScreen(
         }
 
         when {
-            state.hasNoNearbyEvents -> item {
-                DiscoveryEmptyState(
-                    title = "No nearby sales yet",
-                    message = "Check again soon or use Host to add the first sale in this area.",
-                    onReset = null,
-                )
-            }
-            state.hasNoMatches -> item {
-                DiscoveryEmptyState(
-                    title = "No sales match those filters",
-                    message = "Clear the filters to see every nearby public preview.",
-                    onReset = onResetFilters,
+            presentation.availability == ShopperBrowseAvailability.EmptyNearby ||
+                presentation.availability == ShopperBrowseAvailability.FilteredEmpty -> item {
+                ShopperStatePanel(
+                    title = presentation.title,
+                    message = presentation.message,
+                    actionLabel = presentation.actionLabel,
+                    onAction = presentation.actionLabel?.let { onResetFilters },
+                    modifier = Modifier.testTag(YardScapeTestTags.DiscoveryNoResults),
                 )
             }
             state.displayMode == DiscoveryDisplayMode.Map -> item {
@@ -149,7 +146,7 @@ fun BrowseScreen(
                 )
             }
             else -> items(state.items, key = { it.id }) { event ->
-                EventPreviewCard(
+                BrowseListEventCard(
                     event = event,
                     isSaved = event.id in state.savedEventIds,
                     onClick = { onEventSelected(event.id) },
@@ -262,27 +259,6 @@ private fun <T> FilterRow(
                 selected = selected(option),
                 onClick = { onSelected(option) },
             )
-        }
-    }
-}
-
-@Composable
-private fun DiscoveryEmptyState(title: String, message: String, onReset: (() -> Unit)?) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(YardScapeTestTags.DiscoveryNoResults),
-        colors = CardDefaults.cardColors(containerColor = SkyWash),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(message, style = MaterialTheme.typography.bodyMedium)
-            if (onReset != null) {
-                OutlinedButton(onClick = onReset) { Text("Show all sales") }
-            }
         }
     }
 }
@@ -685,35 +661,158 @@ private fun BrowseHero(
         modifier = Modifier.padding(top = spacing.large),
         verticalArrangement = Arrangement.spacedBy(spacing.small),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(spacing.extraSmall),
-            ) {
-                Text(
-                    text = "Nearby sales",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = ForestInk,
-                )
-                Text(
-                    text = "$eventCount public previews",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            OutlinedButton(onClick = onHostSelected) {
-                Text("Host a sale")
-            }
-        }
+        ShopperSectionHeader(
+            title = "Nearby sales",
+            supportingText = "$eventCount public previews",
+            actionLabel = "Host a sale",
+            onAction = onHostSelected,
+        )
         Text(
             text = "Browse public previews by area, date, and category. Exact addresses stay private until RSVP access is granted.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@Composable
+private fun BrowseListEventCard(
+    event: BrowseEventItem,
+    isSaved: Boolean,
+    onClick: () -> Unit,
+    onSavedToggle: () -> Unit,
+) {
+    val actions = shopperBrowseEventActionsFor(isSaved)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            if (shopperBrowseListLayoutFor(maxWidth) == ShopperBrowseListLayout.Expanded) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = YardScapeDesign.spacing.medium),
+                    horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.large),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(modifier = Modifier.weight(0.9f)) {
+                        ShopperEventArtwork(
+                            presentation = event.toShopperEventArtworkPresentation(),
+                            height = 220.dp,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.weight(1.1f),
+                        verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
+                    ) {
+                        BrowseEventMetadata(event)
+                        BrowseEventActions(
+                            eventId = event.id,
+                            actions = actions,
+                            onOpen = onClick,
+                            onSave = onSavedToggle,
+                        )
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = YardScapeDesign.spacing.medium),
+                    verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
+                ) {
+                    ShopperEventArtwork(
+                        presentation = event.toShopperEventArtworkPresentation(),
+                        height = 200.dp,
+                    )
+                    BrowseEventMetadata(event)
+                    BrowseEventActions(
+                        eventId = event.id,
+                        actions = actions,
+                        onOpen = onClick,
+                        onSave = onSavedToggle,
+                    )
+                }
+            }
+        }
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+@Composable
+private fun BrowseEventMetadata(event: BrowseEventItem) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+    ) {
+        Text(
+            text = event.title,
+            style = MaterialTheme.typography.headlineSmall,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+        ) {
+            StatusLabel(text = event.statusLabel)
+            InfoChip(text = event.dateLabel)
+        }
+        Text(
+            text = event.locationLabel,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = event.description,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+        ) {
+            event.categoryLabels.forEach { label -> CategoryChip(label = label) }
+        }
+    }
+}
+
+@Composable
+private fun BrowseEventActions(
+    eventId: String,
+    actions: ShopperBrowseEventActions,
+    onOpen: () -> Unit,
+    onSave: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Button(
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp)
+                .testTag(YardScapeTestTags.browseEventCard(eventId))
+                .semantics { contentDescription = actions.openLabel },
+            onClick = onOpen,
+        ) {
+            Text(actions.openLabel)
+        }
+        TextButton(
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp)
+                .semantics { contentDescription = actions.saveLabel },
+            onClick = onSave,
+        ) {
+            Text(if (actions.isSaved) "Saved" else actions.saveLabel)
+        }
     }
 }
 

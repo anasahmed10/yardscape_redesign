@@ -81,6 +81,27 @@ class ShopperDiscoveryStateTest {
     }
 
     @Test
+    fun browseAvailabilitySeparatesLoadingEmptyFilteredOfflineAndRecoverableStates() {
+        val populated = YardScapeAppState().discoveryState()
+        val noNearby = YardScapeAppState(
+            repository = SeededYardSaleEventRepository(events = emptyList(), rsvps = emptyList()),
+        ).discoveryState()
+        val filtered = YardScapeAppState().apply {
+            updateDiscoveryQuery("no such sale")
+        }.discoveryState()
+
+        assertEquals(ShopperBrowseAvailability.Loading, populated.browsePresentationFor(AppDataAvailability.Loading).availability)
+        assertEquals(ShopperBrowseAvailability.Results, populated.browsePresentationFor(AppDataAvailability.Available).availability)
+        assertEquals(ShopperBrowseAvailability.EmptyNearby, noNearby.browsePresentationFor(AppDataAvailability.Available).availability)
+        assertEquals(ShopperBrowseAvailability.FilteredEmpty, filtered.browsePresentationFor(AppDataAvailability.Available).availability)
+        assertEquals(ShopperBrowseAvailability.OfflineCached, populated.browsePresentationFor(AppDataAvailability.Offline).availability)
+        assertEquals(
+            ShopperBrowseAvailability.RecoverableError,
+            populated.browsePresentationFor(AppDataAvailability.RecoverableError("Try again in a moment.")).availability,
+        )
+    }
+
+    @Test
     fun savedEventsPersistAcrossFiltersModesAndRoutesForTheSession() {
         val state = YardScapeAppState()
         val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID

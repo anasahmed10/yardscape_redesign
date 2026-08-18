@@ -247,6 +247,7 @@ class YardScapeAppState(
     var mapDiscoveryState: MapDiscoveryState by mutableStateOf(
         MapDiscoveryState(
             mapAvailability = when (dataAvailability) {
+                AppDataAvailability.Loading,
                 AppDataAvailability.Available -> MapAvailability.Loading
                 AppDataAvailability.Offline -> MapAvailability.Offline
                 is AppDataAvailability.RecoverableError -> MapAvailability.Failed(dataAvailability.message)
@@ -1106,6 +1107,7 @@ data class EventDetailState(
 }
 
 sealed interface AppDataAvailability {
+    data object Loading : AppDataAvailability
     data object Available : AppDataAvailability
     data object Offline : AppDataAvailability
     data class RecoverableError(val message: String) : AppDataAvailability
