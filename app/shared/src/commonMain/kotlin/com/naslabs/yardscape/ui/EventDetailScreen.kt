@@ -52,9 +52,7 @@ fun PublicEventDetailScreen(
                     Text("Back")
                 }
                 EventPhotoPreview(
-                    title = detail.title,
-                    description = detail.photos.firstOrNull()?.description,
-                    seed = detail.id,
+                    presentation = detail.toShopperEventArtworkPresentation(),
                 )
                 Text(
                     text = detail.title,

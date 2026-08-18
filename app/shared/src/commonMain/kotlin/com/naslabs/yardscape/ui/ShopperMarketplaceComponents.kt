@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.naslabs.yardscape.data.PublicEventDetail
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import yardscape.app.shared.generated.resources.Res
@@ -74,6 +75,20 @@ internal data class ShopperArtwork(
     val contentDescription: String = resource.contentDescription,
 )
 
+internal data class ShopperEventArtworkPresentation(
+    val eventId: String,
+    val photoReference: String?,
+) {
+    val artwork: ShopperArtwork
+        get() = shopperArtworkFor(eventId = eventId, photoReference = photoReference)
+}
+
+internal fun BrowseEventItem.toShopperEventArtworkPresentation(): ShopperEventArtworkPresentation =
+    ShopperEventArtworkPresentation(eventId = id, photoReference = photoReference)
+
+internal fun PublicEventDetail.toShopperEventArtworkPresentation(): ShopperEventArtworkPresentation =
+    ShopperEventArtworkPresentation(eventId = id, photoReference = photos.firstOrNull()?.url)
+
 /**
  * Resolves public event photo references to bundled artwork. No remote media is loaded from this
  * component, so an event's public surface never makes a network request or exposes its source URL.
@@ -103,12 +118,11 @@ private fun stableArtworkIndex(eventId: String, photoReference: String?): Int {
 
 @Composable
 internal fun ShopperEventArtwork(
-    eventId: String,
-    photoReference: String?,
+    presentation: ShopperEventArtworkPresentation,
     modifier: Modifier = Modifier,
     height: Dp = 216.dp,
 ) {
-    val artwork = shopperArtworkFor(eventId = eventId, photoReference = photoReference)
+    val artwork = presentation.artwork
     Image(
         painter = painterResource(artwork.resource.drawableResource()),
         contentDescription = artwork.contentDescription,

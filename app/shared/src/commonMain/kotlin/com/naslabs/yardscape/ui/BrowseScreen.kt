@@ -739,9 +739,7 @@ internal fun EventPreviewCard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             EventPhotoPreview(
-                title = event.title,
-                description = event.photoDescription,
-                seed = event.id,
+                presentation = event.toShopperEventArtworkPresentation(),
             )
 
             Column(

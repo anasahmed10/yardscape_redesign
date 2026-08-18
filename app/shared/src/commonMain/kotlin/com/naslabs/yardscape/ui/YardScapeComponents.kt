@@ -161,13 +161,10 @@ internal fun FilterChip(
 
 @Composable
 internal fun EventPhotoPreview(
-    title: String,
-    description: String?,
-    seed: String,
+    presentation: ShopperEventArtworkPresentation,
 ) {
     ShopperEventArtwork(
-        eventId = seed,
-        photoReference = seed,
+        presentation = presentation,
         height = 184.dp,
     )
 }

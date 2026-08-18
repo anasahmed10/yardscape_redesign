@@ -1082,6 +1082,7 @@ data class BrowseEventItem(
     val categoryLabels: List<String>,
     val statusLabel: String,
     val photoDescription: String?,
+    val photoReference: String? = null,
 )
 
 data class HostEventItem(
@@ -1186,6 +1187,7 @@ fun PublicEventPreview.toBrowseEventItem(nowEpochMillis: Long): BrowseEventItem 
         categoryLabels = categories,
         statusLabel = status.name.lowercase().replaceFirstChar { it.uppercase() },
         photoDescription = photos.firstOrNull()?.description,
+        photoReference = photos.firstOrNull()?.url,
     )
 
 private fun BrowseEventItem.matches(filters: DiscoveryFilters, nowEpochMillis: Long): Boolean {
