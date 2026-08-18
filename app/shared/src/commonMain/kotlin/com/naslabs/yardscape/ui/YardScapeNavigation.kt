@@ -271,6 +271,8 @@ class YardScapeAppState(
         private set
 
     private val hostEditorSessions = mutableMapOf<String, HostEditorState>()
+    var hostEditorSessionSignal: Long by mutableStateOf(0L)
+        private set
     private val hostAttendancePolicies = mutableMapOf(
         SeededYardSaleData.FAMILY_GARAGE_EVENT_ID to HostAttendancePolicy(
             attendeeCap = 2,
@@ -1197,7 +1199,10 @@ class YardScapeAppState(
             route = YardScapeRoute.Account
             return
         }
-        if (eventId == null) hostEditorSessions.remove(NEW_HOST_SESSION_KEY)
+        if (eventId == null) {
+            hostEditorSessions.remove(NEW_HOST_SESSION_KEY)
+            hostEditorSessionSignal++
+        }
         route = target
     }
 
@@ -1289,13 +1294,12 @@ class YardScapeAppState(
     fun hostEventItems(): List<HostEventItem> =
         if (accountState.isSignedIn) {
             repository.hostEvents(hostId).map { event ->
-                val rsvps = repository.rsvpsForEvent(event.id)
-                val policy = hostAttendancePolicies[event.id] ?: HostAttendancePolicy()
+                val attendance = hostAttendanceState(event.id)
                 event.toHostEventItem(
                     nowEpochMillis = nowEpochMillis,
-                    acceptedRsvpCount = rsvps.count { it.status == RsvpStatus.ACCEPTED },
-                    pendingRsvpCount = rsvps.count { it.status == RsvpStatus.REQUESTED },
-                    attendeeCap = policy.attendeeCap,
+                    acceptedRsvpCount = attendance?.acceptedCount ?: 0,
+                    pendingRsvpCount = attendance?.requestedCount ?: 0,
+                    attendeeCap = attendance?.policy?.attendeeCap,
                 )
             }
         } else {
@@ -1318,10 +1322,16 @@ class YardScapeAppState(
     fun hostEditorState(eventId: String?): HostEditorState {
         val sessionKey = eventId ?: NEW_HOST_SESSION_KEY
         return hostEditorSessions.getOrPut(sessionKey) {
+            val event = repository.hostEvent(eventId.orEmpty())
+            val policy = eventId?.let { hostAttendancePolicies[it] } ?: HostAttendancePolicy()
             HostEditorState(
-                draft = repository.hostEvent(eventId.orEmpty())?.toHostEventDraft()
+                draft = event?.toHostEventDraft()
                     ?: blankHostEventDraft(),
                 validationErrors = emptyList(),
+                attendeeCapInput = policy.attendeeCap?.toString().orEmpty(),
+                approvalMode = policy.approvalMode,
+                hostDisplayName = event?.host?.displayName ?: "YardScape host",
+                hostTrustSignals = event?.host?.trustSignals.orEmpty(),
             )
         }
     }
@@ -1701,17 +1711,17 @@ fun YardSaleEvent.toHostEventDraft(): HostEventDraft =
     )
 
 fun PublicEventDetail.toDetailSections(nowEpochMillis: Long): List<Pair<String, String>> =
-    listOf(
-        "When" to saleWindow.toBrowseDateLabel(nowEpochMillis),
-        "Area" to listOfNotNull(
+    shopperDetailSections(
+        scheduleLabel = saleWindow.toBrowseDateLabel(nowEpochMillis),
+        approximateLocationLabel = listOfNotNull(
             publicLocation.neighborhood,
             publicLocation.city,
             publicLocation.distanceLabel ?: publicLocation.areaDescription,
         ).joinToString(" - "),
-        "Categories" to categories.joinToString(", "),
-        "Payments" to acceptedPaymentTypes.joinToString(", "),
-        "Accessibility" to accessibilityNotes.joinToString(", "),
-        "Host" to listOf(hostDisplayName, hostTrustSignals.firstOrNull()).joinToString(" - "),
+        categories = categories,
+        acceptedPaymentTypes = acceptedPaymentTypes,
+        accessibilityNotes = accessibilityNotes,
+        hostContext = listOf(hostDisplayName, hostTrustSignals.firstOrNull()).filterNotNull().joinToString(" - "),
     )
 
 private fun PublicEventDetail.toLocationRevealState(

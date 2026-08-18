@@ -91,7 +91,19 @@ internal fun PublicEventDetail.toShopperEventArtworkPresentation(): ShopperEvent
 
 /** Uses the same local artwork mapping as a shopper-facing event before publishing. */
 internal fun HostPublicPreview.toShopperEventArtworkPresentation(eventId: String): ShopperEventArtworkPresentation =
-    ShopperEventArtworkPresentation(eventId = eventId, photoReference = photoReferences.firstOrNull())
+    hostArtworkPresentationFor(draftId = eventId, photoReference = photoReferences.firstOrNull())
+
+/**
+ * Keeps host picker, selected-photo, and preview artwork stable while a draft is reordered.
+ * The fallback draft key is intentionally independent of a list position or UI section.
+ */
+internal fun hostArtworkPresentationFor(
+    draftId: String?,
+    photoReference: String?,
+): ShopperEventArtworkPresentation = ShopperEventArtworkPresentation(
+    eventId = draftId ?: "new-host-draft",
+    photoReference = photoReference,
+)
 
 /**
  * Resolves public event photo references to bundled artwork. No remote media is loaded from this

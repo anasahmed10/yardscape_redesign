@@ -45,14 +45,45 @@ data class HostPublicPreview(
     val categories: List<String>,
     val photoCaptions: List<String>,
     val photoReferences: List<String>,
-    val rsvpSummary: String,
+    val acceptedPaymentTypes: List<String>,
+    val accessibilityNotes: List<String>,
+    val hostContext: String,
 )
+
+internal fun shopperDetailSections(
+    scheduleLabel: String,
+    approximateLocationLabel: String,
+    categories: List<String>,
+    acceptedPaymentTypes: List<String>,
+    accessibilityNotes: List<String>,
+    hostContext: String,
+): List<Pair<String, String>> = listOf(
+    "When" to scheduleLabel,
+    "Area" to approximateLocationLabel,
+    "Categories" to categories.joinToString(", "),
+    "Payments" to acceptedPaymentTypes.joinToString(", "),
+    "Accessibility" to accessibilityNotes.joinToString(", "),
+    "Host" to hostContext,
+)
+
+internal fun HostPublicPreview.shopperDetailSections(): List<Pair<String, String>> =
+    shopperDetailSections(
+        scheduleLabel = scheduleLabel,
+        approximateLocationLabel = approximateLocationLabel,
+        categories = categories,
+        acceptedPaymentTypes = acceptedPaymentTypes,
+        accessibilityNotes = accessibilityNotes,
+        hostContext = hostContext,
+    )
 
 data class HostEditorProgress(
     val activeStep: HostEditorStep,
     val currentStep: Int,
     val totalSteps: Int,
-)
+) {
+    val previousStep: HostEditorStep?
+        get() = HostEditorStep.entries.getOrNull(currentStep - 2)
+}
 
 data class HostEditorState(
     val draft: HostEventDraft,
@@ -61,6 +92,8 @@ data class HostEditorState(
     val step: HostEditorStep = HostEditorStep.Basics,
     val attendeeCapInput: String = "",
     val approvalMode: HostRsvpApprovalMode = HostRsvpApprovalMode.AutoAccept,
+    val hostDisplayName: String = "YardScape host",
+    val hostTrustSignals: List<String> = emptyList(),
     val pendingConfirmation: HostConfirmationAction? = null,
 ) {
     val progress: HostEditorProgress
@@ -116,10 +149,9 @@ data class HostEditorState(
         categories = draft.categories,
         photoCaptions = draft.photos.mapNotNull { it.description },
         photoReferences = draft.photos.map { it.url },
-        rsvpSummary = buildString {
-            append(approvalMode.label)
-            attendeeCap?.let { append(" · Up to $it attendees") }
-        },
+        acceptedPaymentTypes = draft.acceptedPaymentTypes,
+        accessibilityNotes = draft.accessibilityNotes,
+        hostContext = listOf(hostDisplayName, hostTrustSignals.firstOrNull()).filterNotNull().joinToString(" - "),
     )
 
     fun publishErrors(): List<String> =

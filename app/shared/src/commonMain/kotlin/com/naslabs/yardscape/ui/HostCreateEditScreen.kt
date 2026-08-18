@@ -47,14 +47,12 @@ import com.naslabs.yardscape.domain.EventPhoto
 
 @Composable
 fun HostCreateEditScreen(
-    hostEvents: List<HostEventItem>,
     editorState: HostEditorState,
     availablePhotos: List<EventPhoto>,
     onAddressSearch: (String) -> List<MapSelectedLocation>,
     onEditorStateChanged: (HostEditorState) -> Unit,
     onStepSelected: (HostEditorStep) -> Unit,
     onNew: () -> Unit,
-    onEdit: (String) -> Unit,
     onSaveDraft: () -> Unit,
     onPublish: () -> Unit,
     onCancelEvent: () -> Unit,
@@ -165,7 +163,7 @@ private fun HostEventForm(
         modifier = Modifier.padding(bottom = 18.dp),
         verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
     ) {
-        HostEditorProgressIndicator(state.progress)
+        HostEditorProgressIndicator(state.progress, onStepSelected)
         if (state.validationErrors.isNotEmpty()) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -197,26 +195,33 @@ private fun HostEventForm(
             isExpanded = isExpanded,
         )
 
-        if (state.step != HostEditorStep.Preview) {
+        if (state.progress.previousStep != null || state.step != HostEditorStep.Preview) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state.step.ordinal > 0) {
+                state.progress.previousStep?.let { previousStep ->
                     OutlinedButton(
                         modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                        onClick = { onStepSelected(HostEditorStep.entries[state.step.ordinal - 1]) },
+                        onClick = { onStepSelected(previousStep) },
                     ) { Text("Back") }
                 }
-                Button(
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                    onClick = { onStepSelected(HostEditorStep.entries[state.step.ordinal + 1]) },
-                ) { Text("Continue") }
+                if (state.step != HostEditorStep.Preview) {
+                    Button(
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        onClick = { onStepSelected(HostEditorStep.entries[state.step.ordinal + 1]) },
+                    ) { Text("Continue") }
+                }
             }
-            TextButton(modifier = Modifier.heightIn(min = 48.dp), onClick = onSaveDraft) { Text("Save draft and leave later") }
+            if (state.step != HostEditorStep.Preview) {
+                TextButton(modifier = Modifier.heightIn(min = 48.dp), onClick = onSaveDraft) { Text("Save draft and leave later") }
+            }
         }
     }
 }
 
 @Composable
-private fun HostEditorProgressIndicator(progress: HostEditorProgress) {
+private fun HostEditorProgressIndicator(
+    progress: HostEditorProgress,
+    onStepSelected: (HostEditorStep) -> Unit,
+) {
     Column(
         modifier = Modifier.semantics {
             contentDescription = "Step ${progress.currentStep} of ${progress.totalSteps}: ${progress.activeStep.label}"
@@ -233,6 +238,21 @@ private fun HostEditorProgressIndicator(progress: HostEditorProgress) {
             progress = { progress.currentStep.toFloat() / progress.totalSteps },
             modifier = Modifier.fillMaxWidth(),
         )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.extraSmall),
+            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.extraSmall),
+        ) {
+            HostEditorStep.entries.forEach { step ->
+                when {
+                    step.ordinal < progress.activeStep.ordinal -> TextButton(
+                        modifier = Modifier.heightIn(min = 48.dp),
+                        onClick = { onStepSelected(step) },
+                    ) { Text(step.label) }
+                    step == progress.activeStep -> Text(step.label, style = MaterialTheme.typography.labelLarge)
+                    else -> Text(step.label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
     }
 }
 
@@ -311,7 +331,7 @@ private fun HostPhotosStep(
                 horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                HostPhotoArtwork(photo = photo, eventId = draft.id ?: "host-photo-picker", size = 56.dp)
+                HostPhotoArtwork(photo = photo, draftId = draft.id, size = 56.dp)
                 Text("Add ${photo.description ?: "photo"}")
             }
         }
@@ -326,7 +346,7 @@ private fun HostPhotosStep(
         Surface(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small), verticalAlignment = Alignment.CenterVertically) {
-                    HostPhotoArtwork(photo = photo, eventId = draft.id ?: "host-photo-$index", size = 72.dp)
+                    HostPhotoArtwork(photo = photo, draftId = draft.id, size = 72.dp)
                     Column {
                         Text(if (index == 0) "Cover photo" else "Photo ${index + 1}", style = MaterialTheme.typography.titleMedium)
                         Text("Shown in the public shopper preview", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
@@ -357,10 +377,10 @@ private fun HostPhotosStep(
 }
 
 @Composable
-private fun HostPhotoArtwork(photo: EventPhoto, eventId: String, size: androidx.compose.ui.unit.Dp) {
+private fun HostPhotoArtwork(photo: EventPhoto, draftId: String?, size: androidx.compose.ui.unit.Dp) {
     Box(modifier = Modifier.width(size).height(size)) {
         ShopperEventArtwork(
-            presentation = ShopperEventArtworkPresentation(eventId = eventId, photoReference = photo.url),
+            presentation = hostArtworkPresentationFor(draftId = draftId, photoReference = photo.url),
             modifier = Modifier.fillMaxSize(),
             height = size,
         )
@@ -408,19 +428,18 @@ private fun HostPreviewStep(
     FormSectionLabel("Public shopper preview")
     val previewContent: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            preview.photoReferences.firstOrNull()?.let {
-                ShopperEventArtwork(
-                    presentation = preview.toShopperEventArtworkPresentation(state.draft.id ?: "host-preview"),
-                    modifier = Modifier.fillMaxWidth(),
-                    height = 224.dp,
-                )
-            }
+            ShopperEventArtwork(
+                presentation = preview.toShopperEventArtworkPresentation(state.draft.id ?: "new-host-draft"),
+                modifier = Modifier.fillMaxWidth(),
+                height = 224.dp,
+            )
             Text(preview.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(preview.description)
-            Text(preview.scheduleLabel)
-            Text(preview.approximateLocationLabel)
-            if (preview.categories.isNotEmpty()) Text(preview.categories.joinToString(" · "))
-            Text(preview.rsvpSummary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            preview.shopperDetailSections().forEach { (label, value) ->
+                if (value.isNotBlank()) {
+                    Text("$label · $value", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             PrivacyNote("Preview contains approximate location only. Protected address and access instructions are omitted.")
         }
     }

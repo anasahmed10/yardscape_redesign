@@ -208,11 +208,11 @@ fun App(appState: YardScapeAppState) {
 
 @Composable
 private fun HostEditorRoute(appState: YardScapeAppState, route: YardScapeRoute.HostCreateEdit) {
-    var editorState by remember(appState, route.eventId) {
+    val sessionSignal = appState.hostEditorSessionSignal
+    var editorState by remember(appState, route.eventId, sessionSignal) {
         mutableStateOf(appState.hostEditorState(route.eventId))
     }
     HostCreateEditScreen(
-        hostEvents = appState.hostEventItems(),
         editorState = editorState,
         availablePhotos = appState.availableHostPhotos(),
         onAddressSearch = appState::searchHostLocations,
@@ -221,7 +221,6 @@ private fun HostEditorRoute(appState: YardScapeAppState, route: YardScapeRoute.H
         },
         onStepSelected = { step -> editorState = appState.moveHostEditor(editorState, step) },
         onNew = { appState.openHostCreateEdit() },
-        onEdit = appState::openHostCreateEdit,
         onSaveDraft = { editorState = appState.saveHostDraft(editorState) },
         onPublish = { editorState = appState.publishHostEvent(editorState) },
         onCancelEvent = {
