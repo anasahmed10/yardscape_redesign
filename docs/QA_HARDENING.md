@@ -1,6 +1,6 @@
 # Marketplace QA hardening checkpoint
 
-Evidence date: August 18, 2026. This document records only checks exercised in the current issue #73 run. It is a checkpoint, not a WCAG or platform-conformance claim.
+Evidence dates: August 18 and August 25, 2026. This document records the checks exercised in issues #73 and #78. It is a checkpoint, not a WCAG or platform-conformance claim.
 
 ## Runtime evidence
 
@@ -17,7 +17,26 @@ Keyboard Tab focus was visibly exercised on Browse/map-list, event detail/RSVP, 
 
 The in-app Browser did not honor native `Command`+`+` zoom shortcuts. Its supported page-scale control was exercised at exactly `2.0` on Browse, RSVP, My Finds, Host, Messages, and Account, producing a 195 × 422 visual viewport from the 390 × 844 test viewport. [`qa-73-mobile-browse-zoom-200.png`](./audit-assets/qa-73-mobile-browse-zoom-200.png) records that magnified state. This proves the exercised magnification path only, not native browser-zoom reflow conformance.
 
-TalkBack, VoiceOver, reduced-motion preference behavior, Android instrumentation, and native browser-zoom reflow were not exercised in this checkpoint.
+## Native accessibility and reduced-motion evidence
+
+Issue #78 used a Pixel 9 Pro AVD at an exact 390 x 844 dp override (1170 x 2532 px at 480 dpi), Android 17/API 37.1 preview, and TalkBack package version code 60201234. TalkBack touch exploration was enabled while animations were disabled (`window_animation_scale`, `transition_animation_scale`, and `animator_duration_scale` all set to `0`). The emulator was restored to its physical size, disabled accessibility state, and default animation behavior after the run.
+
+| Surface | Runtime result | Evidence |
+| --- | --- | --- |
+| Browse map/list | The TalkBack accessibility tree exposed named Host, search, filter, date, map/list, location, map attribution, approximate pin, result, and bottom-navigation targets. MapLibre remained rendered with reduced motion, and its public nodes contained neighborhood labels only. | [`Runtime semantics`](./audit-assets/78-runtime-semantics.txt) |
+| Detail, RSVP, reveal | Before confirmation, the accessibility tree contained the RSVP privacy explanation and no protected address, directions action, or private instruction. After accepted RSVP, the protected address, side-gate instruction, and named Directions action appeared together. | [`Runtime semantics`](./audit-assets/78-runtime-semantics.txt), [`detail`](./audit-assets/78-android-talkback-detail.jpg), [`accepted detail`](./audit-assets/78-android-talkback-reveal.jpg) |
+| My Finds | Saved/RSVP segments exposed selected state and distinct names; the empty state remained readable. | [`78-android-talkback-myfinds.jpg`](./audit-assets/78-android-talkback-myfinds.jpg) |
+| Host | Create, edit, and attendee-management actions exposed contextual names; public host copy continued to describe approximate areas only. | [`78-android-talkback-host.jpg`](./audit-assets/78-android-talkback-host.jpg) |
+| Messages | Empty state and Browse recovery action were named; copy explained that conversations require active RSVP access. | [`78-android-talkback-messages.jpg`](./audit-assets/78-android-talkback-messages.jpg) |
+| Safety and Account | Report/block routes and bottom destinations were named and keyboard reachable. Account trust copy remained grouped separately from identity verification. | [`Block Host route`](./audit-assets/78-android-talkback-block-host.jpg), [`account`](./audit-assets/78-android-talkback-account.jpg) |
+
+Keyboard traversal with TalkBack moved focus through Compose controls and activated controls with Enter. Exercised interactive controls measured at least 144 px on this 480 dpi target, equal to the shared 48 dp minimum. The address/privacy transition was checked directly in the runtime accessibility hierarchy and is recorded in the compact text artifact; screenshots are contextual visual evidence only.
+
+Android connected instrumentation could not reach app assertions on the only installed system image. All seven tests failed inside Espresso 3.7.0 because the API 37.1 preview removed `android.hardware.input.InputManager.getInstance`; the app had already built and installed successfully. This is an environment/runner incompatibility, not an app assertion failure. Stable-image TalkBack instrumentation, dialog focus restoration, polite live-region speech, and post-revocation spoken output remain tracked in #82.
+
+The iPhone 17 Pro Simulator ran iOS 26.5 under Xcode 26.6. The unsigned app built, installed, and launched. Its runtime accessibility hierarchy exposed distinct labels and selected values for Browse/map-list, detail, Host, and all five destinations; the pre-RSVP detail hierarchy contained no protected address. Reduce Motion was enabled through the simulator accessibility preference, the app was relaunched, and Browse plus MapLibre remained available without a crash or blocked interaction. [`Runtime semantics`](./audit-assets/78-runtime-semantics.txt) records the preference and hierarchy results; [`78-ios-reduced-motion.jpg`](./audit-assets/78-ios-reduced-motion.jpg) records the rendered state.
+
+Spoken VoiceOver output is not claimed: Apple's accessibility testing guidance says VoiceOver is unavailable on iOS Simulator and requires physical hardware. Physical-device reading order, announcements, focus restoration, reduced-motion gestures, and privacy-closing transitions remain tracked in #83.
 
 ## Contrast evidence
 
@@ -59,6 +78,7 @@ Portable `:app:shared:jsBrowserTest` and `:app:shared:wasmJsBrowserTest` ran hea
 ## Remaining launch gates
 
 - Run the full validation matrix, unsigned Xcode simulator build, `check`, `git diff --check`, and repository secret scan.
-- Run Android instrumentation on an available emulator; `adb` was unavailable during this checkpoint.
-- Exercise TalkBack, VoiceOver, native browser zoom/reflow, reduced motion, and focus restoration on supported devices.
+- Run Android TalkBack instrumentation and spoken-output checks on a stable supported image (#82).
+- Exercise VoiceOver on physical iOS hardware (#83).
+- Exercise native browser zoom/reflow and finish focus-restoration/live-region checks on supported targets.
 - Update `PLATFORM_VALIDATION.md`, `MAP_DISCOVERY.md`, `MOCK_FLOW_USABILITY_REVIEW.md`, and `ROADMAP.md` with final, fully validated evidence.
