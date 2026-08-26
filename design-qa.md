@@ -20,13 +20,14 @@ The combined full-view image is sufficient for the typography, controls, map ove
 - Colors and tokens: linen, evergreen, white, gray-green, and clay map to the approved visual language. Public map markers now use evergreen.
 - Image quality: existing compressed marketplace photography is used with consistent crops and descriptive alternatives; no placeholder or generated imagery was introduced.
 - Copy and content: Browse, host, search, filters, date options, privacy disclosure, nearby results, and compact Saved navigation use production-facing language.
-- Accessibility and behavior: 48 dp targets, semantic labels, sheet resize actions, live-map attribution, and the list alternative remain intact.
+- Accessibility and behavior: 48 dp targets, semantic labels and selected filter state, sheet resize actions, live-map attribution, and the list alternative remain intact.
 
 ## Comparison history
 
 1. Pass 1 found P1 hierarchy drift: the 620 dp compact map placed the nearby-sales sheet below the visible viewport. The compact map was reduced and the sheet now overlays the map above persistent navigation.
 2. Pass 2 found P2 control and overlay drift: date pills clipped, privacy and mode controls were hidden below the sheet, and public pins used blue. Pills were compacted, the bottom overlays were lifted above the sheet, and markers were changed to evergreen.
 3. Pass 3 found a P2 selected-state defect: the Map label used the selected container color and was unreadable. The selected label now uses `onPrimary`; the final comparison shows the complete segmented control.
+4. Review found the custom date pills no longer exposed their selected state and the earlier evidence had been captured before the live map stabilized. Selected semantics are now device-tested, and the final screenshot was recaptured after tiles, attribution, and approximate markers rendered.
 
 ## Follow-up polish
 

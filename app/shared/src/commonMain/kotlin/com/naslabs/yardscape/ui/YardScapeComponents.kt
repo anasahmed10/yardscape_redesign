@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -140,6 +142,7 @@ internal fun FilterChip(
     Surface(
         modifier = Modifier
             .yardScapeInteractiveTarget()
+            .semantics { this.selected = presentation.isSelected }
             .widthIn(max = 160.dp),
         onClick = onClick,
         shape = MaterialTheme.shapes.extraLarge,
