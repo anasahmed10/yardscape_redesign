@@ -1,6 +1,5 @@
 package com.naslabs.yardscape
 
-import androidx.activity.compose.setContent
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -8,15 +7,20 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
-import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
+import com.naslabs.yardscape.data.SeededYardSaleData
 import com.naslabs.yardscape.ui.AppDataAvailability
+import com.naslabs.yardscape.ui.DiscoveryDisplayMode
+import com.naslabs.yardscape.ui.MapAvailability
 import com.naslabs.yardscape.ui.YardScapeAppState
 import com.naslabs.yardscape.ui.YardScapePrimaryDestination
 import com.naslabs.yardscape.ui.YardScapeTestTags
@@ -27,16 +31,24 @@ import org.junit.Test
 
 class MarketplaceAccessibilityTest {
     @get:Rule
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val composeRule = createComposeRule()
 
     @Test
     fun mapResultsSheetNamesItsStateAndProvidesKeyboardAccessibleActions() {
+        val appState = YardScapeAppState().apply {
+            updateMapAvailability(MapAvailability.Failed("Accessibility test fallback"))
+        }
+        composeRule.setContent { App(appState) }
         composeRule.onNodeWithTag(YardScapeTestTags.DiscoveryResultsSheet)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Collapsed"))
             .assert(hasCustomAction("Expand nearby sales"))
             .assertHeightIsAtLeast(48.dp)
-        composeRule.onNodeWithTag(YardScapeTestTags.mapResult("family-garage-sale"))
+        val visibleSaleTag = YardScapeTestTags.mapResult(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+        composeRule.onNodeWithTag(YardScapeTestTags.DiscoveryResultsSheet)
+            .performScrollToNode(hasTestTag(visibleSaleTag))
+        composeRule.onNodeWithTag(visibleSaleTag)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Not selected"))
+            .assert(hasCustomAction("Select on map"))
         val expandAction = composeRule.onAllNodesWithTag(YardScapeTestTags.DiscoveryResultsSheet)
             .fetchSemanticsNodes()
             .single()
@@ -49,15 +61,31 @@ class MarketplaceAccessibilityTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Partially expanded"))
             .assert(hasCustomAction("Expand nearby sales"))
             .assert(hasCustomAction("Collapse nearby sales"))
-        composeRule.onNodeWithTag(YardScapeTestTags.mapResult("family-garage-sale"))
-            .performClick()
+        val selectAction = composeRule.onAllNodesWithTag(visibleSaleTag)
+            .fetchSemanticsNodes()
+            .single()
+            .config[SemanticsActions.CustomActions]
+            .single { it.label == "Select on map" }
+        composeRule.runOnIdle {
+            check(selectAction.action.invoke())
+        }
+        composeRule.onNodeWithTag(YardScapeTestTags.DiscoveryResultsSheet)
+            .performScrollToNode(hasTestTag(visibleSaleTag))
+        composeRule.onNodeWithTag(visibleSaleTag)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Selected"))
     }
 
     @Test
     fun primaryMarketplaceControlsMeetTheSharedMinimumTarget() {
-        composeRule.onNodeWithText("List").performClick()
-        composeRule.onNodeWithTag(YardScapeTestTags.browseEventCard("family-garage-sale"))
+        val appState = YardScapeAppState().apply {
+            updateDiscoveryDisplayMode(DiscoveryDisplayMode.List)
+        }
+        composeRule.setContent { App(appState) }
+        composeRule.onNodeWithText("List").assertHeightIsAtLeast(48.dp)
+        val familySaleTag = YardScapeTestTags.browseEventCard(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+        composeRule.onNodeWithTag(YardScapeTestTags.BrowseScreen)
+            .performScrollToNode(hasTestTag(familySaleTag))
+        composeRule.onNodeWithTag(familySaleTag)
             .assertHeightIsAtLeast(48.dp)
             .performClick()
         composeRule.onNodeWithTag(YardScapeTestTags.RsvpAction)
@@ -76,12 +104,14 @@ class MarketplaceAccessibilityTest {
 
         composeRule.onNodeWithTag(YardScapeTestTags.primaryDestination(YardScapePrimaryDestination.Account))
             .performClick()
+        composeRule.onNodeWithTag(YardScapeTestTags.AccountScreen)
+            .performScrollToNode(androidx.compose.ui.test.hasText("Sign out"))
         composeRule.onNodeWithText("Sign out").assertHeightIsAtLeast(48.dp)
     }
 
     @Test
     fun offlineBrowseStatusUsesAPoliteLiveRegion() {
-        composeRule.activity.setContent {
+        composeRule.setContent {
             App(YardScapeAppState(dataAvailability = AppDataAvailability.Offline))
         }
 
@@ -90,7 +120,7 @@ class MarketplaceAccessibilityTest {
 
     @Test
     fun unavailableSafetyRouteKeepsItsBackActionAtTheSharedMinimumTarget() {
-        composeRule.activity.setContent {
+        composeRule.setContent {
             YardScapeTheme {
                 ShopperSafetyScreen(
                     state = null,

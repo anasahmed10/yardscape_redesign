@@ -645,6 +645,12 @@ private fun CompactMapResultCard(
             .semantics {
                 this.selected = selected
                 stateDescription = if (selected) "Selected" else "Not selected"
+                customActions = listOf(
+                    CustomAccessibilityAction("Select on map") {
+                        onSelect()
+                        true
+                    },
+                )
             },
         colors = CardDefaults.cardColors(
             containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,

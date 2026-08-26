@@ -17,6 +17,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.naslabs.yardscape.domain.UserRole
@@ -32,7 +33,10 @@ fun AccountScreen(
     onPreferencesChanged: (NotificationPreferences) -> Unit,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+            .testTag(YardScapeTestTags.AccountScreen),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {

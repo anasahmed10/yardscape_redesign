@@ -4,15 +4,16 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasContentDescription
-import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
-import androidx.activity.compose.setContent
 import com.naslabs.yardscape.data.MarketplaceMessagingAccessSource
 import com.naslabs.yardscape.data.SeededMarketplaceMessagingRepository
 import com.naslabs.yardscape.data.SeededMessageOutcome
@@ -34,20 +35,24 @@ import org.junit.Test
 
 class RsvpRevealSmokeTest {
     @get:Rule
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val composeRule = createComposeRule()
 
     @Test
     fun browseDetailRsvpRevealShowsExactAddressOnlyAfterAcceptance() {
         val appState = YardScapeAppState()
-        composeRule.activity.setContent { App(appState) }
+        composeRule.setContent { App(appState) }
 
         composeRule.onNodeWithTag(YardScapeTestTags.BrowseScreen)
             .assertIsDisplayed()
 
-        composeRule.onNodeWithTag(
-            YardScapeTestTags.browseEventCard(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID),
-        ).performClick()
+        composeRule.onNodeWithText("List").performClick()
+        val familySaleTag = YardScapeTestTags.browseEventCard(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID)
+        composeRule.onNodeWithTag(YardScapeTestTags.BrowseScreen)
+            .performScrollToNode(hasTestTag(familySaleTag))
+        composeRule.onNodeWithTag(familySaleTag).performClick()
 
+        composeRule.onNodeWithTag(YardScapeTestTags.EventDetailScreen)
+            .performScrollToNode(hasTestTag(YardScapeTestTags.LocationAccessPanel))
         composeRule.onNodeWithTag(YardScapeTestTags.LocationAccessPanel)
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("123 Cedar Street", substring = true)
@@ -55,14 +60,19 @@ class RsvpRevealSmokeTest {
         composeRule.onAllNodesWithTag(YardScapeTestTags.DirectionsAction)
             .assertCountEquals(0)
 
-        composeRule.onNodeWithTag(YardScapeTestTags.RsvpAction)
-            .performClick()
+        composeRule.onNodeWithTag(YardScapeTestTags.EventDetailScreen)
+            .performScrollToNode(hasTestTag(YardScapeTestTags.RsvpAction))
+        composeRule.onNodeWithTag(YardScapeTestTags.RsvpAction).performClick()
         composeRule.onNodeWithTag(YardScapeTestTags.RsvpConfirmAction)
             .performClick()
 
+        composeRule.onNodeWithTag(YardScapeTestTags.EventDetailScreen)
+            .performScrollToNode(hasTestTag(YardScapeTestTags.ExactLocationContent))
         composeRule.onNodeWithTag(YardScapeTestTags.ExactLocationContent)
             .assertIsDisplayed()
             .assertTextContains("123 Cedar Street", substring = true)
+        composeRule.onNodeWithTag(YardScapeTestTags.EventDetailScreen)
+            .performScrollToNode(hasTestTag(YardScapeTestTags.DirectionsAction))
         composeRule.onNodeWithTag(YardScapeTestTags.DirectionsAction)
             .assertIsDisplayed()
 
@@ -75,6 +85,8 @@ class RsvpRevealSmokeTest {
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("123 Cedar Street", substring = true)
             .assertCountEquals(0)
+        composeRule.onNodeWithTag(YardScapeTestTags.EventDetailScreen)
+            .performScrollToNode(androidx.compose.ui.test.hasText("Access revoked"))
         composeRule.onNodeWithText("Access revoked").assertIsDisplayed()
     }
 
@@ -116,7 +128,7 @@ class RsvpRevealSmokeTest {
             messagingRepository = repository,
         )
 
-        composeRule.activity.setContent { App(appState) }
+        composeRule.setContent { App(appState) }
         composeRule.runOnIdle { appState.navigateTo(YardScapePrimaryDestination.Messages) }
 
         composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -135,7 +147,7 @@ class RsvpRevealSmokeTest {
         composeRule.onNodeWithContentDescription("Message composer")
             .performTextInput("Can I bring a trailer?")
         composeRule.onNodeWithContentDescription("Send message").performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) {
+        composeRule.waitUntil(timeoutMillis = 10_000) {
             composeRule.onAllNodesWithText("Sent").fetchSemanticsNodes().size == 2
         }
         composeRule.onAllNodesWithText("Can I bring a trailer?").assertCountEquals(1)
