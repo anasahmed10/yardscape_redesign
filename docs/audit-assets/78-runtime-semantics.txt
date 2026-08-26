@@ -1,0 +1,46 @@
+YardScape issue #78 native accessibility evidence — 2026-08-25
+
+ANDROID RUNTIME
+Device: Pixel 9 Pro AVD, Android 17 / API 37.1 preview
+Viewport: 1170 x 2532 px at 480 dpi = 390 x 844 dp
+TalkBack: com.google.android.marvin.talkback, versionCode 60201234
+Reduced motion: animator, transition, and window animation scales = 0
+
+uiautomator accessibility-tree observations with TalkBack enabled:
+- Browse exposed named Host, search, Filters, date, List/Map, Use my
+  location, Search this area, MapLibre attribution, approximate event pins,
+  and all five destinations. Public nodes used neighborhood labels only.
+- Pre-RSVP detail: exact-address node count = 0; Directions node count = 0.
+- RSVP screen: exact-address node count = 0.
+- Accepted detail: protected-address node count = 1; Directions node count = 1.
+- My Finds exposed Saved selected state and the RSVPs segment.
+- Host exposed named Create, Edit, and Manage attendees actions.
+- Messages exposed its access-dependent empty state and Browse recovery action.
+- Report and Block Host routes, plus Account, exposed named controls.
+- Exercised buttons were at least 144 px high = 48 dp.
+
+Repository privacy tests passed in :app:shared:testAndroidHostTest, including:
+- revokedAndExpiredAccessHideExactAddress
+- cancelledEventHidesExactAddressEvenWithAcceptedRsvp
+- successfulBlockImmediatelyDeniesEveryAffectedLocationAndUnblockDoesNotRestoreAccess
+- cancellationRequiresConfirmationAndImmediatelyClearsExactLocation
+- revokeBlockAndExpiryClearStaleDirectionsAndAddress
+
+Instrumentation limitation:
+:app:androidApp:connectedDebugAndroidTest built and installed, then all seven
+tests stopped before app assertions. Espresso 3.7.0 reflected on the removed
+android.hardware.input.InputManager.getInstance method in the API 37.1 preview.
+Stable-image spoken output, live-region, and focus-restoration checks are #82.
+
+IOS SIMULATOR RUNTIME
+Device: iPhone 17 Pro Simulator, iOS 26.5, Xcode 26.6
+Reduce Motion preference after enabling: 1
+
+The runtime accessibility snapshot exposed named Browse controls, approximate
+event pins, selected values, detail/RSVP actions, Host actions, and all five
+destinations. The pre-RSVP detail snapshot contained no protected address.
+The unsigned app built, installed, relaunched with Reduce Motion, and retained
+an interactive Browse/MapLibre surface.
+
+VoiceOver spoken output is not claimed. Apple documents that VoiceOver is not
+available on iOS Simulator; physical-device verification is tracked by #83.
