@@ -8,6 +8,56 @@ import kotlin.test.assertTrue
 
 class ShopperBrowsePresentationTest {
     @Test
+    fun approvedMarketplaceChromeUsesCompactAndExpandedLayoutsAtSharedBreakpoint() {
+        assertEquals(BrowseMarketplaceLayout.Compact, browseMarketplaceLayoutFor(390.dp))
+        assertEquals(BrowseMarketplaceLayout.Compact, browseMarketplaceLayoutFor(759.dp))
+        assertEquals(BrowseMarketplaceLayout.Expanded, browseMarketplaceLayoutFor(760.dp))
+        assertEquals(BrowseMarketplaceLayout.Expanded, browseMarketplaceLayoutFor(1440.dp))
+    }
+
+    @Test
+    fun compactShellCallsMyFindsSavedWithoutChangingOtherDestinationLabels() {
+        assertEquals(
+            "Saved",
+            marketplaceNavigationLabelFor(
+                destination = YardScapePrimaryDestination.MyFinds,
+                layout = BrowseMarketplaceLayout.Compact,
+            ),
+        )
+        assertEquals(
+            "My Finds",
+            marketplaceNavigationLabelFor(
+                destination = YardScapePrimaryDestination.MyFinds,
+                layout = BrowseMarketplaceLayout.Expanded,
+            ),
+        )
+        YardScapePrimaryDestination.entries
+            .filterNot { it == YardScapePrimaryDestination.MyFinds }
+            .forEach { destination ->
+                assertEquals(
+                    destination.label,
+                    marketplaceNavigationLabelFor(destination, BrowseMarketplaceLayout.Compact),
+                )
+            }
+    }
+
+    @Test
+    fun dateFiltersUseTheApprovedMarketplaceWording() {
+        assertEquals("All dates", marketplaceDateLabelFor(DiscoveryDateFilter.Any))
+        assertEquals("Today", marketplaceDateLabelFor(DiscoveryDateFilter.Today))
+        assertEquals("Tomorrow", marketplaceDateLabelFor(DiscoveryDateFilter.Tomorrow))
+        assertEquals("This weekend", marketplaceDateLabelFor(DiscoveryDateFilter.Weekend))
+    }
+
+    @Test
+    fun marketplaceModeSwitcherLeadsWithTheMapOption() {
+        assertEquals(
+            listOf(DiscoveryDisplayMode.Map, DiscoveryDisplayMode.List),
+            marketplaceDisplayModeOrder(),
+        )
+    }
+
+    @Test
     fun browseListUsesCompactAndExpandedLayoutsAtTheSharedBreakpoint() {
         assertEquals(ShopperBrowseListLayout.Compact, shopperBrowseListLayoutFor(759.dp))
         assertEquals(ShopperBrowseListLayout.Expanded, shopperBrowseListLayoutFor(760.dp))

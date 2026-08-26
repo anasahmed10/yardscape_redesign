@@ -5,6 +5,8 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasTestTag
@@ -55,6 +57,15 @@ class MarketplaceResponsiveTest {
             .assertIsDisplayed()
             .assertWidthIsEqualTo(390.dp)
         composeRule.onNodeWithTag(YardScapeTestTags.AppShell).assertIsDisplayed()
+        composeRule.onNodeWithText("YardScape").assertIsDisplayed()
+        composeRule.onNodeWithText("Browse sales").assertIsDisplayed()
+        composeRule.onNodeWithText("Host a sale").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithContentDescription("Search sales")
+            .assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithText("All dates")
+            .assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertIsSelected()
+        composeRule.onNodeWithText("Today").assertIsNotSelected()
+        composeRule.onNodeWithText("Saved").assertIsDisplayed()
 
         YardScapePrimaryDestination.entries.forEach { destination ->
             composeRule.onNodeWithTag(YardScapeTestTags.primaryDestination(destination))

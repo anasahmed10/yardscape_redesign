@@ -13,15 +13,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -47,6 +53,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.naslabs.yardscape.YardScapeConfig
 import com.naslabs.yardscape.map.PlatformMapCapability
 import com.naslabs.yardscape.map.MapFallbackSurface
 import com.naslabs.yardscape.map.PlatformMapState
@@ -87,13 +95,11 @@ fun BrowseScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .testTag(YardScapeTestTags.BrowseScreen)
-            .padding(horizontal = spacing.large),
-        verticalArrangement = Arrangement.spacedBy(spacing.medium),
+            .testTag(YardScapeTestTags.BrowseScreen),
+        verticalArrangement = Arrangement.spacedBy(spacing.small),
     ) {
         item {
-            BrowseHero(
-                eventCount = state.items.size,
+            BrowseMarketplaceHeader(
                 onHostSelected = onHostSelected,
             )
         }
@@ -115,6 +121,7 @@ fun BrowseScreen(
                         ShopperBrowseAvailability.RecoverableError -> YardScapeStatusMessageKind.Failure
                         else -> null
                     },
+                    modifier = Modifier.padding(horizontal = spacing.large),
                 )
             }
         }
@@ -128,6 +135,7 @@ fun BrowseScreen(
                 onCategoryToggled = onCategoryToggled,
                 onDisplayModeChanged = onDisplayModeChanged,
                 onResetFilters = onResetFilters,
+                modifier = Modifier.padding(horizontal = spacing.large),
             )
         }
 
@@ -144,7 +152,9 @@ fun BrowseScreen(
                         ShopperBrowseAvailability.FilteredEmpty -> onResetFilters
                         else -> null
                     },
-                    modifier = Modifier.testTag(YardScapeTestTags.DiscoveryNoResults),
+                    modifier = Modifier
+                        .padding(horizontal = spacing.large)
+                        .testTag(YardScapeTestTags.DiscoveryNoResults),
                 )
             }
             state.displayMode == DiscoveryDisplayMode.Map -> item {
@@ -161,15 +171,18 @@ fun BrowseScreen(
                     onMapAvailabilityChanged = onMapAvailabilityChanged,
                     onUseMyLocation = onUseMyLocation,
                     onSheetPositionChanged = onSheetPositionChanged,
+                    onDisplayModeChanged = onDisplayModeChanged,
                 )
             }
             else -> items(state.items, key = { it.id }) { event ->
-                BrowseListEventCard(
-                    event = event,
-                    isSaved = event.id in state.savedEventIds,
-                    onClick = { onEventSelected(event.id) },
-                    onSavedToggle = { onSavedToggled(event.id) },
-                )
+                Box(modifier = Modifier.padding(horizontal = spacing.large)) {
+                    BrowseListEventCard(
+                        event = event,
+                        isSaved = event.id in state.savedEventIds,
+                        onClick = { onEventSelected(event.id) },
+                        onSavedToggle = { onSavedToggled(event.id) },
+                    )
+                }
             }
         }
 
@@ -188,9 +201,13 @@ private fun DiscoveryControls(
     onCategoryToggled: (String) -> Unit,
     onDisplayModeChanged: (DiscoveryDisplayMode) -> Unit,
     onResetFilters: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var showMoreFilters by remember { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
@@ -199,25 +216,34 @@ private fun DiscoveryControls(
             OutlinedTextField(
                 modifier = Modifier
                     .weight(1f)
+                    .heightIn(min = 52.dp)
                     .semantics { contentDescription = "Search sales" },
                 value = state.filters.query,
                 onValueChange = onQueryChanged,
                 placeholder = { Text("Search neighborhoods") },
+                leadingIcon = {
+                    Icon(imageVector = SearchIcon, contentDescription = null)
+                },
+                shape = MaterialTheme.shapes.extraLarge,
                 singleLine = true,
             )
             OutlinedButton(
-                modifier = Modifier.yardScapeInteractiveTarget(),
+                modifier = Modifier.heightIn(min = 52.dp),
+                shape = MaterialTheme.shapes.extraLarge,
                 onClick = { showMoreFilters = !showMoreFilters },
             ) {
                 Text(if (showMoreFilters) "Less" else "Filters")
             }
         }
-        FilterRow(
-            options = DiscoveryDateFilter.entries,
-            label = { it.label },
-            selected = { it == state.filters.date },
-            onSelected = onDateChanged,
-        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
+            items(DiscoveryDateFilter.entries) { option ->
+                FilterChip(
+                    label = marketplaceDateLabelFor(option),
+                    selected = option == state.filters.date,
+                    onClick = { onDateChanged(option) },
+                )
+            }
+        }
         if (showMoreFilters || state.filters.distance != DiscoveryDistanceFilter.Any || state.filters.categories.isNotEmpty()) {
             FilterRow(
                 options = DiscoveryDistanceFilter.entries,
@@ -240,16 +266,18 @@ private fun DiscoveryControls(
                 }
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-        ) {
-            DiscoveryDisplayMode.entries.forEach { mode ->
-                FilterChip(
-                    label = mode.name,
-                    selected = state.displayMode == mode,
-                    onClick = { onDisplayModeChanged(mode) },
-                )
+        if (state.displayMode == DiscoveryDisplayMode.List) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            ) {
+                marketplaceDisplayModeOrder().forEach { mode ->
+                    FilterChip(
+                        label = mode.name,
+                        selected = state.displayMode == mode,
+                        onClick = { onDisplayModeChanged(mode) },
+                    )
+                }
             }
         }
         if (state.filters.isActive) {
@@ -295,6 +323,7 @@ private fun MapDiscoveryExperience(
     onMapAvailabilityChanged: (MapAvailability) -> Unit,
     onUseMyLocation: () -> Unit,
     onSheetPositionChanged: (MapResultsSheetPosition) -> Unit,
+    onDisplayModeChanged: (DiscoveryDisplayMode) -> Unit,
 ) {
     val defaultViewport = remember(mapState.markers) { defaultViewportFor(mapState.markers) }
     val viewport = mapState.cameraViewportDraft ?: defaultViewport
@@ -328,6 +357,7 @@ private fun MapDiscoveryExperience(
                     onMapEventSelected = onMapEventSelected,
                     onMapAvailabilityChanged = onMapAvailabilityChanged,
                     onUseMyLocation = onUseMyLocation,
+                    onDisplayModeChanged = onDisplayModeChanged,
                 )
                 NearbyResultList(
                     modifier = Modifier.weight(1f).fillMaxSize(),
@@ -341,11 +371,9 @@ private fun MapDiscoveryExperience(
             }
         } else if (platformMapSupportsComposeOverlay()) {
             val sheetLayout = mapSheetLayoutFor(mapState.sheetPosition)
-            Box(modifier = Modifier.fillMaxWidth().height(620.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().height(450.dp)) {
                 DiscoveryMapPanel(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = sheetLayout.mapBottomClearance),
+                    modifier = Modifier.fillMaxSize(),
                     mapState = mapState,
                     platformState = PlatformMapState(
                         viewport = viewport,
@@ -358,6 +386,8 @@ private fun MapDiscoveryExperience(
                     onMapEventSelected = onMapEventSelected,
                     onMapAvailabilityChanged = onMapAvailabilityChanged,
                     onUseMyLocation = onUseMyLocation,
+                    onDisplayModeChanged = onDisplayModeChanged,
+                    bottomOverlayClearance = sheetLayout.height + 8.dp,
                 )
                 MobileNearbySheet(
                     modifier = Modifier.align(Alignment.BottomCenter),
@@ -390,6 +420,7 @@ private fun MapDiscoveryExperience(
                     onMapEventSelected = onMapEventSelected,
                     onMapAvailabilityChanged = onMapAvailabilityChanged,
                     onUseMyLocation = onUseMyLocation,
+                    onDisplayModeChanged = onDisplayModeChanged,
                 )
                 MobileNearbySheet(
                     modifier = Modifier.fillMaxWidth(),
@@ -417,52 +448,24 @@ private fun DiscoveryMapPanel(
     onMapEventSelected: (String?) -> Unit,
     onMapAvailabilityChanged: (MapAvailability) -> Unit,
     onUseMyLocation: () -> Unit,
+    onDisplayModeChanged: (DiscoveryDisplayMode) -> Unit,
+    bottomOverlayClearance: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     val isFallback = usesMapFallback(platformMapCapability(), mapState.mapAvailability)
-    Column(
+    Box(
         modifier = modifier
             .testTag(YardScapeTestTags.DiscoveryMap)
             .semantics { contentDescription = "Approximate neighborhood map of nearby yard sales" },
-        verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
     ) {
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
-            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
-        ) {
-            OutlinedButton(
-                modifier = Modifier.yardScapeInteractiveTarget(),
-                enabled = mapState.locationPermission != ApproximateLocationPermission.Requesting,
-                onClick = onUseMyLocation,
-            ) {
-                Text(locationButtonLabel(mapState.locationPermission))
-            }
-            if (mapState.canSearchThisArea) {
-                Button(
-                    modifier = Modifier.yardScapeInteractiveTarget(),
-                    onClick = onSearchThisArea,
-                ) {
-                    Text("Search this area")
-                }
-            }
-            if (isFallback && platformMapCapability() == PlatformMapCapability.Interactive) {
-                OutlinedButton(
-                    modifier = Modifier.yardScapeInteractiveTarget(),
-                    onClick = { onMapAvailabilityChanged(MapAvailability.Loading) },
-                ) {
-                    Text("Retry map")
-                }
-            }
-        }
         if (isFallback) {
             MapFallbackSurface(
                 state = platformState,
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                modifier = Modifier.fillMaxSize(),
             )
         } else {
             PlatformMapSurface(
                 state = platformState,
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                modifier = Modifier.fillMaxSize(),
                 onViewportChanged = onMapViewportChanged,
                 onMarkerSelected = onMapEventSelected,
                 onClusterSelected = { clusterId ->
@@ -484,23 +487,114 @@ private fun DiscoveryMapPanel(
                 },
             )
         }
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.small,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+        FlowRow(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(YardScapeDesign.spacing.small),
+            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
         ) {
-            Column(modifier = Modifier.padding(YardScapeDesign.spacing.small)) {
-                Text("Approximate pins", style = MaterialTheme.typography.labelLarge)
-                Text(
-                    if (isFallback) "Map unavailable · List remains fully usable" else "No street addresses shown",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    PlatformMapStyle.OpenFreeMapLiberty.attribution,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            OutlinedButton(
+                modifier = Modifier.yardScapeInteractiveTarget(),
+                enabled = mapState.locationPermission != ApproximateLocationPermission.Requesting,
+                shape = MaterialTheme.shapes.extraLarge,
+                onClick = onUseMyLocation,
+            ) {
+                Text(compactLocationButtonLabel(mapState.locationPermission))
+            }
+            if (mapState.canSearchThisArea) {
+                Button(
+                    modifier = Modifier.yardScapeInteractiveTarget(),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    onClick = onSearchThisArea,
+                ) {
+                    Text("Search this area")
+                }
+            }
+            if (isFallback && platformMapCapability() == PlatformMapCapability.Interactive) {
+                OutlinedButton(
+                    modifier = Modifier.yardScapeInteractiveTarget(),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    onClick = { onMapAvailabilityChanged(MapAvailability.Loading) },
+                ) {
+                    Text("Retry map")
+                }
+            }
+        }
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(
+                    start = YardScapeDesign.spacing.small,
+                    end = YardScapeDesign.spacing.small,
+                    bottom = YardScapeDesign.spacing.small + bottomOverlayClearance,
+                ),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Surface(
+                modifier = Modifier.widthIn(max = 154.dp),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                shadowElevation = 3.dp,
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
+                    Text("Approximate pins", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        if (isFallback) "Map unavailable · List remains usable" else "No addresses shown",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        PlatformMapStyle.OpenFreeMapLiberty.attribution,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
+            DiscoveryModeSwitcher(
+                selected = DiscoveryDisplayMode.Map,
+                onDisplayModeChanged = onDisplayModeChanged,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DiscoveryModeSwitcher(
+    selected: DiscoveryDisplayMode,
+    onDisplayModeChanged: (DiscoveryDisplayMode) -> Unit,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+        shadowElevation = 4.dp,
+    ) {
+        Row(modifier = Modifier.padding(4.dp)) {
+            marketplaceDisplayModeOrder().forEach { mode ->
+                if (mode == selected) {
+                    Surface(
+                        shape = MaterialTheme.shapes.extraLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) {
+                        TextButton(
+                            modifier = Modifier.yardScapeInteractiveTarget(),
+                            onClick = { onDisplayModeChanged(mode) },
+                        ) {
+                            Text(mode.name, color = MaterialTheme.colorScheme.onPrimary)
+                        }
+                    }
+                } else {
+                    TextButton(
+                        modifier = Modifier.yardScapeInteractiveTarget(),
+                        onClick = { onDisplayModeChanged(mode) },
+                    ) {
+                        Text(mode.name, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
             }
         }
     }
@@ -512,6 +606,11 @@ private fun locationButtonLabel(permission: ApproximateLocationPermission): Stri
     ApproximateLocationPermission.Granted -> "Near me"
     ApproximateLocationPermission.Denied -> "Location denied"
     ApproximateLocationPermission.Unavailable -> "Location unavailable"
+}
+
+private fun compactLocationButtonLabel(permission: ApproximateLocationPermission): String = when (permission) {
+    ApproximateLocationPermission.NotRequested -> "Near me"
+    else -> locationButtonLabel(permission)
 }
 
 @Composable
@@ -526,11 +625,22 @@ private fun NearbyResultList(
 ) {
     LazyColumn(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+        verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.extraSmall),
     ) {
         item {
-            Text("Nearby sales", style = MaterialTheme.typography.headlineSmall)
-            Text("${events.size} public previews", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(
+                modifier = Modifier.padding(bottom = YardScapeDesign.spacing.small),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    "Nearby sales",
+                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
+                )
+                Text(
+                    "Showing ${events.size} sales nearby",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         items(events, key = { it.id }) { event ->
             CompactMapResultCard(
@@ -594,15 +704,19 @@ private fun MobileNearbySheet(
                 }
             }
             .testTag(YardScapeTestTags.DiscoveryResultsSheet),
-        shape = MaterialTheme.shapes.large,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         shadowElevation = 8.dp,
     ) {
-        Column(modifier = Modifier.padding(YardScapeDesign.spacing.medium)) {
-            Text(
-                text = "${events.size} nearby sales",
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-                style = MaterialTheme.typography.labelLarge,
-            )
+        Column(modifier = Modifier.padding(horizontal = YardScapeDesign.spacing.large, vertical = 8.dp)) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .width(40.dp)
+                    .height(4.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+            ) {}
+            Spacer(modifier = Modifier.height(YardScapeDesign.spacing.small))
             NearbyResultList(
                 modifier = Modifier.fillMaxSize(),
                 events = events,
@@ -652,54 +766,108 @@ private fun CompactMapResultCard(
                     },
                 )
             },
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         onClick = onSelect,
     ) {
-        Column(
-            modifier = Modifier.padding(YardScapeDesign.spacing.small),
-            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.extraSmall),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = YardScapeDesign.spacing.small),
+            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(event.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(event.dateLabel, color = MaterialTheme.colorScheme.primary)
-            Text(event.locationLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
-                Button(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onOpen) { Text("View sale") }
-                OutlinedButton(
-                    modifier = Modifier
-                        .yardScapeInteractiveTarget()
-                        .semantics { contentDescription = actions.saveLabel },
-                    onClick = onSave,
+            Box(modifier = Modifier.width(126.dp)) {
+                ShopperEventArtwork(
+                    presentation = event.toShopperEventArtworkPresentation(),
+                    height = 106.dp,
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    event.title,
+                    style = MaterialTheme.typography.headlineSmall.copy(fontSize = 17.sp),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    event.dateLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    event.locationLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Text(actions.saveLabel)
+                    event.categoryLabels.take(3).forEach { label -> CategoryChip(label) }
+                }
+                TextButton(
+                    modifier = Modifier.yardScapeInteractiveTarget(),
+                    onClick = onOpen,
+                ) {
+                    Text(actions.openLabel)
                 }
             }
+            IconButton(
+                modifier = Modifier
+                    .size(48.dp)
+                    .semantics { contentDescription = actions.saveLabel },
+                onClick = onSave,
+            ) {
+                Icon(
+                    imageVector = FavoriteBorderIcon,
+                    contentDescription = null,
+                    tint = if (saved) MaterialTheme.colorScheme.secondary else Clay,
+                )
+            }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.24f))
     }
 }
 
 @Composable
-private fun BrowseHero(
-    eventCount: Int,
+private fun BrowseMarketplaceHeader(
     onHostSelected: () -> Unit,
 ) {
     val spacing = YardScapeDesign.spacing
-    Column(
-        modifier = Modifier.padding(top = spacing.large),
-        verticalArrangement = Arrangement.spacedBy(spacing.small),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = spacing.large, vertical = spacing.small),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        ShopperSectionHeader(
-            title = "Nearby sales",
-            supportingText = "$eventCount public previews",
-            actionLabel = "Host a sale",
-            onAction = onHostSelected,
-        )
-        Text(
-            text = "Browse public previews by area, date, and category. Exact addresses stay private until RSVP access is granted.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = YardScapeConfig.appName,
+                style = MaterialTheme.typography.headlineLarge.copy(fontSize = 28.sp),
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = "Browse sales",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        OutlinedButton(
+            modifier = Modifier.yardScapeInteractiveTarget(),
+            shape = MaterialTheme.shapes.extraLarge,
+            onClick = onHostSelected,
+        ) {
+            Text("Host a sale")
+        }
     }
 }
 

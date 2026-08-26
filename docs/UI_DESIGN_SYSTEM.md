@@ -22,3 +22,13 @@ YardScape uses one Material 3 theme from shared Compose. Android, iOS, JS, and W
 - Keep branding text sourced from `YardScapeConfig` and the `yardscape.appName` Gradle property. The theme contains visual tokens, not a hardcoded display name.
 
 The initial theme is deliberately light-only. Dark theme or dynamic color should be introduced as focused cross-platform work, with contrast checks on Android, iOS, JS, and Wasm rather than through an Android-only API.
+
+## Browse marketplace composition
+
+The compact Browse destination uses the approved map-led marketplace composition rather than the standard shell header. Its branded header, search and filter row, date pills, approximate map, floating privacy disclosure, Map/List switch, rounded results sheet, photo-first event rows, and five-item navigation form one continuous discovery surface.
+
+- Keep Browse photography local, compressed, consistently cropped, and descriptive to assistive technology.
+- Use serif type for the YardScape wordmark and event titles; use sans-serif Material typography for controls and metadata.
+- Keep evergreen for discovery actions and map markers, clay for save and selected-navigation accents, linen for the page, and white for the results sheet.
+- Compact navigation may display the compatibility destination `MyFinds` as **Saved**. Its route, state, and accessibility semantics remain unchanged.
+- The live map may differ from illustrative geography in design references, but it must retain approximate public areas, required attribution, an accessible list alternative, and explicit optional location permission.
