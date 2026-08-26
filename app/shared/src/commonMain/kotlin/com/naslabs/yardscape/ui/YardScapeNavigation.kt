@@ -222,6 +222,8 @@ sealed interface YardScapeRoute {
 
 object YardScapeTestTags {
     const val BrowseScreen: String = "browse-screen"
+    const val EventDetailScreen: String = "event-detail-screen"
+    const val RsvpScreen: String = "rsvp-screen"
     const val LocationAccessPanel: String = "event-detail-location-access"
     const val ExactLocationContent: String = "event-detail-exact-location"
     const val DirectionsAction: String = "event-detail-directions-action"
@@ -232,6 +234,7 @@ object YardScapeTestTags {
     const val SavedScreen: String = "saved-screen"
     const val MyFindsScreen: String = "my-finds-screen"
     const val MessagesScreen: String = "messages-screen"
+    const val AccountScreen: String = "account-screen"
     const val DiscoveryMap: String = "discovery-map"
     const val DiscoveryResultsSheet: String = "discovery-results-sheet"
 
@@ -309,6 +312,7 @@ class YardScapeAppState(
         get() = messagingActor()
     private var messagingSessionVersion: Long = 0L
     private var messagingNavigationVersion: Long = 0L
+    private var locationAccessRevision: Long by mutableStateOf(0L)
 
     var shopperSafetyState: ShopperSafetyUiState? by mutableStateOf(null)
         private set
@@ -853,6 +857,7 @@ class YardScapeAppState(
         directionsEventId = null
         val revoked = updated.locationVisibility == LocationVisibility.REVOKED
         if (revoked) {
+            locationAccessRevision++
             exitMatchingRsvp(eventId)
             synchronizeMessagingComposer()
         }
@@ -873,6 +878,7 @@ class YardScapeAppState(
         directionsEventId = null
         val expired = updated.locationVisibility == LocationVisibility.EXPIRED
         if (expired) {
+            locationAccessRevision++
             exitMatchingRsvp(eventId)
             synchronizeMessagingComposer()
         }
@@ -885,6 +891,8 @@ class YardScapeAppState(
     }
 
     fun detailStateFor(eventId: String): EventDetailState? {
+        @Suppress("UNUSED_VARIABLE")
+        val observedLocationAccessRevision = locationAccessRevision
         val detail = repository.publicEventDetail(eventId) ?: return null
         val rsvp = repository.rsvpFor(eventId, shopperId).takeIf { accountState.isSignedIn }
         val exactAddress = repository.exactLocationFor(

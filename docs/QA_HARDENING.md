@@ -1,6 +1,6 @@
 # Marketplace QA hardening checkpoint
 
-Evidence dates: August 18 and August 25, 2026. This document records the checks exercised in issues #73 and #78. It is a checkpoint, not a WCAG or platform-conformance claim.
+Evidence dates: August 18, August 25, and August 26, 2026. This document records the checks exercised in issues #73, #78, and #82. It is a checkpoint, not a WCAG or platform-conformance claim.
 
 ## Runtime evidence
 
@@ -32,7 +32,15 @@ Issue #78 used a Pixel 9 Pro AVD at an exact 390 x 844 dp override (1170 x 2532 
 
 Keyboard traversal with TalkBack moved focus through Compose controls and activated controls with Enter. Exercised interactive controls measured at least 144 px on this 480 dpi target, equal to the shared 48 dp minimum. The address/privacy transition was checked directly in the runtime accessibility hierarchy and is recorded in the compact text artifact; screenshots are contextual visual evidence only.
 
-Android connected instrumentation could not reach app assertions on the only installed system image. All seven tests failed inside Espresso 3.7.0 because the API 37.1 preview removed `android.hardware.input.InputManager.getInstance`; the app had already built and installed successfully. This is an environment/runner incompatibility, not an app assertion failure. Stable-image TalkBack instrumentation, dialog focus restoration, polite live-region speech, and post-revocation spoken output remain tracked in #82.
+The API 37.1 limitation from #78 is resolved by the stable-image run below.
+
+### Stable Android TalkBack run
+
+Issue #82 used the `YardScape_API_36` AVD on Android 16/API 36 with TalkBack `16.0.0.738667889`. The emulator used the exact 390 × 844 dp override (1170 × 2532 px at 480 dpi), touch exploration, and disabled system animations. All seven connected instrumentation tests passed with TalkBack enabled.
+
+Manual touch-exploration and double-tap traversal covered Browse map/list, public detail, RSVP, protected reveal, My Finds, Host, Messages, Account, and the RSVP-cancellation dialog. TalkBack announced the visible labels and state descriptions in logical order, including the map sheet state, the explicit **Select on map** action, RSVP privacy copy, the accepted-location state, Directions, and the dialog title/body/actions. The connected suite separately verifies that offline status uses a polite live region. Dismissing **Keep RSVP** returned to the My Finds screen context without a trapped or hidden focus target; the initiating **Cancel RSVP** action remained reachable in the same logical group. [`Focused Browse`](./audit-assets/82-stable-talkback-browse.jpg) and [`dialog return`](./audit-assets/82-stable-talkback-dialog-focus.jpg) are compressed visual context.
+
+The stable run found and fixed two regressions. Map result cards now expose an unambiguous **Select on map** accessibility action. More importantly, revoking an accepted RSVP now invalidates the visible detail state immediately, so the protected address, private instruction, and Directions action disappear without navigating away. Connected coverage proves the rendered revoke transition; common privacy regression coverage continues to prove revoke, cancellation, expiry, and block transitions. The Android test host was also separated from the production activity so repeated TalkBack runs do not retain a live MapLibre surface between tests.
 
 The iPhone 17 Pro Simulator ran iOS 26.5 under Xcode 26.6. The unsigned app built, installed, and launched. Its runtime accessibility hierarchy exposed distinct labels and selected values for Browse/map-list, detail, Host, and all five destinations; the pre-RSVP detail hierarchy contained no protected address. Reduce Motion was enabled through the simulator accessibility preference, the app was relaunched, and Browse plus MapLibre remained available without a crash or blocked interaction. [`Runtime semantics`](./audit-assets/78-runtime-semantics.txt) records the preference and hierarchy results; [`78-ios-reduced-motion.jpg`](./audit-assets/78-ios-reduced-motion.jpg) records the rendered state.
 
@@ -78,7 +86,8 @@ Portable `:app:shared:jsBrowserTest` and `:app:shared:wasmJsBrowserTest` ran hea
 ## Remaining launch gates
 
 - Run the full validation matrix, unsigned Xcode simulator build, `check`, `git diff --check`, and repository secret scan.
-- Run Android TalkBack instrumentation and spoken-output checks on a stable supported image (#82).
 - Exercise VoiceOver on physical iOS hardware (#83).
+- Restore TalkBack focus to the invoking action after marketplace dialogs (#85).
+- Record rendered TalkBack evidence for revoke, cancellation, expiry, and block transitions (#86).
 - Exercise native browser zoom/reflow and finish focus-restoration/live-region checks on supported targets.
 - Update `PLATFORM_VALIDATION.md`, `MAP_DISCOVERY.md`, `MOCK_FLOW_USABILITY_REVIEW.md`, and `ROADMAP.md` with final, fully validated evidence.

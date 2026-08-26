@@ -77,7 +77,8 @@ fun RsvpScreen(
                 .widthIn(max = shopperWorkflowContentMaxWidthFor(maxWidth))
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .padding(horizontal = spacing.large),
+                .padding(horizontal = spacing.large)
+                .testTag(YardScapeTestTags.RsvpScreen),
             verticalArrangement = Arrangement.spacedBy(spacing.medium),
         ) {
             item {

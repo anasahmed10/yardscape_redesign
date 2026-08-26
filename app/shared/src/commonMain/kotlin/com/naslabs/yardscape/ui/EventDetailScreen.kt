@@ -88,7 +88,8 @@ fun PublicEventDetailScreen(
                 .widthIn(max = shopperWorkflowContentMaxWidthFor(maxWidth))
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .padding(horizontal = spacing.large),
+                .padding(horizontal = spacing.large)
+                .testTag(YardScapeTestTags.EventDetailScreen),
             verticalArrangement = Arrangement.spacedBy(spacing.medium),
         ) {
         item {
