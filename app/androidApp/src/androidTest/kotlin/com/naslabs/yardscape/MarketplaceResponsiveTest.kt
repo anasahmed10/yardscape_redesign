@@ -55,6 +55,13 @@ class MarketplaceResponsiveTest {
             .assertIsDisplayed()
             .assertWidthIsEqualTo(390.dp)
         composeRule.onNodeWithTag(YardScapeTestTags.AppShell).assertIsDisplayed()
+        composeRule.onNodeWithText("YardScape").assertIsDisplayed()
+        composeRule.onNodeWithText("Browse sales").assertIsDisplayed()
+        composeRule.onNodeWithText("Host a sale").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithContentDescription("Search sales")
+            .assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithText("All dates").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithText("Saved").assertIsDisplayed()
 
         YardScapePrimaryDestination.entries.forEach { destination ->
             composeRule.onNodeWithTag(YardScapeTestTags.primaryDestination(destination))

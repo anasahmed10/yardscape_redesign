@@ -2,6 +2,7 @@ package com.naslabs.yardscape.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +13,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,36 +29,53 @@ fun YardScapeAppShell(
     onDestinationSelected: (YardScapePrimaryDestination) -> Unit,
     content: @Composable () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag(YardScapeTestTags.AppShell),
-    ) {
-        AppShellHeader(route = route)
-        Box(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentAlignment = Alignment.TopCenter,
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val marketplaceLayout = browseMarketplaceLayoutFor(maxWidth)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag(YardScapeTestTags.AppShell),
         ) {
-            Box(modifier = Modifier.widthIn(max = 1280.dp).fillMaxSize()) {
-                content()
+            if (route != YardScapeRoute.Browse) {
+                AppShellHeader(route = route)
             }
-        }
-        NavigationBar {
-            YardScapePrimaryDestination.entries.forEach { destination ->
-                NavigationBarItem(
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .testTag(YardScapeTestTags.primaryDestination(destination)),
-                    selected = route.primaryDestination == destination,
-                    onClick = { onDestinationSelected(destination) },
-                    icon = {
-                        Icon(
-                            imageVector = navigationIcon(destination),
-                            contentDescription = null,
-                        )
-                    },
-                    label = { Text(destination.label) },
-                )
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Box(modifier = Modifier.widthIn(max = 1280.dp).fillMaxSize()) {
+                    content()
+                }
+            }
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
+            ) {
+                YardScapePrimaryDestination.entries.forEach { destination ->
+                    NavigationBarItem(
+                        modifier = Modifier
+                            .heightIn(min = 56.dp)
+                            .testTag(YardScapeTestTags.primaryDestination(destination)),
+                        selected = route.primaryDestination == destination,
+                        onClick = { onDestinationSelected(destination) },
+                        icon = {
+                            Icon(
+                                imageVector = navigationIcon(destination),
+                                contentDescription = null,
+                            )
+                        },
+                        label = {
+                            Text(marketplaceNavigationLabelFor(destination, marketplaceLayout))
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.onSecondary,
+                            selectedTextColor = MaterialTheme.colorScheme.secondary,
+                            indicatorColor = MaterialTheme.colorScheme.secondary,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    )
+                }
             }
         }
     }

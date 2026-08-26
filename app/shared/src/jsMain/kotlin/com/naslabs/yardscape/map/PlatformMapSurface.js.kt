@@ -193,7 +193,7 @@ private fun mapRenderItemsFor(
                 longitude = marker.area.center.longitude,
                 latitude = marker.area.center.latitude,
                 description = "Open ${marker.title} near ${marker.area.displayLabel}",
-                color = if (marker.eventId == state.selectedEventId) "#D76845" else "#3478A0",
+                color = if (marker.eventId == state.selectedEventId) "#D76845" else "#2F6F4E",
                 label = "",
                 selected = marker.eventId == state.selectedEventId,
                 onClick = { onMarkerSelected(marker.eventId) },

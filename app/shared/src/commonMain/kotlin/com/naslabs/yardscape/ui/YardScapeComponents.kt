@@ -1,6 +1,7 @@
 package com.naslabs.yardscape.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip as MaterialFilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -137,21 +137,43 @@ internal fun FilterChip(
     onClick: () -> Unit,
 ) {
     val presentation = filterControlPresentationFor(selected)
-    MaterialFilterChip(
+    Surface(
         modifier = Modifier
             .yardScapeInteractiveTarget()
             .widthIn(max = 160.dp),
-        selected = presentation.isSelected,
         onClick = onClick,
-        label = {
+        shape = MaterialTheme.shapes.extraLarge,
+        color = if (presentation.isSelected) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        contentColor = if (presentation.isSelected) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (presentation.isSelected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
+            },
+        ),
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
             Text(
                 text = label,
+                style = MaterialTheme.typography.labelMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        },
-        shape = MaterialTheme.shapes.extraSmall,
-    )
+        }
+    }
 }
 
 internal data class FilterControlPresentation(

@@ -1,0 +1,37 @@
+# YardScape Browse Design QA
+
+- Source visual truth: `docs/audit-assets/88-approved-browse-reference.png`
+- Implementation screenshot: `docs/audit-assets/88-android-browse-final.png`
+- Combined comparison: `docs/audit-assets/88-browse-comparison.png`
+- Viewport: Android 390 × 844 dp, light theme, default Browse Map state
+- Source pixels: 852 × 1846; implementation pixels: 1170 × 2532 at 3× density
+- Normalization: implementation scaled to 852 × 1846 for the side-by-side comparison; Android-owned status/navigation chrome is preserved and excluded from fidelity findings
+
+## Full-view comparison evidence
+
+The final composition matches the reference hierarchy: branded header and host action, prominent search and filter controls, one-line date pills, map-first discovery, floating approximate-location disclosure, Map/List switch, rounded results sheet, photographic sale rows, clay save accents, and five compact destinations. Live OpenFreeMap geography replaces the illustrative map while retaining the same map/result proportions and privacy boundary.
+
+The combined full-view image is sufficient for the typography, controls, map overlays, result artwork, and navigation to remain readable at the normalized size; no separate focused crop was required.
+
+## Required fidelity surfaces
+
+- Fonts and typography: serif display treatment is used for the wordmark and sale titles; sans-serif UI copy uses reduced compact sizing without clipping the four date choices.
+- Spacing and layout: compact content spans the safe horizontal viewport, the map and results sheet share the first screen, and the sheet no longer falls below the fold.
+- Colors and tokens: linen, evergreen, white, gray-green, and clay map to the approved visual language. Public map markers now use evergreen.
+- Image quality: existing compressed marketplace photography is used with consistent crops and descriptive alternatives; no placeholder or generated imagery was introduced.
+- Copy and content: Browse, host, search, filters, date options, privacy disclosure, nearby results, and compact Saved navigation use production-facing language.
+- Accessibility and behavior: 48 dp targets, semantic labels, sheet resize actions, live-map attribution, and the list alternative remain intact.
+
+## Comparison history
+
+1. Pass 1 found P1 hierarchy drift: the 620 dp compact map placed the nearby-sales sheet below the visible viewport. The compact map was reduced and the sheet now overlays the map above persistent navigation.
+2. Pass 2 found P2 control and overlay drift: date pills clipped, privacy and mode controls were hidden below the sheet, and public pins used blue. Pills were compacted, the bottom overlays were lifted above the sheet, and markers were changed to evergreen.
+3. Pass 3 found a P2 selected-state defect: the Map label used the selected container color and was unreadable. The selected label now uses `onPrimary`; the final comparison shows the complete segmented control.
+
+## Follow-up polish
+
+- P3: production OpenFreeMap cartography is more saturated and detailed than the illustrative reference map.
+- P3: the live seeded photos and event copy differ from the fictional reference listings.
+- P3: the collapsed sheet intentionally previews one result at 390 × 844; users can expand it with the existing drag and accessibility actions.
+
+final result: passed

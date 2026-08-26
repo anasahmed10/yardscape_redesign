@@ -102,7 +102,7 @@ actual fun PlatformMapSurface(
                     widthPx,
                     heightPx,
                 ),
-                color = if (marker.eventId == state.selectedEventId) Color(0xFFD76845) else Color(0xFF3478A0),
+                color = if (marker.eventId == state.selectedEventId) Color(0xFFD76845) else Color(0xFF2F6F4E),
                 description = "Open ${marker.title} near ${marker.area.displayLabel}",
                 onClick = { onMarkerSelected(marker.eventId) },
             )

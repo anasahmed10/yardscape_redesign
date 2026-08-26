@@ -41,7 +41,7 @@ private fun materialNavigationIcon(name: String, pathBuilder: PathBuilder.() -> 
         path(fill = SolidColor(Color.Black), pathBuilder = pathBuilder)
     }.build()
 
-private val SearchIcon = materialNavigationIcon("Search") {
+internal val SearchIcon = materialNavigationIcon("Search") {
     moveTo(15.5f, 14.0f)
     horizontalLineToRelative(-0.79f)
     lineToRelative(-0.28f, -0.27f)
@@ -64,7 +64,7 @@ private val SearchIcon = materialNavigationIcon("Search") {
     close()
 }
 
-private val FavoriteBorderIcon = materialNavigationIcon("FavoriteBorder") {
+internal val FavoriteBorderIcon = materialNavigationIcon("FavoriteBorder") {
     moveTo(16.5f, 3.0f)
     curveToRelative(-1.74f, 0.0f, -3.41f, 0.81f, -4.5f, 2.09f)
     curveTo(10.91f, 3.81f, 9.24f, 3.0f, 7.5f, 3.0f)
