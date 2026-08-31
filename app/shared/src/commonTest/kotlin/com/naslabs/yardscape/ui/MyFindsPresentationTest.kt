@@ -9,6 +9,31 @@ import kotlin.test.assertTrue
 
 class MyFindsPresentationTest {
     @Test
+    fun editorialWorkspaceCapsExpandedContentAtTheSharedReadingWidth() {
+        assertEquals(960.dp, myFindsWorkspaceContentWidthFor(1_440.dp))
+    }
+
+    @Test
+    fun editorialPresentationKeepsPrimaryDestinationsHeaderOnlyAndNestedRoutesBackNavigable() {
+        assertFalse(marketplaceEditorialHeaderFor(YardScapeRoute.MyFinds()).showsBackNavigation)
+        assertEquals("My Finds", marketplaceEditorialHeaderFor(YardScapeRoute.MyFinds()).title)
+        assertFalse(
+            marketplaceEditorialHeaderFor(YardScapeRoute.MyFinds(MyFindsSection.Rsvps)).showsBackNavigation,
+        )
+
+        val nested = marketplaceEditorialHeaderFor(YardScapeRoute.EventDetail("event-1"))
+        assertTrue(nested.showsBackNavigation)
+        assertEquals("Event details", nested.title)
+    }
+
+    @Test
+    fun editorialSegmentPresentationPreservesSelectedStateAndMinimumTarget() {
+        assertTrue(marketplaceSegmentPresentationFor(selected = true).isSelected)
+        assertFalse(marketplaceSegmentPresentationFor(selected = false).isSelected)
+        assertEquals(48.dp, marketplaceSegmentPresentationFor(selected = true).minimumHeight)
+    }
+
+    @Test
     fun savedEmptyStateOffersBrowseExitAndMarksSavedSegmentSelected() {
         val presentation = MyFindsState(
             section = MyFindsSection.Saved,
@@ -119,7 +144,7 @@ class MyFindsPresentationTest {
         assertEquals(MyFindsWorkspaceLayout.Compact, myFindsWorkspaceLayoutFor(390))
         assertEquals(MyFindsWorkspaceLayout.Expanded, myFindsWorkspaceLayoutFor(1440))
         assertEquals(390.dp, myFindsWorkspaceContentWidthFor(390.dp))
-        assertEquals(1120.dp, myFindsWorkspaceContentWidthFor(1440.dp))
+        assertEquals(960.dp, myFindsWorkspaceContentWidthFor(1440.dp))
     }
 
     @Test

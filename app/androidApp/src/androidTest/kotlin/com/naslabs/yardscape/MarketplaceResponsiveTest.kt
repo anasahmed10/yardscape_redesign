@@ -4,6 +4,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -130,6 +131,42 @@ class MarketplaceResponsiveTest {
 
         composeRule.runOnIdle { appState.navigateTo(YardScapePrimaryDestination.Browse) }
         composeRule.onNodeWithTag(YardScapeTestTags.BrowseScreen).assertIsDisplayed()
+    }
+
+    @Test
+    fun compactNonBrowseShellUsesEditorialHeaderAndSemanticSavedSelection() {
+        val appState = YardScapeAppState().apply {
+            navigateTo(YardScapePrimaryDestination.MyFinds)
+        }
+        composeRule.setContent {
+            Layout(
+                content = { App(appState) },
+                modifier = Modifier.testTag(COMPACT_HARNESS_TAG),
+            ) { measurables, constraints ->
+                val compactWidth = 390.dp.roundToPx()
+                val placeable = measurables.single().measure(
+                    constraints.copy(minWidth = compactWidth, maxWidth = compactWidth),
+                )
+                layout(compactWidth, placeable.height) {
+                    placeable.placeRelative(0, 0)
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("editorial-header").assertIsDisplayed()
+        composeRule.onAllNodesWithText("My Finds").assertCountEquals(1)
+        composeRule.onNodeWithTag("editorial-segment-saved")
+            .assertIsDisplayed()
+            .assertHeightIsAtLeast(48.dp)
+            .assertIsSelected()
+        composeRule.onNodeWithTag("editorial-segment-rsvps")
+            .assertHeightIsAtLeast(48.dp)
+            .assertIsNotSelected()
+
+        composeRule.runOnIdle { appState.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID) }
+        composeRule.onNodeWithTag("editorial-back-navigation")
+            .assertIsDisplayed()
+            .assertHeightIsAtLeast(48.dp)
     }
     private companion object {
         const val COMPACT_HARNESS_TAG = "marketplace-compact-harness"

@@ -1,7 +1,6 @@
 package com.naslabs.yardscape.ui
 
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 
 enum class MyFindsSection {
     Saved,
@@ -16,10 +15,8 @@ internal enum class MyFindsWorkspaceLayout {
 internal fun myFindsWorkspaceLayoutFor(widthDp: Int): MyFindsWorkspaceLayout =
     if (widthDp >= 760) MyFindsWorkspaceLayout.Expanded else MyFindsWorkspaceLayout.Compact
 
-internal val MyFindsWorkspaceMaxWidth: Dp = 1120.dp
-
 internal fun myFindsWorkspaceContentWidthFor(availableWidth: Dp): Dp =
-    availableWidth.coerceAtMost(MyFindsWorkspaceMaxWidth)
+    marketplaceEditorialContentWidthFor(availableWidth)
 
 internal data class MyFindsSegmentPresentation(
     val section: MyFindsSection,

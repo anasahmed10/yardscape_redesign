@@ -1,6 +1,5 @@
 package com.naslabs.yardscape.ui
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -14,36 +13,46 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.naslabs.yardscape.YardScapeConfig
 
 @Composable
-fun YardScapeAppShell(
+internal fun YardScapeAppShell(
     route: YardScapeRoute,
     onDestinationSelected: (YardScapePrimaryDestination) -> Unit,
+    onBack: () -> Unit,
     content: @Composable () -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val marketplaceLayout = browseMarketplaceLayoutFor(maxWidth)
+        val editorialLayout = marketplaceEditorialLayoutFor(maxWidth)
+        val contentWidth = when (route) {
+            YardScapeRoute.Browse -> 1280.dp
+            else -> when (editorialLayout) {
+                MarketplaceEditorialLayout.Compact -> maxWidth
+                MarketplaceEditorialLayout.Expanded -> marketplaceEditorialContentWidthFor(maxWidth)
+            }
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .testTag(YardScapeTestTags.AppShell),
         ) {
             if (route != YardScapeRoute.Browse) {
-                AppShellHeader(route = route)
+                MarketplaceEditorialHeader(
+                    presentation = marketplaceEditorialHeaderFor(route),
+                    onBack = onBack,
+                )
             }
             Box(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                Box(modifier = Modifier.widthIn(max = 1280.dp).fillMaxSize()) {
+                Box(modifier = Modifier.widthIn(max = contentWidth).fillMaxSize()) {
                     content()
                 }
             }
@@ -77,32 +86,6 @@ fun YardScapeAppShell(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun AppShellHeader(route: YardScapeRoute) {
-    val spacing = YardScapeDesign.spacing
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 1.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = spacing.large, vertical = spacing.small),
-            verticalArrangement = Arrangement.spacedBy(spacing.extraSmall),
-        ) {
-            Text(
-                text = YardScapeConfig.appName,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                text = route.destinationLabel,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

@@ -67,6 +67,7 @@ fun App(appState: YardScapeAppState) {
             YardScapeAppShell(
                 route = appState.route,
                 onDestinationSelected = appState::navigateTo,
+                onBack = { appState.navigateBack() },
             ) {
                 when (val currentRoute = appState.route) {
                     YardScapeRoute.Browse -> BrowseScreen(
