@@ -25,6 +25,7 @@ class LocationRevealPresentationTest {
         val presentation = LocationRevealState.Revealed(protectedAddress)
             .toLocationRevealPresentation()
 
+        assertEquals("Protected location", presentation.statusLabel)
         assertEquals(
             "915 Privacy Lane\nGate B\nBellevue, WA 98004\nUse the side entrance",
             presentation.exactAddressLabel,
@@ -60,8 +61,8 @@ class LocationRevealPresentationTest {
     }
 
     @Test
-    fun shopperWorkflowContentStaysMobileWidthAndCapsExpandedReadingWidth() {
+    fun shopperWorkflowContentStaysMobileWidthAndUsesTheSharedEditorialReadingCap() {
         assertEquals(390.dp, shopperWorkflowContentMaxWidthFor(390.dp))
-        assertEquals(840.dp, shopperWorkflowContentMaxWidthFor(1_440.dp))
+        assertEquals(960.dp, shopperWorkflowContentMaxWidthFor(1_440.dp))
     }
 }

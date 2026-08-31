@@ -97,13 +97,17 @@ class MarketplaceResponsiveTest {
             .assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
         composeRule.onNodeWithTag(YardScapeTestTags.RsvpScreen)
             .performScrollToNode(hasTestTag(YardScapeTestTags.RsvpConfirmAction))
+        composeRule.onAllNodesWithContentDescription("Back to event").assertCountEquals(1)
         composeRule.onNodeWithTag(YardScapeTestTags.RsvpConfirmAction)
-            .assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+            .assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
 
         composeRule.onNodeWithTag(
             YardScapeTestTags.primaryDestination(YardScapePrimaryDestination.MyFinds),
         ).performClick()
         composeRule.onNodeWithText("RSVPs").assertHeightIsAtLeast(48.dp).performClick()
+        composeRule.onNodeWithContentDescription("Table filled with second-hand kitchenware and toys")
+            .performScrollTo()
+            .assertWidthIsEqualTo(126.dp)
         composeRule.onNodeWithContentDescription("Cancel RSVP")
             .performScrollTo()
             .assertHeightIsAtLeast(48.dp)

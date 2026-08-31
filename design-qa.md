@@ -37,6 +37,18 @@ The combined full-view image is sufficient for the typography, controls, map ove
 
 final result: passed
 
+## Shopper editorial refresh
+
+- Source visual truth: `docs/audit-assets/88-approved-browse-reference.png`
+- Compact captures: `91-android-detail-editorial.png`, `91-android-rsvp-protected.png`, `91-android-reveal-protected.png`, `91-android-safety-report.png`, and `91-android-my-finds-rsvps.png`
+- Viewport: Android 390 × 844 dp, light theme, captured through the Android Compose workflow smoke harness at 3× density.
+
+Visual inspection found no P0-P2 issue. Detail now keeps photography, public status, title, and concise supporting copy together in the first card. RSVP uses a focused mint card and separate privacy surface; the authorized reveal is visually distinct and the seeded exact address appears only there. Safety uses calm white form groups with neutral reason choices, while destructive actions remain deferred to their dedicated hierarchy. My Finds now uses the approved compact Browse-like row: a fixed photo with concise metadata on the right, followed by one full-width protected or approximate access label and a compact, scroll-reachable action flow without exposing the address.
+
+Privacy and accessibility review: public Detail and My Finds surfaces show public/approximate language only. The address and directions action are still absent before acceptance and after revocation, as exercised by the focused Android smoke test. Shared target helpers and editorial segments retain 48 dp targets, and new success/closed-access state panels use polite live-region semantics.
+
+final result: passed
+
 ## Shared editorial foundations
 
 - Source visual truth: `docs/audit-assets/88-approved-browse-reference.png`

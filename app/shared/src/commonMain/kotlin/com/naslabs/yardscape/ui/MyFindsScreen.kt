@@ -16,10 +16,11 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -197,6 +197,7 @@ private fun MyFindsSavedEventRow(
     statusLabel = event.statusLabel,
     description = event.description,
     photoReference = event.photoReference,
+    locationAccessLabel = "Public preview",
     layout = layout,
 ) {
     MyFindsActionButton(ShopperRsvpAction.OpenEvent, primary = true, onClick = onEventSelected)
@@ -218,16 +219,32 @@ private fun MyFindsRsvpRow(
     dateLabel = item.dateLabel,
     locationLabel = item.approximateLocationLabel,
     statusLabel = item.state.label,
-    description = item.supportingCopy,
+    description = if (layout == MyFindsWorkspaceLayout.Compact && ShopperRsvpAction.Directions in item.visibleActions) {
+        ""
+    } else {
+        item.supportingCopy
+    },
     photoReference = item.photoReference,
+    locationAccessLabel = if (ShopperRsvpAction.Directions in item.visibleActions) {
+        if (layout == MyFindsWorkspaceLayout.Compact) "Protected access" else "Protected location active"
+    } else {
+        if (layout == MyFindsWorkspaceLayout.Compact) "Approximate area" else "Approximate area only"
+    },
     layout = layout,
 ) {
-    if (ShopperRsvpAction.Directions in item.visibleActions) {
-        PrivacyNote("Protected location is available for this active accepted RSVP.")
+    if (layout == MyFindsWorkspaceLayout.Expanded && ShopperRsvpAction.Directions in item.visibleActions) {
+        PrivacyNote(
+            "Protected location is available for this active accepted RSVP.",
+            modifier = Modifier.yardScapeStatusAnnouncement(YardScapeStatusMessageKind.Success),
+        )
     }
     item.visibleActions.forEach { action ->
         when (action) {
-            ShopperRsvpAction.OpenEvent -> MyFindsActionButton(action, primary = true, onClick = onEventSelected)
+            ShopperRsvpAction.OpenEvent -> MyFindsActionButton(
+                action,
+                primary = ShopperRsvpAction.Directions !in item.visibleActions,
+                onClick = onEventSelected,
+            )
             ShopperRsvpAction.Directions -> MyFindsActionButton(action, primary = true, onClick = onDirections)
             ShopperRsvpAction.AddReminder -> MyFindsActionButton(
                 action,
@@ -253,10 +270,18 @@ private fun MyFindsEventRow(
     statusLabel: String,
     description: String,
     photoReference: String?,
+    locationAccessLabel: String,
     layout: MyFindsWorkspaceLayout,
     actions: @Composable () -> Unit,
 ) {
-    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(YardScapeTestTags.myFindsEventCard(eventId)),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
         if (layout == MyFindsWorkspaceLayout.Expanded) {
             Row(
                 modifier = Modifier.padding(vertical = YardScapeDesign.spacing.medium),
@@ -268,19 +293,107 @@ private fun MyFindsEventRow(
                     modifier = Modifier.weight(0.8f),
                     height = 196.dp,
                 )
-                MyFindsEventDetails(title, dateLabel, locationLabel, statusLabel, description, actions, Modifier.weight(1.2f))
+                MyFindsEventDetails(
+                    title,
+                    dateLabel,
+                    locationLabel,
+                    statusLabel,
+                    locationAccessLabel,
+                    description,
+                    actions,
+                    modifier = Modifier.weight(1.2f),
+                )
             }
         } else {
             Column(
-                modifier = Modifier.padding(vertical = YardScapeDesign.spacing.medium),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(YardScapeDesign.spacing.small),
                 verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
             ) {
-                ShopperEventArtwork(ShopperEventArtworkPresentation(eventId, photoReference), height = 184.dp)
-                MyFindsEventDetails(title, dateLabel, locationLabel, statusLabel, description, actions)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    ShopperEventArtwork(
+                        presentation = ShopperEventArtworkPresentation(eventId, photoReference),
+                        modifier = Modifier.width(126.dp),
+                        height = 106.dp,
+                    )
+                    MyFindsCompactEventSummary(
+                        title = title,
+                        dateLabel = dateLabel,
+                        locationLabel = locationLabel,
+                        statusLabel = statusLabel,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                MyFindsCompactEventAccessAndActions(
+                    locationAccessLabel = locationAccessLabel,
+                    description = description,
+                    actions = actions,
+                )
             }
         }
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+@Composable
+private fun MyFindsCompactEventSummary(
+    title: String,
+    dateLabel: String,
+    locationLabel: String,
+    statusLabel: String,
+    modifier: Modifier = Modifier,
+) {
+    val itemSpacing = 4.dp
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(itemSpacing)) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+            verticalArrangement = Arrangement.spacedBy(itemSpacing),
+        ) {
+            StatusLabel(statusLabel)
+            InfoChip(dateLabel)
+        }
+        Text(
+            locationLabel,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun MyFindsCompactEventAccessAndActions(
+    locationAccessLabel: String,
+    description: String,
+    actions: @Composable () -> Unit,
+) {
+    val itemSpacing = 4.dp
+    Column(verticalArrangement = Arrangement.spacedBy(itemSpacing)) {
+        StatusLabel(locationAccessLabel)
+        if (description.isNotBlank()) {
+            Text(
+                description,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+            verticalArrangement = Arrangement.spacedBy(itemSpacing),
+        ) { actions() }
+    }
 }
 
 @Composable
@@ -289,24 +402,40 @@ private fun MyFindsEventDetails(
     dateLabel: String,
     locationLabel: String,
     statusLabel: String,
+    locationAccessLabel: String,
     description: String,
     actions: @Composable () -> Unit,
+    compact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    val itemSpacing = if (compact) 4.dp else YardScapeDesign.spacing.small
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(itemSpacing)) {
+        Text(
+            title,
+            style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
-            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+            horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+            verticalArrangement = Arrangement.spacedBy(itemSpacing),
         ) {
             StatusLabel(statusLabel)
             InfoChip(dateLabel)
+            InfoChip(locationAccessLabel)
         }
         Text(locationLabel, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (description.isNotBlank()) {
+            Text(
+                description,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = if (compact) 1 else 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
-            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+            horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+            verticalArrangement = Arrangement.spacedBy(itemSpacing),
         ) { actions() }
     }
 }

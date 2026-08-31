@@ -59,13 +59,14 @@ internal fun MarketplaceEditorialHeader(
 @Composable
 internal fun MarketplaceEditorialBackNavigation(
     onBack: () -> Unit,
+    contentDescription: String = "Back to previous screen",
     modifier: Modifier = Modifier,
 ) {
     TextButton(
         modifier = modifier
             .heightIn(min = YardScapeMinimumInteractiveTarget)
             .testTag(YardScapeTestTags.EditorialBackNavigation)
-            .semantics { contentDescription = "Back to previous screen" },
+            .semantics { this.contentDescription = contentDescription },
         onClick = onBack,
     ) {
         Text("Back", fontWeight = FontWeight.SemiBold)

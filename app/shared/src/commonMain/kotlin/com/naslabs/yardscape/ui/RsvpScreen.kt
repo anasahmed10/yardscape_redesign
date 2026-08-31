@@ -12,9 +12,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,35 +81,43 @@ fun RsvpScreen(
             verticalArrangement = Arrangement.spacedBy(spacing.medium),
         ) {
             item {
-                TextButton(
-                    modifier = Modifier
-                        .padding(top = spacing.small)
-                        .heightIn(min = 48.dp)
-                        .semantics { contentDescription = "Back to event" },
-                    onClick = onBack,
-                ) {
-                    Text("Back")
-                }
-            }
-            item {
                 Column(
+                    modifier = Modifier.padding(top = spacing.small),
                     verticalArrangement = Arrangement.spacedBy(spacing.large),
                 ) {
-                    StatusLabel(text = "RSVP")
-                    Text(
-                        text = state.title,
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
+                    MarketplaceEditorialBackNavigation(
+                        onBack = onBack,
+                        contentDescription = "Back to event",
                     )
-                    Text(
-                        text = state.message,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(YardScapeTestTags.RsvpProtectedLocationCard),
+                        shape = MaterialTheme.shapes.large,
+                        color = if (state.canConfirm) MintMist else MaterialTheme.colorScheme.surface,
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(spacing.large),
+                            verticalArrangement = Arrangement.spacedBy(spacing.medium),
+                        ) {
+                            StatusLabel(text = "RSVP")
+                            Text(
+                                text = state.title,
+                                style = MaterialTheme.typography.headlineLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = state.message,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     if (state.canConfirm) {
                         ShopperStatePanel(
                             title = "Protected location",
                             message = "The exact address and directions appear only while your accepted RSVP has active access.",
+                            statusMessageKind = YardScapeStatusMessageKind.ClosedAccess,
                         )
                         Button(
                             modifier = Modifier
@@ -122,15 +129,6 @@ fun RsvpScreen(
                         ) {
                             Text("Confirm RSVP")
                         }
-                    }
-                    OutlinedButton(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .semantics { contentDescription = "Back to event" },
-                        onClick = onBack,
-                    ) {
-                        Text("Back to event")
                     }
                 }
             }

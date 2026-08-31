@@ -97,9 +97,12 @@ internal fun CategoryChip(label: String) {
 }
 
 @Composable
-internal fun StatusLabel(text: String) {
+internal fun StatusLabel(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
     Text(
-        modifier = Modifier
+        modifier = modifier
             .background(
                 color = SunTag,
                 shape = MaterialTheme.shapes.extraSmall,
@@ -201,9 +204,12 @@ internal fun EventPhotoPreview(
 }
 
 @Composable
-internal fun PrivacyNote(text: String) {
+internal fun PrivacyNote(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.primaryContainer,
     ) {

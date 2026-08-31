@@ -51,6 +51,8 @@ class RsvpRevealSmokeTest {
             .performScrollToNode(hasTestTag(familySaleTag))
         composeRule.onNodeWithTag(familySaleTag).performClick()
 
+        composeRule.onNodeWithTag(YardScapeTestTags.EventDetailHero).assertIsDisplayed()
+        composeRule.onNodeWithTag(YardScapeTestTags.EventDetailPublicStatus).assertIsDisplayed()
         composeRule.onNodeWithTag(YardScapeTestTags.EventDetailScreen)
             .performScrollToNode(hasTestTag(YardScapeTestTags.LocationAccessPanel))
         composeRule.onNodeWithTag(YardScapeTestTags.LocationAccessPanel)
@@ -63,6 +65,7 @@ class RsvpRevealSmokeTest {
         composeRule.onNodeWithTag(YardScapeTestTags.EventDetailScreen)
             .performScrollToNode(hasTestTag(YardScapeTestTags.RsvpAction))
         composeRule.onNodeWithTag(YardScapeTestTags.RsvpAction).performClick()
+        composeRule.onNodeWithTag(YardScapeTestTags.RsvpProtectedLocationCard).assertIsDisplayed()
         composeRule.onNodeWithTag(YardScapeTestTags.RsvpConfirmAction)
             .performClick()
 
@@ -71,6 +74,7 @@ class RsvpRevealSmokeTest {
         composeRule.onNodeWithTag(YardScapeTestTags.ExactLocationContent)
             .assertIsDisplayed()
             .assertTextContains("123 Cedar Street", substring = true)
+        composeRule.onNodeWithTag(YardScapeTestTags.ProtectedLocationCard).assertIsDisplayed()
         composeRule.onNodeWithTag(YardScapeTestTags.EventDetailScreen)
             .performScrollToNode(hasTestTag(YardScapeTestTags.DirectionsAction))
         composeRule.onNodeWithTag(YardScapeTestTags.DirectionsAction)
@@ -160,4 +164,5 @@ class RsvpRevealSmokeTest {
         composeRule.onAllNodesWithText("Private draft that must close").assertCountEquals(0)
         composeRule.onNodeWithText("Location access revoked").assertIsDisplayed()
     }
+
 }
