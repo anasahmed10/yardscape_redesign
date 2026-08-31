@@ -18,12 +18,15 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -31,6 +34,22 @@ internal enum class HostMarketplaceLayout { Compact, Expanded }
 
 internal fun hostMarketplaceLayoutFor(width: Dp): HostMarketplaceLayout =
     if (width >= 760.dp) HostMarketplaceLayout.Expanded else HostMarketplaceLayout.Compact
+
+internal enum class HostEditorialSurface { Dashboard, Editor, Attendance }
+
+internal data class HostEditorialSurfacePresentation(
+    val artworkSize: Dp,
+    val actionsInline: Boolean,
+)
+
+internal fun hostEditorialSurfacePresentationFor(
+    surface: HostEditorialSurface,
+    layout: HostMarketplaceLayout,
+): HostEditorialSurfacePresentation =
+    HostEditorialSurfacePresentation(
+        artworkSize = if (surface == HostEditorialSurface.Dashboard) 128.dp else 96.dp,
+        actionsInline = layout == HostMarketplaceLayout.Expanded,
+    )
 
 @Composable
 fun HostDashboardScreen(
@@ -46,6 +65,7 @@ fun HostDashboardScreen(
                 modifier = Modifier
                     .widthIn(max = 1120.dp)
                     .fillMaxWidth()
+                    .testTag(YardScapeTestTags.HostDashboardScreen)
                     .padding(horizontal = YardScapeDesign.spacing.large),
                 verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
             ) {
@@ -54,9 +74,10 @@ fun HostDashboardScreen(
                         modifier = Modifier.padding(top = YardScapeDesign.spacing.large),
                         verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
                     ) {
-                        Text("Your sales", style = MaterialTheme.typography.headlineMedium)
+                        StatusLabel("Host workspace")
+                        Text("Your sales", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Manage event details and attendance. Shopper previews show only the approximate area.",
+                            "Keep every sale polished for shoppers while exact location access stays protected.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Button(
@@ -100,55 +121,67 @@ private fun HostDashboardRow(
     onEditEvent: (String) -> Unit,
     onManageAttendees: (String) -> Unit,
 ) {
+    val presentation = hostEditorialSurfacePresentationFor(HostEditorialSurface.Dashboard, layout)
     val actionModifier = Modifier.heightIn(min = 48.dp)
     val capacity = event.attendeeCap?.let { " of $it" }.orEmpty()
     val rsvpSummary = buildString {
         append("${event.acceptedRsvpCount}$capacity attending")
         if (event.pendingRsvpCount > 0) append(" · ${event.pendingRsvpCount} pending")
     }
-    Column(verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
-            verticalAlignment = Alignment.Top,
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.large,
+        shadowElevation = 1.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(YardScapeDesign.spacing.medium),
+            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
         ) {
-            Box(modifier = Modifier.width(112.dp).height(112.dp)) {
-                ShopperEventArtwork(
-                    presentation = ShopperEventArtworkPresentation(event.id, event.photoReference),
-                    modifier = Modifier.fillMaxSize(),
-                    height = 112.dp,
-                )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.extraSmall),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
+                verticalAlignment = Alignment.Top,
             ) {
-                Text(event.title, style = MaterialTheme.typography.titleLarge)
-                Text("${event.statusLabel} · ${event.dateLabel}", color = MaterialTheme.colorScheme.primary)
-                Text(event.publicLocationLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(rsvpSummary, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Box(modifier = Modifier.width(presentation.artworkSize).height(presentation.artworkSize)) {
+                    ShopperEventArtwork(
+                        presentation = ShopperEventArtworkPresentation(event.id, event.photoReference),
+                        modifier = Modifier.fillMaxSize(),
+                        height = presentation.artworkSize,
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.extraSmall),
+                ) {
+                    StatusLabel(event.statusLabel)
+                    Text(event.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text(event.dateLabel, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                    Text(event.publicLocationLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(rsvpSummary, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-        }
-        if (layout == HostMarketplaceLayout.Expanded) {
-            Row(horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
+            if (presentation.actionsInline) {
+                Row(horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
+                    OutlinedButton(
+                        modifier = actionModifier.weight(1f).semantics { contentDescription = "Edit ${event.title}" },
+                        onClick = { onEditEvent(event.id) },
+                    ) { Text("Edit sale") }
+                    Button(
+                        modifier = actionModifier.weight(1f).semantics { contentDescription = "Manage attendees for ${event.title}" },
+                        onClick = { onManageAttendees(event.id) },
+                    ) { Text("Manage attendees") }
+                }
+            } else {
                 OutlinedButton(
-                    modifier = actionModifier.weight(1f).semantics { contentDescription = "Edit ${event.title}" },
+                    modifier = actionModifier.fillMaxWidth().semantics { contentDescription = "Edit ${event.title}" },
                     onClick = { onEditEvent(event.id) },
                 ) { Text("Edit sale") }
                 Button(
-                    modifier = actionModifier.weight(1f).semantics { contentDescription = "Manage attendees for ${event.title}" },
+                    modifier = actionModifier.fillMaxWidth().semantics { contentDescription = "Manage attendees for ${event.title}" },
                     onClick = { onManageAttendees(event.id) },
                 ) { Text("Manage attendees") }
             }
-        } else {
-            OutlinedButton(
-                modifier = actionModifier.fillMaxWidth().semantics { contentDescription = "Edit ${event.title}" },
-                onClick = { onEditEvent(event.id) },
-            ) { Text("Edit sale") }
-            Button(
-                modifier = actionModifier.fillMaxWidth().semantics { contentDescription = "Manage attendees for ${event.title}" },
-                onClick = { onManageAttendees(event.id) },
-            ) { Text("Manage attendees") }
         }
     }
 }

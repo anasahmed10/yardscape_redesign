@@ -44,3 +44,9 @@ Event Detail, RSVP, safety, and My Finds extend the Browse language through shar
 RSVP confirmation uses a warm focused card, a separate privacy explanation, and one prominent confirmation action. Closed, revoked, expired, cancelled, capacity, and failure states retain the same grouped state-panel treatment with a polite semantic announcement. Safety screens use a calm header/form grouping; destructive block actions are error-colored only at the irreversible confirmation/action level, while report choices and exits remain neutral.
 
 My Finds retains the photo-first event card grammar from Browse. Saved cards carry a **Public preview** status; RSVP cards say either **Protected location active** or **Approximate area only** without rendering an address. Directions remains an action only for active accepted access. Nested shopper workflows use screen-specific back descriptions (for example, “Back to Browse” and “Back to event”) and all interactive controls retain the shared 48 dp minimum target.
+
+## Host editorial workflows
+
+Host is a calm, photo-led workspace rather than a utility table. The dashboard pairs each local sale image with a concise status, public-area label, RSVP progress, and clearly separated edit and attendee actions. On compact screens those actions stack; expanded workspaces place them in one row without widening readable content indefinitely.
+
+The seven-step editor keeps one screen-owned Back affordance, visible progress, white grouped form surfaces, and a compact continuation surface. The public preview is explicitly labeled and uses the same photography and approximate-only metadata shoppers receive; it must never include a private street address or access instructions. Attendance uses carded attendee rows, readable state labels, and confirmation-gated mutations. Destructive or access-changing actions remain semantically clear and retain the 48 dp minimum target.

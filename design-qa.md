@@ -37,6 +37,20 @@ The combined full-view image is sufficient for the typography, controls, map ove
 
 final result: passed
 
+## Host editorial refresh
+
+- Source visual language: `docs/audit-assets/88-approved-browse-reference.png`
+- Compact captures: `docs/audit-assets/92-android-host-dashboard.png`, `docs/audit-assets/92-android-host-editor.png`, and `docs/audit-assets/92-android-host-attendees.png`
+- Viewport: Android compact runtime at 1280 × 2856 px (480 dpi; approximately 427 × 952 dp), light theme.
+
+The Host workspace translates—not copies—the approved Browse marketplace language. The dashboard now leads with a clear editorial section, warm photo-first sale cards, evergreen actions, clay selected navigation, and deliberately separated host controls. The editor has a single screen-owned Back affordance, readable seven-step progress, a white form group, and a compact action surface. Attendance maintains the same soft grouped surface, clear status labels, capacity warning, and strongly separated attendee controls.
+
+Visual QA found no P0–P2 issues in hierarchy, clipping, action affordance, or the compact navigation overlap. The public dashboard and preview path continue to use approximate place labels only; the editor keeps protected address/instruction fields inside its private-location step, and attendance never exposes an address. Existing shared host presentation tests cover public-preview redaction and artwork fallback. The new runtime accessibility assertion covers the dashboard Create action and nested editor Back target; emulator instrumentation is separately blocked by Android 17's test-runtime `InputManager.getInstance` incompatibility before tests can execute.
+
+Follow-up P3: a fully completed preview-state capture should be refreshed using a deterministic host-editor fixture when the Android instrumentation environment is upgraded; the production preview UI and its redaction logic are covered by the existing common tests.
+
+final result: passed
+
 ## Shopper editorial refresh
 
 - Source visual truth: `docs/audit-assets/88-approved-browse-reference.png`

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -136,6 +137,23 @@ class MarketplaceAccessibilityTest {
         }
 
         composeRule.onNodeWithText("Back").assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun hostWorkflowKeepsEditorialSurfacesAndNestedNavigationAtSharedTargetSize() {
+        composeRule.setContent { App(YardScapeAppState()) }
+
+        composeRule.onNodeWithTag(YardScapeTestTags.primaryDestination(YardScapePrimaryDestination.Host))
+            .performClick()
+        composeRule.onNodeWithTag(YardScapeTestTags.HostDashboardScreen)
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Create a sale")
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+        composeRule.onNodeWithTag(YardScapeTestTags.HostEditorScreen)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(YardScapeTestTags.EditorialBackNavigation)
+            .assertHeightIsAtLeast(48.dp)
     }
 
     private fun hasCustomAction(label: String): SemanticsMatcher =

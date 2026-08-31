@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -45,11 +46,13 @@ fun HostAttendanceScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val layout = hostMarketplaceLayoutFor(maxWidth)
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
                 modifier = Modifier
                     .widthIn(max = 960.dp)
                     .fillMaxWidth()
+                    .testTag(YardScapeTestTags.HostAttendanceScreen)
                     .padding(horizontal = YardScapeDesign.spacing.large),
                 verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
             ) {
@@ -69,6 +72,7 @@ fun HostAttendanceScreen(
                                 eventId = state.eventId,
                                 attendee = attendee,
                                 atCapacity = state.isAtCapacity,
+                                layout = layout,
                                 onRequestAction = onRequestAction,
                                 onMessageAttendee = {
                                     coroutineScope.launch { onMessageAttendee(state.eventId, attendee.shopperId) }
@@ -100,11 +104,15 @@ fun HostAttendanceScreen(
 
 @Composable
 private fun HostAttendanceHeader(state: HostAttendanceState?, onBack: () -> Unit) {
+    val presentation = hostEditorialSurfacePresentationFor(HostEditorialSurface.Attendance, HostMarketplaceLayout.Compact)
     Column(
         modifier = Modifier.padding(top = YardScapeDesign.spacing.large),
         verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
     ) {
-        TextButton(onClick = onBack) { Text("Back to Host") }
+        MarketplaceEditorialBackNavigation(
+            onBack = onBack,
+            contentDescription = "Back to Host",
+        )
         state?.let { attendance ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -113,11 +121,12 @@ private fun HostAttendanceHeader(state: HostAttendanceState?, onBack: () -> Unit
             ) {
                 ShopperEventArtwork(
                     presentation = ShopperEventArtworkPresentation(attendance.eventId, attendance.eventPhoto?.url),
-                    modifier = Modifier.width(88.dp).height(88.dp),
-                    height = 88.dp,
+                    modifier = Modifier.width(presentation.artworkSize).height(presentation.artworkSize),
+                    height = presentation.artworkSize,
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.extraSmall)) {
-                    Text("Manage attendees", style = MaterialTheme.typography.headlineMedium)
+                    StatusLabel("Host attendance")
+                    Text("Manage attendees", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
                     Text(attendance.eventTitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         "Exact location stays protected until RSVP access is active.",
@@ -170,21 +179,30 @@ private fun HostAttendeeRow(
     eventId: String,
     attendee: HostAttendeeItem,
     atCapacity: Boolean,
+    layout: HostMarketplaceLayout,
     onRequestAction: (eventId: String, shopperId: String, action: HostAttendeeAction) -> Boolean,
     onMessageAttendee: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = YardScapeDesign.spacing.medium),
-        verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+    val inlineActions = hostEditorialSurfacePresentationFor(HostEditorialSurface.Attendance, layout).actionsInline
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 1.dp,
     ) {
-        Text(attendee.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Text(attendee.state.label, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-        Text(attendee.exactAccessLabel, style = MaterialTheme.typography.bodyMedium)
-        Text(attendee.state.guidance, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
+        Column(
+            modifier = Modifier.padding(YardScapeDesign.spacing.medium),
+            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+        ) {
+            Text(attendee.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            StatusLabel(attendee.state.label)
+            Text(attendee.exactAccessLabel, style = MaterialTheme.typography.bodyMedium)
+            Text(attendee.state.guidance, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            val actionModifier = if (inlineActions) Modifier.heightIn(min = 48.dp) else Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
             attendee.availableActions.forEach { action ->
                 OutlinedButton(
-                    modifier = Modifier.heightIn(min = 48.dp),
+                    modifier = actionModifier,
                     enabled = action != HostAttendeeAction.Accept || !atCapacity,
                     onClick = { onRequestAction(eventId, attendee.shopperId, action) },
                 ) { Text(action.label) }
@@ -192,10 +210,11 @@ private fun HostAttendeeRow(
             if (attendee.canMessageAttendee) {
                 Button(
                     modifier = Modifier
-                        .heightIn(min = 48.dp)
+                        .then(actionModifier)
                         .semantics { contentDescription = "Message ${attendee.displayName}" },
                     onClick = onMessageAttendee,
                 ) { Text("Message attendee") }
+            }
             }
         }
     }
