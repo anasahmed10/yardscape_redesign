@@ -11,7 +11,7 @@ YardScape uses one Material 3 theme from shared Compose. Android, iOS, JS, and W
 | Spacing | `YardScapeDesign.spacing` exposes 4, 8, 12, 16, 24, and 32 dp steps. Use 16 dp for normal screen/card padding, 12 dp for section gaps, and 8 dp for compact groups. |
 | Shape | Extra-small 6 dp shapes are chips; small 8 dp shapes are cards and controls; 12, 16, and 24 dp shapes are reserved for progressively larger surfaces. |
 
-Non-Browse destinations use the shared editorial shell: a linen wordmark header, contextual route label, five-destination navigation, and a 960 dp reading-width cap on expanded layouts. Nested routes receive the same header with a semantic 48 dp back action. Browse intentionally retains its map-led header and full-width discovery composition.
+Non-Browse destinations use the shared editorial shell: one linen-surface serif route title, five-destination navigation, and a 960 dp reading-width cap on expanded layouts. Nested routes receive the same title with a semantic 48 dp back action. The YardScape wordmark belongs only to Browse's map-led header and full-width discovery composition.
 
 `SunTag` and the seeded photo-preview colors are extended decorative tokens. They should not be used for body text, protected-location policy, errors, or primary actions.
 

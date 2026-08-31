@@ -42,9 +42,9 @@ final result: passed
 - Source visual truth: `docs/audit-assets/88-approved-browse-reference.png`
 - Implementation capture: `docs/audit-assets/90-android-my-finds-editorial.png`
 - Representative surface: compact **My Finds** at 390 × 844 dp, light theme; implementation pixels are 1170 × 2532 at 3× density.
-- Shared implementation: linen editorial header, serif YardScape wordmark, contextual route label, evergreen selected segment, white unselected segment, clay selected navigation accent, 48 dp interaction targets, and a 960 dp expanded reading-width cap.
+- Shared implementation: one linen editorial serif route title, evergreen selected segment, white unselected segment, clay selected navigation accent, 48 dp interaction targets, and a 960 dp expanded reading-width cap. The YardScape wordmark is intentionally limited to Browse.
 - Privacy check: this foundation handles route chrome and selection only; it receives neither event addresses nor precise coordinates. Existing public/protected location surfaces remain unchanged.
 - Accessibility check: primary navigation retains labels and selected semantics; My Finds segments now use semantic selected state with 48 dp minimum targets; nested routes have a named semantic back action.
-- Comparison result: the compact route extends the approved Browse language without copying its map-specific controls. The duplicate page title found during device QA was removed, leaving one editorial My Finds heading and a clear Saved/RSVPs hierarchy. No P0-P2 visual, privacy, or accessibility issue remains in the captured surface.
+- Comparison result: the compact route extends the approved Browse language without copying its map-specific controls. The redundant app wordmark was removed from the non-Browse shell, leaving one editorial My Finds heading and a clear Saved/RSVPs hierarchy. No P0-P2 visual, privacy, or accessibility issue remains in the refreshed capture.
 
 final result: passed

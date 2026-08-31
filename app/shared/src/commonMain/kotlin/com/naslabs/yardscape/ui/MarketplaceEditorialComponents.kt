@@ -22,7 +22,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.naslabs.yardscape.YardScapeConfig
 
 @Composable
 internal fun MarketplaceEditorialHeader(
@@ -47,26 +46,14 @@ internal fun MarketplaceEditorialHeader(
             if (presentation.showsBackNavigation && onBack != null) {
                 MarketplaceEditorialBackNavigation(onBack = onBack)
             }
-            Box(modifier = Modifier.weight(1f)) {
-                androidx.compose.foundation.layout.Column(
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text(
-                        text = YardScapeConfig.appName,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = presentation.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
+            Text(
+                modifier = Modifier.weight(1f),
+                text = presentation.title,
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

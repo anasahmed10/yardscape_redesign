@@ -154,6 +154,7 @@ class MarketplaceResponsiveTest {
         }
 
         composeRule.onNodeWithTag("editorial-header").assertIsDisplayed()
+        composeRule.onAllNodesWithText("YardScape").assertCountEquals(0)
         composeRule.onAllNodesWithText("My Finds").assertCountEquals(1)
         composeRule.onNodeWithTag("editorial-segment-saved")
             .assertIsDisplayed()
