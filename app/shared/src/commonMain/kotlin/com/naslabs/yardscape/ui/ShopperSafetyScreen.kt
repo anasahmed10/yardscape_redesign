@@ -1,11 +1,14 @@
 package com.naslabs.yardscape.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -18,6 +21,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -41,13 +45,17 @@ fun ShopperSafetyScreen(
         return
     }
     val spacing = YardScapeDesign.spacing
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag(YardScapeTestTags.ShopperSafetyScreen)
-            .padding(horizontal = spacing.large),
-        verticalArrangement = Arrangement.spacedBy(spacing.medium),
-    ) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .widthIn(max = shopperWorkflowContentMaxWidthFor(maxWidth))
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .testTag(YardScapeTestTags.ShopperSafetyScreen)
+                .padding(horizontal = spacing.large),
+            verticalArrangement = Arrangement.spacedBy(spacing.medium),
+        ) {
         item {
             Column(
                 modifier = Modifier.padding(top = spacing.large),
@@ -92,6 +100,7 @@ fun ShopperSafetyScreen(
                     "Do not include an exact address, access instructions, private contact details, or payment information in a report.",
                 )
             }
+        }
         }
     }
 

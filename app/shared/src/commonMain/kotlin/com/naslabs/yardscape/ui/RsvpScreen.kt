@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -130,15 +129,6 @@ fun RsvpScreen(
                         ) {
                             Text("Confirm RSVP")
                         }
-                    }
-                    OutlinedButton(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .semantics { contentDescription = "Back to event" },
-                        onClick = onBack,
-                    ) {
-                        Text("Back to event")
                     }
                 }
             }

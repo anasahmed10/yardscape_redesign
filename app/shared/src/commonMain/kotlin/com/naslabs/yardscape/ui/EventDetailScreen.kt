@@ -99,7 +99,7 @@ fun PublicEventDetailScreen(
             ) {
                 MarketplaceEditorialBackNavigation(
                     onBack = onBack,
-                    contentDescription = "Back to Browse",
+                    contentDescription = "Back to previous screen",
                 )
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
