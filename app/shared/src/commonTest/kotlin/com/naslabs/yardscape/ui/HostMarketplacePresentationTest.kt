@@ -11,6 +11,22 @@ import kotlin.test.assertTrue
 
 class HostMarketplacePresentationTest {
     @Test
+    fun hostEditorialSurfacesKeepPhotoLedCompactCardsAndTwoColumnExpandedActions() {
+        val compact = hostEditorialSurfacePresentationFor(
+            HostEditorialSurface.Dashboard,
+            HostMarketplaceLayout.Compact,
+        )
+        val expanded = hostEditorialSurfacePresentationFor(
+            HostEditorialSurface.Dashboard,
+            HostMarketplaceLayout.Expanded,
+        )
+
+        assertEquals(128.dp, compact.artworkSize)
+        assertFalse(compact.actionsInline)
+        assertTrue(expanded.actionsInline)
+    }
+
+    @Test
     fun dashboardItemsExposePublicArtworkAndHostOnlyRsvpProgressWithoutProtectedLocation() {
         val appState = YardScapeAppState()
         val item = appState.hostEventItems().first { it.id == SeededYardSaleData.FAMILY_GARAGE_EVENT_ID }

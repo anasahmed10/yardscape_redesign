@@ -28,6 +28,9 @@ enum class HostAttendeeAction(
     Revoke("Revoke location", "Revoke exact-location access?", "The attendee remains accepted, but the exact location disappears immediately."),
 }
 
+internal val HostAttendeeAction.isDestructive: Boolean
+    get() = this != HostAttendeeAction.Accept
+
 data class PendingHostAttendeeAction(
     val eventId: String,
     val shopperId: String,

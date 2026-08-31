@@ -7,6 +7,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -26,6 +27,11 @@ import com.naslabs.yardscape.ui.YardScapePrimaryDestination
 import com.naslabs.yardscape.ui.YardScapeTestTags
 import com.naslabs.yardscape.ui.YardScapeTheme
 import com.naslabs.yardscape.ui.ShopperSafetyScreen
+import com.naslabs.yardscape.ui.HostAttendanceScreen
+import com.naslabs.yardscape.ui.HostAttendancePolicy
+import com.naslabs.yardscape.ui.HostAttendeeAction
+import com.naslabs.yardscape.ui.HostAttendanceState
+import com.naslabs.yardscape.ui.PendingHostAttendeeAction
 import org.junit.Rule
 import org.junit.Test
 
@@ -136,6 +142,54 @@ class MarketplaceAccessibilityTest {
         }
 
         composeRule.onNodeWithText("Back").assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun hostWorkflowKeepsEditorialSurfacesAndNestedNavigationAtSharedTargetSize() {
+        composeRule.setContent { App(YardScapeAppState()) }
+
+        composeRule.onNodeWithTag(YardScapeTestTags.primaryDestination(YardScapePrimaryDestination.Host))
+            .performClick()
+        composeRule.onNodeWithTag(YardScapeTestTags.HostDashboardScreen)
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Create a sale")
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+        composeRule.onNodeWithTag(YardScapeTestTags.HostEditorScreen)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(YardScapeTestTags.EditorialBackNavigation)
+            .assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun attendanceConfirmationKeepsBothChoicesAtTheSharedMinimumTarget() {
+        composeRule.setContent {
+            YardScapeTheme {
+                HostAttendanceScreen(
+                    state = HostAttendanceState(
+                        eventId = "event",
+                        eventTitle = "Test sale",
+                        eventPhoto = null,
+                        policy = HostAttendancePolicy(),
+                        attendees = emptyList(),
+                    ),
+                    pendingAction = PendingHostAttendeeAction(
+                        eventId = "event",
+                        shopperId = "shopper",
+                        attendeeName = "Test shopper",
+                        action = HostAttendeeAction.Revoke,
+                    ),
+                    onBack = {},
+                    onRequestAction = { _, _, _ -> true },
+                    onMessageAttendee = { _, _ -> true },
+                    onDismissAction = {},
+                    onConfirmAction = { true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Revoke location").assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithText("Go back").assertHeightIsAtLeast(48.dp)
     }
 
     private fun hasCustomAction(label: String): SemanticsMatcher =

@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +69,7 @@ fun HostCreateEditScreen(
                 modifier = Modifier
                     .widthIn(max = 1120.dp)
                     .fillMaxWidth()
+                    .testTag(YardScapeTestTags.HostEditorScreen)
                     .padding(horizontal = spacing.large),
                 verticalArrangement = Arrangement.spacedBy(spacing.medium),
             ) {
@@ -76,10 +78,10 @@ fun HostCreateEditScreen(
                         modifier = Modifier.padding(top = spacing.large),
                         verticalArrangement = Arrangement.spacedBy(spacing.small),
                     ) {
-                        TextButton(
-                            modifier = Modifier.yardScapeInteractiveTarget(),
-                            onClick = onBack,
-                        ) { Text("Back to your sales") }
+                        MarketplaceEditorialBackNavigation(
+                            onBack = onBack,
+                            contentDescription = "Back to your sales",
+                        )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -89,6 +91,7 @@ fun HostCreateEditScreen(
                                 Text(
                                     text = if (editorState.savedEventId == null) "Create a sale" else "Edit sale",
                                     style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
                                 Text(
@@ -130,6 +133,14 @@ fun HostCreateEditScreen(
             confirmButton = {
                 Button(
                     modifier = Modifier.yardScapeInteractiveTarget(),
+                    colors = if (action.isDestructive) {
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError,
+                        )
+                    } else {
+                        ButtonDefaults.buttonColors()
+                    },
                     onClick = {
                         when (action) {
                             HostConfirmationAction.Publish -> onPublish()
@@ -190,34 +201,54 @@ private fun HostEventForm(
             }
         }
 
-        HostEditorStepContent(
-            state = state,
-            availablePhotos = availablePhotos,
-            onAddressSearch = onAddressSearch,
-            onDraftChanged = ::updateDraft,
-            onEditorStateChanged = onEditorStateChanged,
-            onSaveDraft = onSaveDraft,
-            isExpanded = isExpanded,
-            nowEpochMillis = nowEpochMillis,
-        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.large,
+            shadowElevation = 1.dp,
+        ) {
+            Column(modifier = Modifier.padding(YardScapeDesign.spacing.medium)) {
+                HostEditorStepContent(
+                    state = state,
+                    availablePhotos = availablePhotos,
+                    onAddressSearch = onAddressSearch,
+                    onDraftChanged = ::updateDraft,
+                    onEditorStateChanged = onEditorStateChanged,
+                    onSaveDraft = onSaveDraft,
+                    isExpanded = isExpanded,
+                    nowEpochMillis = nowEpochMillis,
+                )
+            }
+        }
 
         if (state.progress.previousStep != null || state.step != HostEditorStep.Preview) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.progress.previousStep?.let { previousStep ->
-                    OutlinedButton(
-                        modifier = Modifier.weight(1f).yardScapeInteractiveTarget(),
-                        onClick = { onStepSelected(previousStep) },
-                    ) { Text("Back") }
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+            ) {
+                Column(
+                    modifier = Modifier.padding(YardScapeDesign.spacing.small),
+                    verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.extraSmall),
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.progress.previousStep?.let { previousStep ->
+                            OutlinedButton(
+                                modifier = Modifier.weight(1f).yardScapeInteractiveTarget(),
+                                onClick = { onStepSelected(previousStep) },
+                            ) { Text("Back") }
+                        }
+                        if (state.step != HostEditorStep.Preview) {
+                            Button(
+                                modifier = Modifier.weight(1f).yardScapeInteractiveTarget(),
+                                onClick = { onStepSelected(HostEditorStep.entries[state.step.ordinal + 1]) },
+                            ) { Text("Continue") }
+                        }
+                    }
+                    if (state.step != HostEditorStep.Preview) {
+                        TextButton(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onSaveDraft) { Text("Save draft and leave later") }
+                    }
                 }
-                if (state.step != HostEditorStep.Preview) {
-                    Button(
-                        modifier = Modifier.weight(1f).yardScapeInteractiveTarget(),
-                        onClick = { onStepSelected(HostEditorStep.entries[state.step.ordinal + 1]) },
-                    ) { Text("Continue") }
-                }
-            }
-            if (state.step != HostEditorStep.Preview) {
-                TextButton(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onSaveDraft) { Text("Save draft and leave later") }
             }
         }
     }
@@ -436,20 +467,30 @@ private fun HostPreviewStep(
     val preview = state.publicPreview(nowEpochMillis)
     FormSectionLabel("Public shopper preview")
     val previewContent: @Composable () -> Unit = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ShopperEventArtwork(
-                presentation = preview.toShopperEventArtworkPresentation(state.draft.id ?: "new-host-draft"),
-                modifier = Modifier.fillMaxWidth(),
-                height = 224.dp,
-            )
-            Text(preview.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(preview.description)
-            preview.shopperDetailSections().forEach { (label, value) ->
-                if (value.isNotBlank()) {
-                    Text("$label · $value", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Surface(
+            modifier = Modifier.fillMaxWidth().testTag(YardScapeTestTags.HostPreviewCard),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
+        ) {
+            Column(
+                modifier = Modifier.padding(YardScapeDesign.spacing.small),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ShopperEventArtwork(
+                    presentation = preview.toShopperEventArtworkPresentation(state.draft.id ?: "new-host-draft"),
+                    modifier = Modifier.fillMaxWidth(),
+                    height = 224.dp,
+                )
+                StatusLabel("Public preview")
+                Text(preview.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(preview.description)
+                preview.shopperDetailSections().forEach { (label, value) ->
+                    if (value.isNotBlank()) {
+                        Text("$label · $value", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
+                PrivacyNote("Preview contains approximate location only. Protected address and access instructions are omitted.")
             }
-            PrivacyNote("Preview contains approximate location only. Protected address and access instructions are omitted.")
         }
     }
     val actions: @Composable () -> Unit = {
@@ -461,7 +502,14 @@ private fun HostPreviewStep(
         ) { Text("Review and publish") }
         if (state.savedEventId != null) {
             OutlinedButton(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = { onRequestConfirmation(HostConfirmationAction.Hide) }) { Text("Hide from search") }
-            OutlinedButton(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = { onRequestConfirmation(HostConfirmationAction.Cancel) }) { Text("Cancel event") }
+            Button(
+                modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(),
+                onClick = { onRequestConfirmation(HostConfirmationAction.Cancel) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            ) { Text("Cancel event") }
         }
     }
     if (isExpanded) {
