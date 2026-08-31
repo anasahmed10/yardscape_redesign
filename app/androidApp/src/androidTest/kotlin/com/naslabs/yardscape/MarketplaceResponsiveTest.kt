@@ -188,7 +188,7 @@ class MarketplaceResponsiveTest {
         composeRule.runOnIdle { appState.navigateTo(YardScapePrimaryDestination.Browse) }
         composeRule.runOnIdle { appState.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID) }
         composeRule.onAllNodesWithTag("editorial-header").assertCountEquals(0)
-        composeRule.onAllNodesWithContentDescription("Back to previous screen").assertCountEquals(1)
+        composeRule.onAllNodesWithContentDescription("Back to Browse").assertCountEquals(1)
     }
     private companion object {
         const val COMPACT_HARNESS_TAG = "marketplace-compact-harness"

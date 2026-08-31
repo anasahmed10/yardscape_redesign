@@ -36,3 +36,11 @@ The compact Browse destination uses the approved map-led marketplace composition
 - Keep evergreen for discovery actions and map markers, clay for save and selected-navigation accents, linen for the page, and white for the results sheet.
 - Compact navigation may display the compatibility destination `MyFinds` as **Saved**. Its route, state, and accessibility semantics remain unchanged.
 - The live map may differ from illustrative geography in design references, but it must retain approximate public areas, required attribution, an accessible list alternative, and explicit optional location permission.
+
+## Shopper editorial workflows
+
+Event Detail, RSVP, safety, and My Finds extend the Browse language through shared editorial surfaces rather than copying its map composition. Detail begins with local event photography, a public-preview label, concise event copy, tags, and a grouped public-information card. Its location card distinguishes protected access from public approximate-area states; it may render the exact address only for the already-authorized reveal state.
+
+RSVP confirmation uses a warm focused card, a separate privacy explanation, and one prominent confirmation action. Closed, revoked, expired, cancelled, capacity, and failure states retain the same grouped state-panel treatment with a polite semantic announcement. Safety screens use a calm header/form grouping; destructive block actions are error-colored only at the irreversible confirmation/action level, while report choices and exits remain neutral.
+
+My Finds retains the photo-first event card grammar from Browse. Saved cards carry a **Public preview** status; RSVP cards say either **Protected location active** or **Approximate area only** without rendering an address. Directions remains an action only for active accepted access. Nested shopper workflows use screen-specific back descriptions (for example, “Back to Browse” and “Back to event”) and all interactive controls retain the shared 48 dp minimum target.

@@ -33,7 +33,7 @@ import com.naslabs.yardscape.data.SeededYardSaleData
 internal fun shopperWorkflowContentMaxWidthFor(availableWidth: Dp): Dp =
     when (shopperMarketplaceLayoutFor(availableWidth)) {
         ShopperMarketplaceLayout.Compact -> availableWidth
-        ShopperMarketplaceLayout.Expanded -> minOf(availableWidth, 840.dp)
+        ShopperMarketplaceLayout.Expanded -> marketplaceEditorialContentWidthFor(availableWidth)
     }
 
 internal data class LocationRevealPresentation(
@@ -50,7 +50,7 @@ internal data class LocationRevealPresentation(
 internal fun LocationRevealState.toLocationRevealPresentation(): LocationRevealPresentation =
     when (this) {
         is LocationRevealState.Revealed -> LocationRevealPresentation(
-            statusLabel = "Access granted",
+            statusLabel = "Protected location",
             title = title,
             supportingText = "Your accepted RSVP includes protected location access for the active sale window.",
             exactAddressLabel = message,
@@ -97,29 +97,40 @@ fun PublicEventDetailScreen(
                 modifier = Modifier.padding(top = spacing.small),
                 verticalArrangement = Arrangement.spacedBy(spacing.medium),
             ) {
-                TextButton(
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .semantics { contentDescription = "Back to previous screen" },
-                    onClick = onBack,
+                MarketplaceEditorialBackNavigation(
+                    onBack = onBack,
+                    contentDescription = "Back to Browse",
+                )
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.surface,
                 ) {
-                    Text("Back")
+                    Column(
+                        modifier = Modifier.padding(spacing.medium),
+                        verticalArrangement = Arrangement.spacedBy(spacing.medium),
+                    ) {
+                        ShopperEventArtwork(
+                            presentation = detail.toShopperEventArtworkPresentation(),
+                            modifier = Modifier.testTag(YardScapeTestTags.EventDetailHero),
+                            height = 256.dp,
+                        )
+                        StatusLabel(
+                            text = "Public event preview",
+                            modifier = Modifier.testTag(YardScapeTestTags.EventDetailPublicStatus),
+                        )
+                        Text(
+                            text = detail.title,
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = detail.description,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-                ShopperEventArtwork(
-                    presentation = detail.toShopperEventArtworkPresentation(),
-                    height = 256.dp,
-                )
-                StatusLabel(text = "Public event preview")
-                Text(
-                    text = detail.title,
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = detail.description,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
 
@@ -217,26 +228,35 @@ fun PublicEventDetailScreen(
 @Composable
 private fun EventMetadataSection(sections: List<Pair<String, String>>) {
     val spacing = YardScapeDesign.spacing
-    Column(verticalArrangement = Arrangement.spacedBy(spacing.medium)) {
-        ShopperSectionHeader(
-            title = "Sale details",
-            supportingText = "Public information from the host",
-        )
-        sections.forEachIndexed { index, (label, value) ->
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.extraSmall)) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            if (index < sections.lastIndex) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier.padding(spacing.large),
+            verticalArrangement = Arrangement.spacedBy(spacing.medium),
+        ) {
+            ShopperSectionHeader(
+                title = "Sale details",
+                supportingText = "Public information from the host",
+            )
+            sections.forEachIndexed { index, (label, value) ->
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.extraSmall)) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                if (index < sections.lastIndex) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
             }
         }
     }
@@ -253,12 +273,17 @@ internal fun LocationAccessPanel(
         modifier = Modifier
             .fillMaxWidth()
             .border(1.dp, accentColor, MaterialTheme.shapes.medium)
-            .testTag(YardScapeTestTags.LocationAccessPanel),
+            .testTag(YardScapeTestTags.LocationAccessPanel)
+            .yardScapeStatusAnnouncement(
+                if (presentation.hasActiveAccess) YardScapeStatusMessageKind.Success else YardScapeStatusMessageKind.ClosedAccess,
+            ),
         shape = MaterialTheme.shapes.medium,
         color = if (presentation.hasActiveAccess) MintMist else SkyWash,
     ) {
         Column(
-            modifier = Modifier.padding(YardScapeDesign.spacing.large),
+            modifier = Modifier
+                .padding(YardScapeDesign.spacing.large)
+                .testTag(YardScapeTestTags.ProtectedLocationCard),
             verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
         ) {
             StatusLabel(text = presentation.statusLabel)

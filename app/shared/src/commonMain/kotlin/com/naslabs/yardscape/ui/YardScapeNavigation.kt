@@ -229,6 +229,13 @@ object YardScapeTestTags {
     const val DirectionsAction: String = "event-detail-directions-action"
     const val RsvpAction: String = "event-detail-rsvp-action"
     const val RsvpConfirmAction: String = "rsvp-confirm-action"
+    const val EventDetailHero: String = "event-detail-hero-artwork"
+    const val EventDetailPublicStatus: String = "event-detail-public-status"
+    const val ProtectedLocationCard: String = "protected-location-card"
+    const val RsvpProtectedLocationCard: String = "rsvp-protected-location-card"
+    const val ShopperSafetyScreen: String = "shopper-safety-screen"
+    const val ShopperSafetyActions: String = "shopper-safety-actions"
+    const val MyFindsEventCardPrefix: String = "my-finds-event-card-"
     const val AppShell: String = "app-shell"
     const val EditorialHeader: String = "editorial-header"
     const val EditorialHeaderTitle: String = "editorial-header-title"
@@ -245,6 +252,7 @@ object YardScapeTestTags {
 
     fun browseEventCard(eventId: String): String = "browse-event-card-$eventId"
     fun mapResult(eventId: String): String = "discovery-map-result-$eventId"
+    fun myFindsEventCard(eventId: String): String = "$MyFindsEventCardPrefix$eventId"
     fun primaryDestination(destination: YardScapePrimaryDestination): String =
         "primary-destination-${destination.name.lowercase()}"
 

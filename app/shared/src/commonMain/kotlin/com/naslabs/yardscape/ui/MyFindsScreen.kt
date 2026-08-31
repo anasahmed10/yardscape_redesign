@@ -16,10 +16,11 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -197,6 +197,7 @@ private fun MyFindsSavedEventRow(
     statusLabel = event.statusLabel,
     description = event.description,
     photoReference = event.photoReference,
+    locationAccessLabel = "Public preview",
     layout = layout,
 ) {
     MyFindsActionButton(ShopperRsvpAction.OpenEvent, primary = true, onClick = onEventSelected)
@@ -220,10 +221,18 @@ private fun MyFindsRsvpRow(
     statusLabel = item.state.label,
     description = item.supportingCopy,
     photoReference = item.photoReference,
+    locationAccessLabel = if (ShopperRsvpAction.Directions in item.visibleActions) {
+        "Protected location active"
+    } else {
+        "Approximate area only"
+    },
     layout = layout,
 ) {
     if (ShopperRsvpAction.Directions in item.visibleActions) {
-        PrivacyNote("Protected location is available for this active accepted RSVP.")
+        PrivacyNote(
+            "Protected location is available for this active accepted RSVP.",
+            modifier = Modifier.yardScapeStatusAnnouncement(YardScapeStatusMessageKind.Success),
+        )
     }
     item.visibleActions.forEach { action ->
         when (action) {
@@ -253,10 +262,18 @@ private fun MyFindsEventRow(
     statusLabel: String,
     description: String,
     photoReference: String?,
+    locationAccessLabel: String,
     layout: MyFindsWorkspaceLayout,
     actions: @Composable () -> Unit,
 ) {
-    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(YardScapeTestTags.myFindsEventCard(eventId)),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
         if (layout == MyFindsWorkspaceLayout.Expanded) {
             Row(
                 modifier = Modifier.padding(vertical = YardScapeDesign.spacing.medium),
@@ -268,7 +285,16 @@ private fun MyFindsEventRow(
                     modifier = Modifier.weight(0.8f),
                     height = 196.dp,
                 )
-                MyFindsEventDetails(title, dateLabel, locationLabel, statusLabel, description, actions, Modifier.weight(1.2f))
+                MyFindsEventDetails(
+                    title,
+                    dateLabel,
+                    locationLabel,
+                    statusLabel,
+                    locationAccessLabel,
+                    description,
+                    actions,
+                    Modifier.weight(1.2f),
+                )
             }
         } else {
             Column(
@@ -276,7 +302,15 @@ private fun MyFindsEventRow(
                 verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
             ) {
                 ShopperEventArtwork(ShopperEventArtworkPresentation(eventId, photoReference), height = 184.dp)
-                MyFindsEventDetails(title, dateLabel, locationLabel, statusLabel, description, actions)
+                MyFindsEventDetails(
+                    title,
+                    dateLabel,
+                    locationLabel,
+                    statusLabel,
+                    locationAccessLabel,
+                    description,
+                    actions,
+                )
             }
         }
     }
@@ -289,6 +323,7 @@ private fun MyFindsEventDetails(
     dateLabel: String,
     locationLabel: String,
     statusLabel: String,
+    locationAccessLabel: String,
     description: String,
     actions: @Composable () -> Unit,
     modifier: Modifier = Modifier,
@@ -301,6 +336,7 @@ private fun MyFindsEventDetails(
         ) {
             StatusLabel(statusLabel)
             InfoChip(dateLabel)
+            InfoChip(locationAccessLabel)
         }
         Text(locationLabel, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
