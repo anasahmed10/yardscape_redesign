@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -96,8 +97,26 @@ fun HostAttendanceScreen(
             onDismissRequest = onDismissAction,
             title = { Text(pending.action.confirmationTitle) },
             text = { Text("${pending.attendeeName}: ${pending.action.consequence}") },
-            confirmButton = { Button(onClick = { onConfirmAction() }) { Text(pending.action.label) } },
-            dismissButton = { TextButton(onClick = onDismissAction) { Text("Go back") } },
+            confirmButton = {
+                Button(
+                    modifier = Modifier.yardScapeInteractiveTarget(),
+                    colors = if (pending.action.isDestructive) {
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError,
+                        )
+                    } else {
+                        ButtonDefaults.buttonColors()
+                    },
+                    onClick = { onConfirmAction() },
+                ) { Text(pending.action.label) }
+            },
+            dismissButton = {
+                TextButton(
+                    modifier = Modifier.yardScapeInteractiveTarget(),
+                    onClick = onDismissAction,
+                ) { Text("Go back") }
+            },
         )
     }
 }
@@ -201,11 +220,20 @@ private fun HostAttendeeRow(
             val actionModifier = if (inlineActions) Modifier.heightIn(min = 48.dp) else Modifier.fillMaxWidth().heightIn(min = 48.dp)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
             attendee.availableActions.forEach { action ->
-                OutlinedButton(
-                    modifier = actionModifier,
-                    enabled = action != HostAttendeeAction.Accept || !atCapacity,
-                    onClick = { onRequestAction(eventId, attendee.shopperId, action) },
-                ) { Text(action.label) }
+                if (action == HostAttendeeAction.Accept) {
+                    Button(
+                        modifier = actionModifier,
+                        enabled = !atCapacity,
+                        onClick = { onRequestAction(eventId, attendee.shopperId, action) },
+                    ) { Text(action.label) }
+                } else {
+                    OutlinedButton(
+                        modifier = actionModifier,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        enabled = true,
+                        onClick = { onRequestAction(eventId, attendee.shopperId, action) },
+                    ) { Text(action.label) }
+                }
             }
             if (attendee.canMessageAttendee) {
                 Button(

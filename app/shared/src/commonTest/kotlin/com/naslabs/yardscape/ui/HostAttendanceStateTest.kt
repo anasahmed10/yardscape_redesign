@@ -12,6 +12,17 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class HostAttendanceStateTest {
+    @Test
+    fun accessChangingAndDestructiveHostActionsExposeTheirVisualRiskLevel() {
+        assertFalse(HostAttendeeAction.Accept.isDestructive)
+        assertTrue(HostAttendeeAction.Decline.isDestructive)
+        assertTrue(HostAttendeeAction.Remove.isDestructive)
+        assertTrue(HostAttendeeAction.Revoke.isDestructive)
+        assertFalse(HostConfirmationAction.Publish.isDestructive)
+        assertTrue(HostConfirmationAction.Hide.isDestructive)
+        assertTrue(HostConfirmationAction.Cancel.isDestructive)
+    }
+
     private val eventId = SeededYardSaleData.FAMILY_GARAGE_EVENT_ID
 
     @Test

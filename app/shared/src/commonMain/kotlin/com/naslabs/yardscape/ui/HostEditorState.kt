@@ -38,6 +38,9 @@ enum class HostConfirmationAction(val title: String, val message: String, val co
     ),
 }
 
+internal val HostConfirmationAction.isDestructive: Boolean
+    get() = this == HostConfirmationAction.Hide || this == HostConfirmationAction.Cancel
+
 data class HostPublicPreview(
     val title: String,
     val description: String,

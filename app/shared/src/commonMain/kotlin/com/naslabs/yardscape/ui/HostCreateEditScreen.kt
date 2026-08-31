@@ -133,6 +133,14 @@ fun HostCreateEditScreen(
             confirmButton = {
                 Button(
                     modifier = Modifier.yardScapeInteractiveTarget(),
+                    colors = if (action.isDestructive) {
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError,
+                        )
+                    } else {
+                        ButtonDefaults.buttonColors()
+                    },
                     onClick = {
                         when (action) {
                             HostConfirmationAction.Publish -> onPublish()
@@ -494,7 +502,14 @@ private fun HostPreviewStep(
         ) { Text("Review and publish") }
         if (state.savedEventId != null) {
             OutlinedButton(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = { onRequestConfirmation(HostConfirmationAction.Hide) }) { Text("Hide from search") }
-            OutlinedButton(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = { onRequestConfirmation(HostConfirmationAction.Cancel) }) { Text("Cancel event") }
+            Button(
+                modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(),
+                onClick = { onRequestConfirmation(HostConfirmationAction.Cancel) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            ) { Text("Cancel event") }
         }
     }
     if (isExpanded) {
