@@ -4,14 +4,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.filter
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -130,6 +136,59 @@ class MarketplaceResponsiveTest {
 
         composeRule.runOnIdle { appState.navigateTo(YardScapePrimaryDestination.Browse) }
         composeRule.onNodeWithTag(YardScapeTestTags.BrowseScreen).assertIsDisplayed()
+    }
+
+    @Test
+    fun compactRootShellOwnsEditorialTitlesAndLeavesNestedNavigationToWorkflows() {
+        val appState = YardScapeAppState().apply {
+            navigateTo(YardScapePrimaryDestination.MyFinds)
+        }
+        composeRule.setContent {
+            Layout(
+                content = { App(appState) },
+                modifier = Modifier.testTag(COMPACT_HARNESS_TAG),
+            ) { measurables, constraints ->
+                val compactWidth = 390.dp.roundToPx()
+                val placeable = measurables.single().measure(
+                    constraints.copy(minWidth = compactWidth, maxWidth = compactWidth),
+                )
+                layout(compactWidth, placeable.height) {
+                    placeable.placeRelative(0, 0)
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("editorial-header").assertIsDisplayed()
+        composeRule.onAllNodesWithText("YardScape").assertCountEquals(0)
+        composeRule.onAllNodesWithText("My Finds").assertCountEquals(1)
+        composeRule.onNodeWithTag("editorial-segment-saved")
+            .assertIsDisplayed()
+            .assertHeightIsAtLeast(48.dp)
+            .assertIsSelected()
+        composeRule.onNodeWithTag("editorial-segment-rsvps")
+            .assertHeightIsAtLeast(48.dp)
+            .assertIsNotSelected()
+
+        composeRule.runOnIdle { appState.navigateTo(YardScapePrimaryDestination.Account) }
+        composeRule.onAllNodesWithTag(YardScapeTestTags.EditorialHeaderTitle).assertCountEquals(1)
+        composeRule.onNodeWithTag(YardScapeTestTags.EditorialHeaderTitle).assertTextEquals("Account")
+        composeRule.onNodeWithTag(YardScapeTestTags.AccountIntro)
+            .onChildren()
+            .filter(hasText("Account"))
+            .assertCountEquals(0)
+
+        composeRule.runOnIdle { appState.navigateTo(YardScapePrimaryDestination.Messages) }
+        composeRule.onAllNodesWithTag(YardScapeTestTags.EditorialHeaderTitle).assertCountEquals(1)
+        composeRule.onNodeWithTag(YardScapeTestTags.EditorialHeaderTitle).assertTextEquals("Messages")
+        composeRule.onNodeWithTag(YardScapeTestTags.MessagesIntro)
+            .onChildren()
+            .filter(hasText("Messages"))
+            .assertCountEquals(0)
+
+        composeRule.runOnIdle { appState.navigateTo(YardScapePrimaryDestination.Browse) }
+        composeRule.runOnIdle { appState.openEvent(SeededYardSaleData.FAMILY_GARAGE_EVENT_ID) }
+        composeRule.onAllNodesWithTag("editorial-header").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("Back to previous screen").assertCountEquals(1)
     }
     private companion object {
         const val COMPACT_HARNESS_TAG = "marketplace-compact-harness"

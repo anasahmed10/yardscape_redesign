@@ -230,6 +230,11 @@ object YardScapeTestTags {
     const val RsvpAction: String = "event-detail-rsvp-action"
     const val RsvpConfirmAction: String = "rsvp-confirm-action"
     const val AppShell: String = "app-shell"
+    const val EditorialHeader: String = "editorial-header"
+    const val EditorialHeaderTitle: String = "editorial-header-title"
+    const val EditorialBackNavigation: String = "editorial-back-navigation"
+    const val AccountIntro: String = "account-intro"
+    const val MessagesIntro: String = "messages-intro"
     const val DiscoveryNoResults: String = "discovery-no-results"
     const val SavedScreen: String = "saved-screen"
     const val MyFindsScreen: String = "my-finds-screen"
@@ -242,6 +247,8 @@ object YardScapeTestTags {
     fun mapResult(eventId: String): String = "discovery-map-result-$eventId"
     fun primaryDestination(destination: YardScapePrimaryDestination): String =
         "primary-destination-${destination.name.lowercase()}"
+
+    fun editorialSegment(value: String): String = "editorial-segment-$value"
 }
 
 private data class RsvpRouteContext(

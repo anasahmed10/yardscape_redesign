@@ -5,9 +5,35 @@ import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MyFindsPresentationTest {
+    @Test
+    fun editorialWorkspaceCapsExpandedContentAtTheSharedReadingWidth() {
+        assertEquals(960.dp, myFindsWorkspaceContentWidthFor(1_440.dp))
+    }
+
+    @Test
+    fun editorialPresentationOwnsOnlyPrimaryRootTitles() {
+        assertEquals("My Finds", marketplaceEditorialHeaderFor(YardScapeRoute.MyFinds())?.title)
+        assertEquals("Host tools", marketplaceEditorialHeaderFor(YardScapeRoute.Host)?.title)
+        assertEquals("Messages", marketplaceEditorialHeaderFor(YardScapeRoute.Messages)?.title)
+        assertEquals("Account", marketplaceEditorialHeaderFor(YardScapeRoute.Account)?.title)
+
+        assertNull(marketplaceEditorialHeaderFor(YardScapeRoute.EventDetail("event-1")))
+        assertNull(marketplaceEditorialHeaderFor(YardScapeRoute.Rsvp("event-1")))
+        assertNull(marketplaceEditorialHeaderFor(YardScapeRoute.HostCreateEdit()))
+        assertNull(marketplaceEditorialHeaderFor(YardScapeRoute.MessageThread("conversation-1234abcd")))
+    }
+
+    @Test
+    fun editorialSegmentPresentationPreservesSelectedStateAndMinimumTarget() {
+        assertTrue(marketplaceSegmentPresentationFor(selected = true).isSelected)
+        assertFalse(marketplaceSegmentPresentationFor(selected = false).isSelected)
+        assertEquals(48.dp, marketplaceSegmentPresentationFor(selected = true).minimumHeight)
+    }
+
     @Test
     fun savedEmptyStateOffersBrowseExitAndMarksSavedSegmentSelected() {
         val presentation = MyFindsState(
@@ -119,7 +145,7 @@ class MyFindsPresentationTest {
         assertEquals(MyFindsWorkspaceLayout.Compact, myFindsWorkspaceLayoutFor(390))
         assertEquals(MyFindsWorkspaceLayout.Expanded, myFindsWorkspaceLayoutFor(1440))
         assertEquals(390.dp, myFindsWorkspaceContentWidthFor(390.dp))
-        assertEquals(1120.dp, myFindsWorkspaceContentWidthFor(1440.dp))
+        assertEquals(960.dp, myFindsWorkspaceContentWidthFor(1440.dp))
     }
 
     @Test

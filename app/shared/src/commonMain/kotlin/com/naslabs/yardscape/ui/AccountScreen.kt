@@ -40,8 +40,12 @@ fun AccountScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Column(Modifier.padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Account", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Column(
+                Modifier
+                    .padding(top = 18.dp)
+                    .testTag(YardScapeTestTags.AccountIntro),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Text("Mock profiles and local session state only. No real credentials are stored.")
             }
         }

@@ -11,6 +11,8 @@ YardScape uses one Material 3 theme from shared Compose. Android, iOS, JS, and W
 | Spacing | `YardScapeDesign.spacing` exposes 4, 8, 12, 16, 24, and 32 dp steps. Use 16 dp for normal screen/card padding, 12 dp for section gaps, and 8 dp for compact groups. |
 | Shape | Extra-small 6 dp shapes are chips; small 8 dp shapes are cards and controls; 12, 16, and 24 dp shapes are reserved for progressively larger surfaces. |
 
+The primary non-Browse roots (My Finds, Host, Messages, and Account) use the shared editorial shell: one linen-surface serif route title, five-destination navigation, and a 960 dp reading-width cap on expanded layouts. Nested workflows retain their screen-owned titles and back affordances until they migrate individually in #91–#93. The YardScape wordmark belongs only to Browse's map-led header and full-width discovery composition.
+
 `SunTag` and the seeded photo-preview colors are extended decorative tokens. They should not be used for body text, protected-location policy, errors, or primary actions.
 
 ## Component conventions
@@ -20,6 +22,8 @@ YardScape uses one Material 3 theme from shared Compose. Android, iOS, JS, and W
 - Keep exact addresses out of public components regardless of their visual treatment.
 - Use the shared privacy note component for short contextual disclosure; do not treat it as final legal copy.
 - Keep branding text sourced from `YardScapeConfig` and the `yardscape.appName` Gradle property. The theme contains visual tokens, not a hardcoded display name.
+- Shared editorial foundations are internal Compose primitives: `MarketplaceEditorialHeader`, `MarketplaceEditorialBackNavigation`, and `MarketplaceSegmentedControl`. Existing `ShopperEventArtwork`, `ShopperSectionHeader`, `StatusLabel`, `PrivacyNote`, and `ShopperStatePanel` remain the corresponding reusable event photography, section, status, privacy, and state surfaces.
+- Segmented selections and all shell navigation targets expose selected semantics and retain a 48 dp minimum interactive target.
 
 The initial theme is deliberately light-only. Dark theme or dynamic color should be introduced as focused cross-platform work, with contrast checks on Android, iOS, JS, and Wasm rather than through an Android-only API.
 

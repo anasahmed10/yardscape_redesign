@@ -67,21 +67,22 @@ fun MyFindsScreen(
                     modifier = Modifier.padding(top = spacing.large),
                     verticalArrangement = Arrangement.spacedBy(spacing.small),
                 ) {
-                    Text("My Finds", style = MaterialTheme.typography.headlineMedium)
                     Text(
                         "Save public previews, track RSVP status, and use protected directions only when access is active.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(spacing.small)) {
-                        presentation.segments.forEach { segment ->
-                            MyFindsSectionButton(
-                                segment = segment,
-                                onClick = { onSectionSelected(segment.section) },
-                                modifier = Modifier.weight(1f),
+                    MarketplaceSegmentedControl(
+                        options = presentation.segments.map { segment ->
+                            MarketplaceSegmentOption(
+                                value = segment.section,
+                                label = segment.label,
+                                isSelected = segment.isSelected,
                             )
-                        }
-                    }
+                        },
+                        onSelected = onSectionSelected,
+                        testTagFor = { section -> YardScapeTestTags.editorialSegment(section.name.lowercase()) },
+                    )
                 }
             }
             when (presentation.selectedSection) {
@@ -126,23 +127,6 @@ fun MyFindsScreen(
                 ) { Text("Keep RSVP") }
             },
         )
-    }
-}
-
-@Composable
-private fun MyFindsSectionButton(
-    segment: MyFindsSegmentPresentation,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val semantics = modifier.heightIn(min = 48.dp).semantics {
-        contentDescription = "${segment.label}${if (segment.isSelected) ", selected" else ""}"
-        selected = segment.isSelected
-    }
-    if (segment.isSelected) {
-        Button(modifier = semantics, onClick = onClick) { Text(segment.label) }
-    } else {
-        OutlinedButton(modifier = semantics, onClick = onClick) { Text(segment.label) }
     }
 }
 
