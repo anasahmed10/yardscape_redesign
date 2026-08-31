@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun MarketplaceEditorialHeader(
     presentation: MarketplaceEditorialHeaderPresentation,
-    onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -43,11 +42,10 @@ internal fun MarketplaceEditorialHeader(
             horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (presentation.showsBackNavigation && onBack != null) {
-                MarketplaceEditorialBackNavigation(onBack = onBack)
-            }
             Text(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(YardScapeTestTags.EditorialHeaderTitle),
                 text = presentation.title,
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onBackground,

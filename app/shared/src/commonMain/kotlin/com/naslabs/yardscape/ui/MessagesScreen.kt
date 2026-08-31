@@ -136,8 +136,11 @@ private fun MessagingInboxContent(
         verticalArrangement = Arrangement.spacedBy(spacing.small),
     ) {
         item {
-            Column(modifier = Modifier.padding(top = spacing.large, bottom = spacing.medium)) {
-                Text("Messages", style = MaterialTheme.typography.headlineMedium)
+            Column(
+                modifier = Modifier
+                    .padding(top = spacing.large, bottom = spacing.medium)
+                    .testTag(YardScapeTestTags.MessagesIntro),
+            ) {
                 Text(
                     "Event conversations stay available only while RSVP access is active.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

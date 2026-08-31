@@ -19,23 +19,23 @@ internal fun marketplaceEditorialContentWidthFor(availableWidth: Dp): Dp =
 
 internal data class MarketplaceEditorialHeaderPresentation(
     val title: String,
-    val showsBackNavigation: Boolean,
 )
 
-internal fun marketplaceEditorialHeaderFor(route: YardScapeRoute): MarketplaceEditorialHeaderPresentation =
-    MarketplaceEditorialHeaderPresentation(
-        title = route.destinationLabel,
-        showsBackNavigation = when (route) {
-            YardScapeRoute.Browse,
-            is YardScapeRoute.MyFinds,
-            YardScapeRoute.Host,
-            YardScapeRoute.Messages,
-            YardScapeRoute.Account,
-            -> false
+/**
+ * The shared shell owns the editorial title for primary roots only. Nested
+ * workflows retain their screen-owned title and back affordance until their
+ * individual workflow migration.
+ */
+internal fun marketplaceEditorialHeaderFor(route: YardScapeRoute): MarketplaceEditorialHeaderPresentation? =
+    when (route) {
+        is YardScapeRoute.MyFinds,
+        YardScapeRoute.Host,
+        YardScapeRoute.Messages,
+        YardScapeRoute.Account,
+        -> MarketplaceEditorialHeaderPresentation(title = route.destinationLabel)
 
-            else -> true
-        },
-    )
+        else -> null
+    }
 
 internal data class MarketplaceSegmentOption<T>(
     val value: T,

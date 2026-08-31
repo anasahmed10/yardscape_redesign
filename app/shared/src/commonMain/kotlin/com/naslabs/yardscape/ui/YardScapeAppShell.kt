@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 internal fun YardScapeAppShell(
     route: YardScapeRoute,
     onDestinationSelected: (YardScapePrimaryDestination) -> Unit,
-    onBack: () -> Unit,
     content: @Composable () -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -42,10 +41,9 @@ internal fun YardScapeAppShell(
                 .fillMaxSize()
                 .testTag(YardScapeTestTags.AppShell),
         ) {
-            if (route != YardScapeRoute.Browse) {
+            marketplaceEditorialHeaderFor(route)?.let { presentation ->
                 MarketplaceEditorialHeader(
-                    presentation = marketplaceEditorialHeaderFor(route),
-                    onBack = onBack,
+                    presentation = presentation,
                 )
             }
             Box(

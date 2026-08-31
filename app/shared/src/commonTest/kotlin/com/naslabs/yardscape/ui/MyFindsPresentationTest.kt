@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MyFindsPresentationTest {
@@ -14,16 +15,16 @@ class MyFindsPresentationTest {
     }
 
     @Test
-    fun editorialPresentationKeepsPrimaryDestinationsHeaderOnlyAndNestedRoutesBackNavigable() {
-        assertFalse(marketplaceEditorialHeaderFor(YardScapeRoute.MyFinds()).showsBackNavigation)
-        assertEquals("My Finds", marketplaceEditorialHeaderFor(YardScapeRoute.MyFinds()).title)
-        assertFalse(
-            marketplaceEditorialHeaderFor(YardScapeRoute.MyFinds(MyFindsSection.Rsvps)).showsBackNavigation,
-        )
+    fun editorialPresentationOwnsOnlyPrimaryRootTitles() {
+        assertEquals("My Finds", marketplaceEditorialHeaderFor(YardScapeRoute.MyFinds())?.title)
+        assertEquals("Host tools", marketplaceEditorialHeaderFor(YardScapeRoute.Host)?.title)
+        assertEquals("Messages", marketplaceEditorialHeaderFor(YardScapeRoute.Messages)?.title)
+        assertEquals("Account", marketplaceEditorialHeaderFor(YardScapeRoute.Account)?.title)
 
-        val nested = marketplaceEditorialHeaderFor(YardScapeRoute.EventDetail("event-1"))
-        assertTrue(nested.showsBackNavigation)
-        assertEquals("Event details", nested.title)
+        assertNull(marketplaceEditorialHeaderFor(YardScapeRoute.EventDetail("event-1")))
+        assertNull(marketplaceEditorialHeaderFor(YardScapeRoute.Rsvp("event-1")))
+        assertNull(marketplaceEditorialHeaderFor(YardScapeRoute.HostCreateEdit()))
+        assertNull(marketplaceEditorialHeaderFor(YardScapeRoute.MessageThread("conversation-1234abcd")))
     }
 
     @Test
