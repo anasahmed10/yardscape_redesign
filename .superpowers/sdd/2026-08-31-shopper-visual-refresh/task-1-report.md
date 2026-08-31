@@ -31,6 +31,10 @@ Captured and inspected 390 x 844 dp Android workflow evidence at 3x density:
 
 The final visual inspection found no P0-P2 issues. `design-qa.md` records the passed result.
 
+### Follow-up P1 correction
+
+Review found that compact My Finds cards were still vertically stacked. The compact treatment now uses the approved Browse-like horizontal row with a fixed 126 dp photo, concise right-column metadata/actions, and no redundant protected-location panel. The expanded layout remains unchanged. The focused Android responsive workflow asserts the fixed compact artwork width, and `91-android-my-finds-rsvps.png` was recaptured and visually inspected at 390 x 844 dp.
+
 ## Privacy and accessibility review
 
 Public Detail and My Finds surfaces retain only public or approximate location language. Exact address and directions content remain in the existing authorized reveal branch and are absent before acceptance and after revocation; the Android smoke test verifies both boundaries. New protected and access-state surfaces provide explicit status semantics with polite live-region announcements, and existing 48 dp target helpers remain in use.

@@ -228,7 +228,7 @@ private fun MyFindsRsvpRow(
     },
     layout = layout,
 ) {
-    if (ShopperRsvpAction.Directions in item.visibleActions) {
+    if (layout == MyFindsWorkspaceLayout.Expanded && ShopperRsvpAction.Directions in item.visibleActions) {
         PrivacyNote(
             "Protected location is available for this active accepted RSVP.",
             modifier = Modifier.yardScapeStatusAnnouncement(YardScapeStatusMessageKind.Success),
@@ -293,15 +293,22 @@ private fun MyFindsEventRow(
                     locationAccessLabel,
                     description,
                     actions,
-                    Modifier.weight(1.2f),
+                    modifier = Modifier.weight(1.2f),
                 )
             }
         } else {
-            Column(
-                modifier = Modifier.padding(vertical = YardScapeDesign.spacing.medium),
-                verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(YardScapeDesign.spacing.small),
+                horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium),
+                verticalAlignment = Alignment.Top,
             ) {
-                ShopperEventArtwork(ShopperEventArtworkPresentation(eventId, photoReference), height = 184.dp)
+                ShopperEventArtwork(
+                    presentation = ShopperEventArtworkPresentation(eventId, photoReference),
+                    modifier = Modifier.width(126.dp),
+                    height = 106.dp,
+                )
                 MyFindsEventDetails(
                     title,
                     dateLabel,
@@ -310,6 +317,8 @@ private fun MyFindsEventRow(
                     locationAccessLabel,
                     description,
                     actions,
+                    compact = true,
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -326,23 +335,35 @@ private fun MyFindsEventDetails(
     locationAccessLabel: String,
     description: String,
     actions: @Composable () -> Unit,
+    compact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    val itemSpacing = if (compact) 4.dp else YardScapeDesign.spacing.small
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(itemSpacing)) {
+        Text(
+            title,
+            style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
-            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+            horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+            verticalArrangement = Arrangement.spacedBy(itemSpacing),
         ) {
             StatusLabel(statusLabel)
             InfoChip(dateLabel)
             InfoChip(locationAccessLabel)
         }
         Text(locationLabel, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(
+            description,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = if (compact) 1 else 2,
+            overflow = TextOverflow.Ellipsis,
+        )
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
-            verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small),
+            horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+            verticalArrangement = Arrangement.spacedBy(itemSpacing),
         ) { actions() }
     }
 }
