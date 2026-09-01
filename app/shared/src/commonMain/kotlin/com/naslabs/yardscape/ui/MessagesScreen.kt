@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -141,6 +142,7 @@ private fun MessagingInboxContent(
                     .padding(top = spacing.large, bottom = spacing.medium)
                     .testTag(YardScapeTestTags.MessagesIntro),
             ) {
+                Text("Private event conversations", style = MaterialTheme.typography.titleLarge)
                 Text(
                     "Event conversations stay available only while RSVP access is active.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -184,18 +186,20 @@ private fun InboxRow(row: MarketplaceInboxRowPresentation, onOpen: () -> Unit) {
         modifier = Modifier.fillMaxWidth().heightIn(min = row.minimumHeight).clickable(onClick = onOpen)
             .semantics { contentDescription = row.contentDescription },
         color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.large,
+        shadowElevation = 1.dp,
     ) {
         Row(Modifier.padding(spacing.small), verticalAlignment = Alignment.CenterVertically) {
             ShopperEventArtwork(row.artwork, Modifier.width(96.dp), 80.dp)
             Spacer(Modifier.width(spacing.medium))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.extraSmall)) {
-                Text(row.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(row.contextLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text(row.title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 row.preview?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 row.lastActivityLabel?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             row.unreadLabel?.let { unread ->
-                Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.extraLarge) {
+                Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.extraLarge) {
                     Text(unread.substringBefore(' '), Modifier.padding(horizontal = spacing.small, vertical = spacing.extraSmall))
                 }
             }
@@ -250,9 +254,10 @@ private fun MessageThreadLoadedContent(
         verticalArrangement = Arrangement.spacedBy(spacing.medium),
     ) {
         item {
-            Column(Modifier.padding(top = spacing.medium)) {
-                TextButton(onBack, Modifier.yardScapeInteractiveTarget()) { Text("Back to messages") }
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.padding(top = spacing.medium), verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+                MarketplaceEditorialBackNavigation(onBack, "Back to messages")
+                Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.large) {
+                Row(Modifier.padding(spacing.small), verticalAlignment = Alignment.CenterVertically) {
                     ShopperEventArtwork(presentation.artwork, Modifier.width(96.dp), 72.dp)
                     Spacer(Modifier.width(spacing.medium))
                     Column(Modifier.weight(1f)) {
@@ -260,10 +265,20 @@ private fun MessageThreadLoadedContent(
                         Text("Event conversation", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(spacing.small)) {
-                    TextButton({ onOpenEvent(state.thread.conversationKey.eventId) }, Modifier.yardScapeInteractiveTarget()) { Text("View sale") }
-                    if (presentation.showReportAction) TextButton(onReport, Modifier.yardScapeInteractiveTarget()) { Text("Report") }
-                    if (presentation.showBlockAction) TextButton(onBlock, Modifier.yardScapeInteractiveTarget()) { Text("Block") }
+                    Button(
+                        { onOpenEvent(state.thread.conversationKey.eventId) },
+                        Modifier.yardScapeInteractiveTarget(),
+                    ) { Text(presentation.eventAction.label) }
+                    if (presentation.showReportAction) {
+                        OutlinedButton(onReport, Modifier.yardScapeInteractiveTarget()) { Text("Report") }
+                    }
+                    if (presentation.showBlockAction) {
+                        TextButton(onBlock, Modifier.yardScapeInteractiveTarget()) {
+                            Text("Block", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
                 }
             }
         }
@@ -337,8 +352,8 @@ private fun MessageBubble(message: MarketplaceMessageBubblePresentation, onRetry
 @Composable
 private fun Composer(draft: String, isEnabled: Boolean, onDraftChanged: (String) -> Unit, onSend: () -> Unit) {
     val spacing = YardScapeDesign.spacing
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-    Column(Modifier.padding(vertical = spacing.small), verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+    Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.large) {
+    Column(Modifier.padding(spacing.medium), verticalArrangement = Arrangement.spacedBy(spacing.small)) {
         OutlinedTextField(
             value = draft,
             onValueChange = onDraftChanged,
@@ -353,6 +368,7 @@ private fun Composer(draft: String, isEnabled: Boolean, onDraftChanged: (String)
             enabled = isEnabled && draft.isNotBlank(),
             modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget().semantics { contentDescription = "Send message" },
         ) { Text("Send message") }
+    }
     }
 }
 

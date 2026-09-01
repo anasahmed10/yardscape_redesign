@@ -37,6 +37,18 @@ The combined full-view image is sufficient for the typography, controls, map ove
 
 final result: passed
 
+## Messaging and account editorial refresh
+
+- Source visual language: `docs/audit-assets/88-approved-browse-reference.png`
+- Compact captures: `docs/audit-assets/93-android-messages-inbox.png`, `docs/audit-assets/93-android-account-overview.png`, and `docs/audit-assets/93-android-account-settings.png`.
+- Viewport target: Android 390 × 844 dp, light theme.
+
+Messages extends Browse's warm marketplace grammar through photo-first conversation rows, evergreen event action, clay unread treatment, quiet grouped composer, and deliberate safety hierarchy. Closed, revoked, expired, cancelled, offline, retry, empty, and loading experiences continue to use the existing access model and semantic status treatment. Account keeps the shell-owned route title, then applies linen spacing, mint access cards, warm white profile/settings groups, and clear sign-out/session-expiry hierarchy.
+
+The presentation policy tests verify the shared width cap, 48 dp controls, event action tone, report/block separation, and photo-first inbox contract. Existing messaging policy tests continue to prove RSVP gating and protected-message redaction. The seeded runtime inbox is empty by design; retry and closed-access presentation are covered by its focused shared tests. Android tree inspection verified root headings, action labels, navigation semantics, and 48 dp control bounds at 390 × 844 dp. Shared Android host tests, Android debug assembly, JS/Wasm compatibility distribution, and iOS simulator tests pass.
+
+final result: passed
+
 ## Host editorial refresh
 
 - Source visual language: `docs/audit-assets/88-approved-browse-reference.png`

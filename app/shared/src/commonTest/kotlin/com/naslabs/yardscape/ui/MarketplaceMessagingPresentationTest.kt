@@ -40,6 +40,8 @@ class MarketplaceMessagingPresentationTest {
         )
         assertEquals(48.dp, row.minimumHeight)
         assertTrue(row.isUnread)
+        assertTrue(row.isPhotoFirst)
+        assertEquals("Event conversation", row.contextLabel)
     }
 
     @Test
@@ -149,6 +151,19 @@ class MarketplaceMessagingPresentationTest {
         assertEquals(390.dp, marketplaceMessagingContentWidthFor(390.dp, 1_080.dp))
         assertEquals(1_080.dp, marketplaceMessagingContentWidthFor(1_440.dp, 1_080.dp))
         assertEquals(960.dp, marketplaceMessagingContentWidthFor(1_440.dp, 960.dp))
+    }
+
+    @Test
+    fun threadActionsKeepOnePrimarySaleActionAndSeparateSafetyActions() {
+        val presentation = marketplaceThreadPresentation(
+            MessagingThreadPresentation(thread = thread()),
+            currentActorId = SHOPPER_ID,
+        )
+
+        assertEquals(MarketplaceThreadActionTone.Primary, presentation.eventAction.tone)
+        assertEquals(MarketplaceThreadActionTone.Neutral, presentation.reportActionTone)
+        assertEquals(MarketplaceThreadActionTone.Destructive, presentation.blockActionTone)
+        assertEquals(48.dp, presentation.safetyActionMinimumHeight)
     }
 
     @Test

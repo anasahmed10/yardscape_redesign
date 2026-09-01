@@ -1,16 +1,18 @@
 package com.naslabs.yardscape.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,27 +34,39 @@ fun AccountScreen(
     onOpenSettings: (AccountSettingsSection) -> Unit,
     onPreferencesChanged: (NotificationPreferences) -> Unit,
 ) {
+    val presentation = marketplaceAccountPresentation(state)
+    val spacing = YardScapeDesign.spacing
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize().testTag(YardScapeTestTags.AccountScreen),
+        contentAlignment = Alignment.TopCenter,
+    ) {
     LazyColumn(
-        modifier = Modifier
+        modifier = Modifier.width(marketplaceAccountContentWidthFor(maxWidth))
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
-            .testTag(YardScapeTestTags.AccountScreen),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = spacing.large),
+        verticalArrangement = Arrangement.spacedBy(spacing.medium),
     ) {
         item {
             Column(
                 Modifier
-                    .padding(top = 18.dp)
+                    .padding(top = spacing.large)
                     .testTag(YardScapeTestTags.AccountIntro),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.extraSmall),
             ) {
-                Text("Mock profiles and local session state only. No real credentials are stored.")
+                Text(
+                    if (state.isSignedIn) "Your local marketplace space" else "A privacy-first marketplace space",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    "Mock profiles and local session state only. No real credentials are stored.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
         when (state.sessionStatus) {
             MockSessionStatus.SignedOut -> item {
                 SignedOutCard(
-                    title = "Browse without an account",
+                    title = presentation.heading,
                     message = state.signInReason
                         ?: "Public sale previews remain available. Sign in only when you need a protected action.",
                     onSignIn = onSignIn,
@@ -60,7 +74,7 @@ fun AccountScreen(
             }
             MockSessionStatus.Expired -> item {
                 SignedOutCard(
-                    title = "Session expired safely",
+                    title = presentation.heading,
                     message = "Protected location and private account data were cleared. Sign in again to continue; public browsing is still available.",
                     onSignIn = onSignIn,
                 )
@@ -98,13 +112,19 @@ fun AccountScreen(
             PrivacyNote("Marketplace safety: meet only during listed sale hours, keep conversations in the app, and report pressure to share private contact or payment details.")
         }
     }
+    }
 }
 
 @Composable
 private fun SignedOutCard(title: String, message: String, onSignIn: (UserRole) -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        shape = MaterialTheme.shapes.large,
+    ) {
+        Column(Modifier.padding(YardScapeDesign.spacing.large), verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.medium)) {
+            Text(title, style = MaterialTheme.typography.headlineSmall)
             Text(message)
             Button(modifier = Modifier.fillMaxWidth().yardScapeInteractiveTarget(), onClick = { onSignIn(UserRole.SHOPPER) }) {
                 Text("Use mock shopper session")
@@ -119,16 +139,17 @@ private fun SignedOutCard(title: String, message: String, onSignIn: (UserRole) -
 @Composable
 private fun ProfileCard(profile: MockAccountProfile?) {
     if (profile == null) return
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(profile.displayName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(profile.role.name.lowercase().replaceFirstChar { it.uppercase() } + " profile")
-            Text("Confirmed facts", fontWeight = FontWeight.Bold)
+    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.large) {
+        Column(Modifier.padding(YardScapeDesign.spacing.large), verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
+            Text("Your marketplace profile", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text(profile.displayName, style = MaterialTheme.typography.headlineSmall)
+            Text(profile.role.name.lowercase().replaceFirstChar { it.uppercase() } + " profile", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Confirmed facts", style = MaterialTheme.typography.titleSmall)
             profile.verificationFacts.forEach { Text("• $it") }
-            Text("Community activity — not identity verification", fontWeight = FontWeight.Bold)
+            Text("Community activity", style = MaterialTheme.typography.titleSmall)
             profile.communitySignals.forEach { Text("• $it") }
             Text(
-                "These signals may help with context, but they do not guarantee identity, safety, or transaction quality.",
+                "These signals offer context, not identity, safety, or transaction guarantees.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -142,22 +163,21 @@ private fun AccountSettingsContent(
     onPreferencesChanged: (NotificationPreferences) -> Unit,
 ) {
     when (state.selectedSettingsSection) {
-        AccountSettingsSection.Sessions -> Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Mock session", fontWeight = FontWeight.Bold)
+        AccountSettingsSection.Sessions -> EditorialSettingsCard("Sessions") {
+            Column(verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
+                Text("Mock session", style = MaterialTheme.typography.titleMedium)
                 Text("This local session contains no real credential, token, or production account data.")
                 OutlinedButton(modifier = Modifier.yardScapeInteractiveTarget(), onClick = onExpireSession) { Text("Simulate session expiry") }
             }
         }
-        AccountSettingsSection.Privacy -> Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Privacy and location", fontWeight = FontWeight.Bold)
+        AccountSettingsSection.Privacy -> EditorialSettingsCard("Privacy and location") {
+            Column(verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
                 Text("Public browsing uses approximate areas. Exact addresses require an active accepted RSVP and are cleared on sign-out or session expiry.")
                 Text("Report and block controls will use the same signed-in safety gate without exposing your action publicly.")
             }
         }
-        AccountSettingsSection.Notifications -> Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        AccountSettingsSection.Notifications -> EditorialSettingsCard("Notifications") {
+            Column(verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
                 PreferenceRow("RSVP updates", state.notificationPreferences.rsvpUpdates) {
                     onPreferencesChanged(state.notificationPreferences.copy(rsvpUpdates = it))
                 }
@@ -171,6 +191,16 @@ private fun AccountSettingsContent(
             }
         }
         null -> Text("Choose an account setting to review.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun EditorialSettingsCard(title: String, content: @Composable () -> Unit) {
+    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.large) {
+        Column(Modifier.padding(YardScapeDesign.spacing.large), verticalArrangement = Arrangement.spacedBy(YardScapeDesign.spacing.small)) {
+            Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            content()
+        }
     }
 }
 

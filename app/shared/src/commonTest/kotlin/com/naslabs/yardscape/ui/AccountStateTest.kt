@@ -1,5 +1,6 @@
 package com.naslabs.yardscape.ui
 
+import androidx.compose.ui.unit.dp
 import com.naslabs.yardscape.data.SeededYardSaleData
 import com.naslabs.yardscape.domain.UserRole
 import kotlin.test.Test
@@ -11,6 +12,31 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AccountStateTest {
+    @Test
+    fun accountPresentationSeparatesWarmSignedOutAndEditorialSignedInStates() {
+        val controller = SeededAccountSessionController()
+        val signedOut = marketplaceAccountPresentation(
+            controller.stateFor(MockSessionStatus.SignedOut, UserRole.SHOPPER),
+        )
+        val signedIn = marketplaceAccountPresentation(
+            controller.stateFor(MockSessionStatus.SignedIn, UserRole.SHOPPER),
+        )
+
+        assertEquals(MarketplaceAccountSurface.SignedOut, signedOut.surface)
+        assertEquals("Browse without an account", signedOut.heading)
+        assertEquals(MarketplaceAccountSurface.Profile, signedIn.surface)
+        assertEquals("Your marketplace profile", signedIn.heading)
+        assertEquals(48.dp, signedIn.minimumInteractiveTarget)
+    }
+
+    @Test
+    fun accountPresentationCapsExpandedReadingWidthAndKeepsSettingsGrouped() {
+        assertEquals(MarketplaceAccountLayout.Compact, marketplaceAccountLayoutFor(390.dp))
+        assertEquals(MarketplaceAccountLayout.Expanded, marketplaceAccountLayoutFor(1440.dp))
+        assertEquals(960.dp, marketplaceAccountContentWidthFor(1440.dp))
+        assertEquals(MarketplaceAccountSettingsStyle.GroupedCard, marketplaceAccountSettingsStyle)
+    }
+
     @Test
     fun signedOutVisitorsCanBrowseButProtectedActionsRequestSignIn() {
         val state = YardScapeAppState(initialAccountStatus = MockSessionStatus.SignedOut)

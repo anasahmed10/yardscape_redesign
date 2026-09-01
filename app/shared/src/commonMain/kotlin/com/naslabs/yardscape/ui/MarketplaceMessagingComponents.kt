@@ -56,6 +56,8 @@ internal data class MarketplaceInboxRowPresentation(
     val preview: String?,
     val lastActivityLabel: String?,
     val unreadLabel: String?,
+    val contextLabel: String = "Event conversation",
+    val isPhotoFirst: Boolean = true,
     val minimumHeight: Dp = MARKETPLACE_MESSAGING_MINIMUM_TARGET_DP.dp,
 ) {
     val isUnread: Boolean
@@ -88,6 +90,12 @@ internal enum class MarketplaceMessageDeliveryTone {
     Error,
 }
 
+internal enum class MarketplaceThreadActionTone {
+    Primary,
+    Neutral,
+    Destructive,
+}
+
 internal data class MarketplaceClosedBannerPresentation(val title: String, val message: String)
 
 internal data class MarketplaceComposerPresentation(
@@ -99,6 +107,7 @@ internal data class MarketplaceComposerPresentation(
 
 internal data class MarketplaceEventActionPresentation(
     val label: String = "View sale",
+    val tone: MarketplaceThreadActionTone = MarketplaceThreadActionTone.Primary,
     val minimumHeight: Dp = MARKETPLACE_MESSAGING_MINIMUM_TARGET_DP.dp,
 )
 
@@ -111,6 +120,9 @@ internal data class MarketplaceThreadPresentation(
     val eventAction: MarketplaceEventActionPresentation = MarketplaceEventActionPresentation(),
     val showReportAction: Boolean,
     val showBlockAction: Boolean,
+    val reportActionTone: MarketplaceThreadActionTone = MarketplaceThreadActionTone.Neutral,
+    val blockActionTone: MarketplaceThreadActionTone = MarketplaceThreadActionTone.Destructive,
+    val safetyActionMinimumHeight: Dp = MARKETPLACE_MESSAGING_MINIMUM_TARGET_DP.dp,
 ) {
     override fun toString(): String =
         "MarketplaceThreadPresentation(eventTitle=$eventTitle, messageCount=${messages.size}, " +
