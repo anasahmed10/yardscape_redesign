@@ -77,6 +77,7 @@ actual fun PlatformMapSurface(
         val density = LocalDensity.current
         val widthPx = with(density) { maxWidth.toPx().toDouble() }
         val heightPx = with(density) { maxHeight.toPx().toDouble() }
+        val pixelScale = density.density.toDouble()
         val visibleViewport = cameraState.position.toMapViewport()
         state.clusters.forEach { cluster ->
             MapOverlayMarker(
@@ -86,6 +87,7 @@ actual fun PlatformMapSurface(
                     visibleViewport,
                     widthPx,
                     heightPx,
+                    pixelScale,
                 ),
                 color = Color(0xFF1F5B4A),
                 description = "${cluster.eventCount} sales near ${cluster.area.displayLabel}",
@@ -101,6 +103,7 @@ actual fun PlatformMapSurface(
                     visibleViewport,
                     widthPx,
                     heightPx,
+                    pixelScale,
                 ),
                 color = if (marker.eventId == state.selectedEventId) Color(0xFFD76845) else Color(0xFF2F6F4E),
                 description = "Open ${marker.title} near ${marker.area.displayLabel}",

@@ -15,8 +15,9 @@ internal fun projectMapPoint(
     viewport: MapViewport,
     widthPx: Double,
     heightPx: Double,
+    pixelScale: Double = 1.0,
 ): MapScreenOffset {
-    val worldSize = 512.0 * 2.0.pow(viewport.zoomLevel)
+    val worldSize = 512.0 * 2.0.pow(viewport.zoomLevel) * pixelScale
     val deltaX = (mercatorX(longitude) - mercatorX(viewport.center.longitude)).let { delta ->
         when {
             delta > 0.5 -> delta - 1.0

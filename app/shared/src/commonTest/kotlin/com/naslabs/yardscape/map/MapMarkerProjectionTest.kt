@@ -47,4 +47,19 @@ class MapMarkerProjectionTest {
 
         assertEquals(656.0, offset.xPx, absoluteTolerance = 0.001)
     }
+
+    @Test
+    fun projectionScalesMapDeltaForHighDensityNativeOverlay() {
+        val offset = projectMapPoint(
+            latitude = 0.0,
+            longitude = 90.0,
+            viewport = MapViewport(ViewportCenter(0.0, 0.0), 1.0),
+            widthPx = 1_200.0,
+            heightPx = 900.0,
+            pixelScale = 3.0,
+        )
+
+        assertEquals(1_368.0, offset.xPx, absoluteTolerance = 0.001)
+        assertEquals(450.0, offset.yPx, absoluteTolerance = 0.001)
+    }
 }
